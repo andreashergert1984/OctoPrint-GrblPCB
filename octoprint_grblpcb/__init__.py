@@ -506,6 +506,16 @@ class GrblPcbPlugin(
     def _is_probe_active(self):
         return self._probe_thread is not None and self._probe_thread.is_alive()
 
+    def _alarm_block(self, connector):
+        """409 response if GRBL is in alarm: jobs and probing would fail line by line."""
+        import flask
+
+        if getattr(connector, "_grbl_state", "") == "Alarm":
+            return flask.jsonify(error=gettext(
+                "GRBL is in alarm. Unlock it (or home), check the position and the zero, then try again."
+            )), 409
+        return None
+
     def _is_streaming_active(self, connector):
         if connector is None:
             return False
@@ -1706,6 +1716,10 @@ class GrblPcbPlugin(
         if self._is_streaming_active(connector):
             return flask.jsonify(error=gettext("Cannot start probing while streaming is active")), 409
 
+        blocked = self._alarm_block(connector)
+        if blocked:
+            return blocked
+
         # Continue an interrupted run on the same clamping; otherwise measure
         # every point again (a complete map or a moved zero means a new board)
         if not self._height_map.can_resume(connector._work_offset):
@@ -2198,6 +2212,10 @@ class GrblPcbPlugin(
         if self._is_streaming_active(connector):
             return flask.jsonify(error=gettext("Cannot start probing while streaming is active")), 409
 
+        blocked = self._alarm_block(connector)
+        if blocked:
+            return blocked
+
         # Start probing in background thread
         self._probe_stop.clear()
         self._probe_thread = threading.Thread(
@@ -2590,6 +2608,10 @@ class GrblPcbPlugin(
 
         if self._is_probe_active():
             return flask.jsonify(error=gettext("Cannot start streaming while probing is active")), 409
+
+        blocked = self._alarm_block(connector)
+        if blocked:
+            return blocked
 
         op_index = data.get("operation_index", 0)
         if op_index < 0 or op_index >= len(self._project.operations):

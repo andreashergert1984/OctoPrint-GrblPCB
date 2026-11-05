@@ -25,6 +25,7 @@ class _ConnectorStub:
         self._z_zeroed = z_zeroed
         self._work_offset = work_offset or {"x": 0.0, "y": 0.0, "z": 0.0}
         self._state = state
+        self._grbl_state = state
         self.calls = []
         self.status_requests = 0
 
@@ -341,3 +342,27 @@ class TestManualCommandsDuringJob:
         self.plugin._handle_hold = lambda data: "held"
         with self.app.app_context():
             assert self.plugin.on_api_command("hold", {}) == "held"
+
+
+class TestAlarmBlocksJobs:
+    def setup_method(self):
+        self.app = Flask(__name__)
+        Babel(self.app)
+        self.plugin = GrblPcbPlugin()
+        self.plugin._save_project = lambda: None
+
+    def test_send_blocked_in_alarm(self):
+        self.plugin._project = _leveled_project()
+        connector = _ConnectorStub(z_zeroed=True, state="Alarm")
+        self.plugin._get_grbl_connector = lambda: connector
+        with self.app.app_context():
+            response, status = self.plugin._handle_send_to_cnc({"operation_index": 0, "force": True})
+        assert status == 409
+        assert connector.calls == []
+
+    def test_autolevel_blocked_in_alarm(self):
+        self.plugin._height_map = HeightMap()
+        self.plugin._get_grbl_connector = lambda: _ConnectorStub(state="Alarm")
+        with self.app.app_context():
+            response, status = self.plugin._handle_start_autolevel({})
+        assert status == 409

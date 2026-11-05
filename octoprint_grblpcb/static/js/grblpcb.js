@@ -944,12 +944,19 @@ $(function() {
             self.autolevelRunning(true);
             self.autolevelProgress(0);
             self.autolevelStatus(gettext("Probing started..."));
-            self._sendCommand("start_autolevel");
+            // the backend may reset the points (new measurement): reload them
+            self._sendCommand("start_autolevel").done(self._refreshProject).fail(function(xhr) {
+                self.autolevelRunning(false);
+                self.autolevelStatus(gettext("Error: ") + (xhr.responseJSON?.error || gettext("failed")));
+            });
         };
 
         self.stopAutolevel = function() {
             self.autolevelRunning(false);
-            self._sendCommand("stop_autolevel");
+            self._sendCommand("stop_autolevel").done(function() {
+                // the probe thread saves the partial map when it ends
+                setTimeout(self._refreshProject, 1500);
+            });
             self.autolevelStatus(gettext("Probing stopped"));
         };
 
@@ -1220,9 +1227,9 @@ $(function() {
             }
             self.alignmentProbing(true);
             self.alignmentStatus(gettext("Probing alignment holes..."));
-            self._sendCommand("probe_alignment").fail(function() {
+            self._sendCommand("probe_alignment").fail(function(xhr) {
                 self.alignmentProbing(false);
-                self.alignmentStatus(gettext("Failed to start alignment probing"));
+                self.alignmentStatus(gettext("Error: ") + (xhr.responseJSON?.error || gettext("Failed to start alignment probing")));
             });
         };
 
