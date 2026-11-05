@@ -1570,9 +1570,11 @@ $(function() {
                     self.executionActive(false);
                     self.executionStatus(_.sprintf(gettext("Stopped at line %d"), data.current_line) + errorSuffix);
                 } else if (data.status === "tool_change") {
-                    self.executionStatus(_.sprintf(gettext("⚠️ TOOL CHANGE required at line %d. Click Confirm when ready."), data.current_line + 1));
+                    self.executionStatus(_.sprintf(gettext("⚠️ TOOL CHANGE required at line %d. After changing the tool, probe and zero Z, then click Confirm."), data.current_line + 1));
                 } else if (data.status === "pause") {
                     self.executionStatus(_.sprintf(gettext("⏸ Program pause at line %d. Click Confirm to continue."), data.current_line + 1));
+                } else if (data.status === "waiting_for_idle") {
+                    self.executionStatus(gettext("Waiting until the machine is idle before continuing. If GRBL is in alarm, unlock it or stop the job."));
                 } else if (data.status === "progress") {
                     var eta = data.eta > 0 ? " " + _.sprintf(gettext("ETA: %ds"), Math.round(data.eta)) : "";
                     self.executionStatus(

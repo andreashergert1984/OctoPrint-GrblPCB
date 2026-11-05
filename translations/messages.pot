@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: OctoPrint-GrblPCB 0.1.0\n"
 "Report-Msgid-Bugs-To: i18n@octoprint.org\n"
-"POT-Creation-Date: 2026-11-05 22:23+0100\n"
+"POT-Creation-Date: 2026-11-05 22:28+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -733,7 +733,9 @@ msgstr ""
 
 #: octoprint_grblpcb/static/js/grblpcb.js:1573
 #, python-format
-msgid "⚠️ TOOL CHANGE required at line %d. Click Confirm when ready."
+msgid ""
+"⚠️ TOOL CHANGE required at line %d. After changing the tool, probe and "
+"zero Z, then click Confirm."
 msgstr ""
 
 #: octoprint_grblpcb/static/js/grblpcb.js:1575
@@ -742,16 +744,22 @@ msgid "⏸ Program pause at line %d. Click Confirm to continue."
 msgstr ""
 
 #: octoprint_grblpcb/static/js/grblpcb.js:1577
-#, python-format
-msgid "ETA: %ds"
+msgid ""
+"Waiting until the machine is idle before continuing. If GRBL is in alarm,"
+" unlock it or stop the job."
 msgstr ""
 
 #: octoprint_grblpcb/static/js/grblpcb.js:1579
 #, python-format
+msgid "ETA: %ds"
+msgstr ""
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1581
+#, python-format
 msgid "Line %d/%d (%d%%)"
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1583
+#: octoprint_grblpcb/static/js/grblpcb.js:1585
 #, python-format
 msgid "Streaming started: %s"
 msgstr ""

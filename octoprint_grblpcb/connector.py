@@ -596,6 +596,7 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                         time.sleep(0.1)
                     if self._stream_stop.is_set():
                         break
+                    self._settle_after_pause()
                     continue  # Skip sending M6 to GRBL (it doesn't understand it)
 
                 # Handle M0 program pause the same way
@@ -611,6 +612,7 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                         time.sleep(0.1)
                     if self._stream_stop.is_set():
                         break
+                    self._settle_after_pause()
                     continue
                 
                 cmd_len = len(line) + 1  # +1 for newline
@@ -668,6 +670,33 @@ class ConnectedGrblPrinter(ConnectedPrinter):
             else:
                 self._send_stream_progress("completed", operation_name)
     
+    SETTLE_QUIET = 0.5  # seconds without responses before streaming resumes
+
+    def _settle_after_pause(self):
+        """
+        Wait until manual commands sent during the pause are done.
+
+        During a tool change the user jogs, probes and zeroes; GRBL answers
+        those with ok/[PRB] into the stream queue. Counting them as answers
+        to streamed lines would overfill GRBL's 128-byte RX buffer. Discard
+        them until GRBL is idle and nothing arrives for SETTLE_QUIET.
+        """
+        started = quiet_since = time.time()
+        reported = False
+        while not self._stream_stop.is_set():
+            try:
+                self._comm._response_queue.get(timeout=0.1)
+                quiet_since = time.time()
+                continue
+            except queue.Empty:
+                pass
+            if self._grbl_state == "Idle" and time.time() - quiet_since >= self.SETTLE_QUIET:
+                return
+            if not reported and time.time() - started > 2.0:
+                # e.g. GRBL went into alarm during the pause: say why we wait
+                self._send_stream_progress("waiting_for_idle", "", line_num=self._stream_current_line)
+                reported = True
+
     def _wait_response(self, timeout: float = 5.0):
         """Wait for a response from the GRBL response queue."""
         try:

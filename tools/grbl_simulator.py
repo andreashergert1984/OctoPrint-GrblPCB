@@ -33,6 +33,7 @@ import tty
 
 VERSION_BANNER = "Grbl 1.1h ['$' for help]"
 PLANNER_BLOCKS = 15
+RX_BUFFER = 128  # bytes, as in GRBL 1.1 on an ATmega328
 AXES = ("x", "y", "z")
 WCS_CODES = ("G54", "G55", "G56", "G57", "G58", "G59")
 WORD_RE = re.compile(r"([A-Z])\s*([+-]?\d*\.?\d+)")
@@ -62,6 +63,10 @@ class GrblSimulator:
         # Drilled holes in machine coordinates: (x, y, diameter); X/Y probes
         # inside a hole stop at its wall
         self._holes = list(holes)
+        # Bytes received but not yet answered with ok/error; a sender that
+        # counts characters correctly never exceeds RX_BUFFER
+        self._rx_pending_bytes = 0
+        self.rx_overflow = False
         self._probe_radius = probe_diameter / 2.0
         self._reset_state()
         threading.Thread(target=self._motion_loop, daemon=True).start()
@@ -148,7 +153,21 @@ class GrblSimulator:
                 return False
             return True
 
+    def received_bytes(self, count):
+        """Account bytes of a line entering the RX buffer."""
+        with self._lock:
+            self._rx_pending_bytes += count
+            if self._rx_pending_bytes > RX_BUFFER:
+                self.rx_overflow = True
+
     def line(self, raw):
+        # GRBL frees the RX buffer when the parser takes the line, before
+        # it answers with ok
+        with self._lock:
+            self._rx_pending_bytes = max(0, self._rx_pending_bytes - (len(raw) + 1))
+        self._handle_line(raw)
+
+    def _handle_line(self, raw):
         line = re.sub(r"\(.*?\)|;.*$", "", raw).strip().upper().replace(" ", "")
         if not line:
             return
@@ -485,6 +504,7 @@ def serve(link_path, verbose=False, **kwargs):
     threading.Thread(target=line_worker, daemon=True).start()
 
     buf = bytearray()
+    warned = False
     try:
         while True:
             ready, _, _ = select.select([master], [], [], 0.5)
@@ -495,6 +515,10 @@ def serve(link_path, verbose=False, **kwargs):
                     continue
                 if byte in (0x0A, 0x0D):
                     if buf:
+                        sim.received_bytes(len(buf) + 1)
+                        if sim.rx_overflow and not warned:
+                            print("WARNING: RX buffer overflow (sender exceeded 128 bytes)", flush=True)
+                            warned = True
                         lines.put(buf.decode("ascii", errors="replace"))
                         buf.clear()
                 else:
