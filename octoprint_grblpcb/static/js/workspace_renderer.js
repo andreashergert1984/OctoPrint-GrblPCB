@@ -402,6 +402,7 @@
         if (this.showProbeGrid) this._drawProbePoints(ctx);
         if (this.showAxes) this._drawAxes(ctx, w, h);
         if (this.showMachinePos && this.machinePos) this._drawMachinePosition(ctx);
+        this._drawLabels(ctx);
 
         // UI overlays
         this._drawLegend(ctx, w, h);
@@ -620,21 +621,49 @@
             ctx.setLineDash([4, 2]);
             ctx.stroke();
             ctx.setLineDash([]);
-
-            // Label at top
-            var labelPos = this._w2s(
-                (layer.min_x + layer.max_x) / 2,
-                layer.max_y + 1.5 / this.zoom, 0
-            );
-            ctx.fillStyle = style.stroke;
-            ctx.font = "10px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(
-                style.label + " " + layer.width.toFixed(1) + "×" + layer.height.toFixed(1),
-                labelPos.x, labelPos.y
-            );
-            ctx.textAlign = "left";
         }
+    };
+
+    // =========================================================================
+    // Draw: board and layer labels, stacked above the board
+    // =========================================================================
+
+    WorkspaceRenderer.prototype._drawLabels = function(ctx) {
+        var lines = [];
+        var b = this.boardBounds;
+        if (this.showBoard && b) {
+            lines.push({
+                text: _.sprintf(gettext("Board: %s x %s mm"),
+                    (b.max_x - b.min_x).toFixed(1), (b.max_y - b.min_y).toFixed(1)),
+                color: "#00cc66",
+                font: "11px sans-serif"
+            });
+        }
+        if (this.showLayers && this.layers) {
+            for (var i = 0; i < this.layers.length; i++) {
+                var layer = this.layers[i];
+                if (!layer.visible || layer.width <= 0 || layer.height <= 0) continue;
+                var style = this._getLayerStyle(layer.layer_type);
+                lines.push({
+                    text: style.label + " " + layer.width.toFixed(1) + " × " + layer.height.toFixed(1),
+                    color: style.stroke,
+                    font: "10px sans-serif"
+                });
+            }
+        }
+        if (!lines.length || !b) return;
+
+        // Anchor: centre of the board's top edge; the last line sits just
+        // above the board, earlier lines stack upwards
+        var anchor = this._w2s((b.min_x + b.max_x) / 2, b.max_y, 0);
+        var lineHeight = 13;
+        ctx.textAlign = "center";
+        for (var j = 0; j < lines.length; j++) {
+            ctx.fillStyle = lines[j].color;
+            ctx.font = lines[j].font;
+            ctx.fillText(lines[j].text, anchor.x, anchor.y - 6 - (lines.length - 1 - j) * lineHeight);
+        }
+        ctx.textAlign = "left";
     };
 
     // =========================================================================
@@ -743,8 +772,6 @@
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Board label
-        this._drawBoardLabel(ctx, b);
     };
 
     WorkspaceRenderer.prototype._drawBoard3D = function(ctx, b) {
@@ -860,23 +887,8 @@
             }
         }
 
-        // Board label
-        this._drawBoardLabel(ctx, b);
     };
 
-    WorkspaceRenderer.prototype._drawBoardLabel = function(ctx, b) {
-        var center = this._w2s(
-            (b.min_x + b.max_x) / 2,
-            b.max_y + 2 / this.zoom, 0
-        );
-        ctx.fillStyle = "#00cc66";
-        ctx.font = "11px sans-serif";
-        ctx.textAlign = "center";
-        var bw = (b.max_x - b.min_x).toFixed(1);
-        var bh = (b.max_y - b.min_y).toFixed(1);
-        ctx.fillText(_.sprintf(gettext("Board: %s x %s mm"), bw, bh), center.x, center.y);
-        ctx.textAlign = "left";
-    };
 
     // =========================================================================
     // Draw: heat map surface (colored quads between probe points)
