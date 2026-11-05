@@ -1234,10 +1234,10 @@ $(function() {
                 force: !!force
             }).done(function(response) {
                 if (response.result === "warnings") {
-                    // Pre-flight warnings — show them and ask user to confirm
+                    // Pre-flight warnings: show them and ask user to confirm
                     self.executionActive(false);
-                    var msg = response.warnings.join("\n\n");
-                    if (confirm("⚠️ Pre-flight warnings:\n\n" + msg + "\n\nProceed anyway?")) {
+                    var msg = _.map(response.warnings, self._preflightWarningText).join("\n\n");
+                    if (confirm(gettext("Pre-flight warnings:") + "\n\n" + msg + "\n\n" + gettext("Proceed anyway?"))) {
                         self.sendToCnc(operationIndex, true);
                     } else {
                         self.executionStatus(gettext("Aborted: check Z-zero and autolevel"));
@@ -1250,6 +1250,19 @@ $(function() {
                 self.executionActive(false);
                 self.executionStatus(gettext("Error: ") + (xhr.responseJSON?.error || gettext("failed")));
             });
+        };
+
+        self._preflightWarningText = function(warning) {
+            switch (warning.code) {
+                case "z_not_zeroed":
+                    return gettext("Z-zero has not been set since connecting. Probe Z and zero it at the board surface before milling (Probe Z, then Zero Z).");
+                case "heightmap_origin_moved":
+                    return _.sprintf(gettext("The work zero has moved by X %s mm, Y %s mm since the height map was probed. The leveled G-code would correct the wrong spots. Probe the board again."), warning.dx, warning.dy);
+                case "heightmap_origin_unknown":
+                    return gettext("It is unknown where the work zero was when the height map was probed. Probe the board again so the leveled G-code matches the clamped board.");
+                default:
+                    return warning.code;
+            }
         };
 
         self.stopExecution = function() {

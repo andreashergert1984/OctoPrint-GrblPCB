@@ -58,6 +58,10 @@ class HeightMap:
     points: list = field(default_factory=list)  # flat list of ProbePoint
     completed: bool = False
 
+    # Work offset (WCO, machine coordinates of the work zero) while probing.
+    # The heights only apply to the board as it was clamped then.
+    work_offset: Optional[dict] = None
+
     # Interpolator (not serialized)
     _interpolator: Optional[RegularGridInterpolator] = field(
         default=None, repr=False
@@ -200,6 +204,7 @@ class HeightMap:
             "grid_y": self.grid_y,
             "points": [p.to_dict() for p in self.points],
             "completed": self.completed,
+            "work_offset": self.work_offset,
         }
 
     @classmethod
@@ -212,11 +217,33 @@ class HeightMap:
             grid_x=data["grid_x"],
             grid_y=data["grid_y"],
             completed=data.get("completed", False),
+            work_offset=data.get("work_offset"),
         )
         hm.points = [ProbePoint.from_dict(p) for p in data.get("points", [])]
         if hm.completed:
             hm.build_interpolator()
         return hm
+
+
+ORIGIN_TOLERANCE_MM = 0.05
+
+
+def height_map_origin_check(height_map: HeightMap, current_offset: dict) -> Optional[dict]:
+    """
+    Check that the height map belongs to the current work zero.
+
+    Only X and Y are compared: after a tool change Z is zeroed again at the
+    same spot, the relative heights stay valid.
+
+    Returns None if it matches, otherwise a warning dict with a ``code``.
+    """
+    if not height_map.work_offset:
+        return {"code": "heightmap_origin_unknown"}
+    dx = current_offset.get("x", 0.0) - height_map.work_offset.get("x", 0.0)
+    dy = current_offset.get("y", 0.0) - height_map.work_offset.get("y", 0.0)
+    if abs(dx) > ORIGIN_TOLERANCE_MM or abs(dy) > ORIGIN_TOLERANCE_MM:
+        return {"code": "heightmap_origin_moved", "dx": round(dx, 3), "dy": round(dy, 3)}
+    return None
 
 
 # =============================================================================

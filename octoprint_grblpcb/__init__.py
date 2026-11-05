@@ -50,7 +50,7 @@ from .toolpath import (
     compute_alignment_transform,
     apply_alignment_transform,
 )
-from .autolevel import HeightMap, apply_autolevel
+from .autolevel import HeightMap, apply_autolevel, height_map_origin_check
 
 
 class GrblPcbPlugin(
@@ -1655,6 +1655,7 @@ class GrblPcbPlugin(
         )
 
         self._project.height_map = self._height_map.to_dict()
+        self._discard_leveled_gcode()
         self._save_project()
 
         return flask.jsonify(
@@ -1679,6 +1680,12 @@ class GrblPcbPlugin(
 
         if self._is_streaming_active(connector):
             return flask.jsonify(error="Cannot start probing while streaming is active"), 409
+
+        # The new heights replace the old ones: leveled G-code from the
+        # previous measurement must not be sent any more
+        self._height_map.work_offset = dict(connector._work_offset)
+        self._discard_leveled_gcode()
+        self._save_project()
 
         # Start probing in background thread
         self._probe_stop.clear()
@@ -1949,6 +1956,13 @@ class GrblPcbPlugin(
             elif resp[0] == "error":
                 return False
         return False
+
+    def _discard_leveled_gcode(self):
+        """Drop leveled G-code of all operations (height map changed)."""
+        if self._project is None:
+            return
+        for op in self._project.operations:
+            op.gcode_leveled = ""
 
     def _handle_apply_autolevel(self, data):
         """Apply autolevel correction to a generated G-code operation."""
@@ -2503,21 +2517,20 @@ class GrblPcbPlugin(
         if not gcode:
             return flask.jsonify(error="No G-code to execute"), 400
 
-        # Pre-flight check: Z-zero must be set before milling
-        skip_checks = data.get("force", False)
-        if not skip_checks:
+        # Pre-flight checks; the frontend shows the warnings by code and
+        # resends with force=True once the user confirms
+        if not data.get("force", False):
+            warnings = []
             op_type = (op.operation_type or "").lower()
             needs_z_accuracy = op_type in {"isolation", "drill", "outline", "cut"}
             if needs_z_accuracy and not getattr(connector, "_z_zeroed", False):
-                return flask.jsonify(
-                    result="warnings",
-                    warnings=[
-                        "Z-zero has not been set since connecting. "
-                        "Please probe Z and zero it at the board surface "
-                        "before milling (use Probe Z + Zero Z)."
-                    ],
-                    message="Z-zero not confirmed.",
-                )
+                warnings.append({"code": "z_not_zeroed"})
+            if op.gcode_leveled and self._height_map is not None:
+                origin = height_map_origin_check(self._height_map, connector._work_offset)
+                if origin:
+                    warnings.append(origin)
+            if warnings:
+                return flask.jsonify(result="warnings", warnings=warnings)
 
         success = connector.stream_gcode(gcode, operation_name=op.name)
         if not success:

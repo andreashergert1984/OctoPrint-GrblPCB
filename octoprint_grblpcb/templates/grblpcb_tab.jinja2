@@ -734,12 +734,11 @@
                                     <small data-bind="text: name" class="grblpcb-text-light"></small>
                                 </div>
                                 <div>
-                                    <span class="label grblpcb-text-xs" data-bind="css: {
-                                        'label-success': has_gcode, 'label-default': !has_gcode
-                                    }, text: has_gcode ? 'G' : '—'"></span>
-                                    <span class="label grblpcb-text-xs" data-bind="css: {
-                                        'label-success': has_leveled_gcode, 'label-default': !has_leveled_gcode
-                                    }, text: has_leveled_gcode ? 'L' : '—'"></span>
+                                    <span class="label grblpcb-text-xs" data-bind="visible: !has_gcode">{{ _("No G-code") }}</span>
+                                    <span class="label label-success grblpcb-text-xs" data-bind="visible: has_leveled_gcode"
+                                          title="{{ _('The leveled G-code is sent: the height map is applied.') }}">{{ _("Leveled") }}</span>
+                                    <span class="label grblpcb-text-xs" data-bind="visible: has_gcode && !has_leveled_gcode"
+                                          title="{{ _('The G-code is sent without height correction.') }}">{{ _("Not leveled") }}</span>
                                 </div>
                             </div>
                             <!-- Operation details -->

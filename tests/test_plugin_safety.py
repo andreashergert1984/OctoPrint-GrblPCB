@@ -19,9 +19,10 @@ class _AliveThread:
 
 
 class _ConnectorStub:
-    def __init__(self, streaming=False, z_zeroed=False, state="Idle"):
+    def __init__(self, streaming=False, z_zeroed=False, state="Idle", work_offset=None):
         self._streaming = streaming
         self._z_zeroed = z_zeroed
+        self._work_offset = work_offset or {"x": 0.0, "y": 0.0, "z": 0.0}
         self._state = state
         self.calls = []
         self.status_requests = 0
@@ -119,7 +120,7 @@ class TestPluginSafety:
 
         body = response.get_json()
         assert body["result"] == "warnings"
-        assert "Z-zero has not been set" in body["warnings"][0]
+        assert body["warnings"] == [{"code": "z_not_zeroed"}]
 
     def test_remove_layer_invalid_type_returns_400(self):
         self.plugin._project = PCBProject()
@@ -218,3 +219,86 @@ class TestPluginSafety:
         assert report["ready"] is False
         assert report["summary"] == "attention required"
         assert any(check["name"] == "streaming" and not check["ok"] for check in report["checks"])
+
+
+class _Settings:
+    def get_int(self, path):
+        return 3
+
+    def get_float(self, path):
+        return 1.0
+
+
+def _leveled_project():
+    project = PCBProject()
+    project.board_width = 20.0
+    project.board_height = 10.0
+    project.operations = [
+        MillingOperation(
+            name="Iso",
+            operation_type="isolation",
+            layer_type="top_copper",
+            gcode="G1 X1 Z-0.1",
+            gcode_leveled="G1 X1 Z-0.05",
+        )
+    ]
+    return project
+
+
+def _probed_map(work_offset):
+    hm = HeightMap()
+    hm.generate_grid(0, 0, 20, 10, grid_x=2, grid_y=2)
+    for i in range(len(hm.points)):
+        hm.set_probe_result(i, 0.0)
+    hm.work_offset = work_offset
+    return hm
+
+
+class TestLeveledGcodeSafety:
+    def setup_method(self):
+        self.app = Flask(__name__)
+        self.plugin = GrblPcbPlugin()
+        self.plugin._settings = _Settings()
+        self.plugin._save_project = lambda: None
+
+    def _send(self, connector):
+        self.plugin._get_grbl_connector = lambda: connector
+        with self.app.app_context():
+            return self.plugin._handle_send_to_cnc({"operation_index": 0}).get_json()
+
+    def test_new_grid_discards_leveled_gcode(self):
+        self.plugin._project = _leveled_project()
+        with self.app.app_context():
+            self.plugin._handle_setup_autolevel({})
+        assert self.plugin._project.operations[0].gcode_leveled == ""
+
+    def test_matching_origin_sends_leveled_gcode(self):
+        self.plugin._project = _leveled_project()
+        self.plugin._height_map = _probed_map({"x": 10.0, "y": 10.0, "z": -1.0})
+        connector = _ConnectorStub(z_zeroed=True, work_offset={"x": 10.02, "y": 9.99, "z": -0.5})
+        assert self._send(connector)["result"] == "ok"
+        assert connector.calls[0][0] == "G1 X1 Z-0.05"
+
+    def test_moved_origin_warns(self):
+        self.plugin._project = _leveled_project()
+        self.plugin._height_map = _probed_map({"x": 10.0, "y": 10.0, "z": -1.0})
+        connector = _ConnectorStub(z_zeroed=True, work_offset={"x": 12.0, "y": 10.0, "z": -1.0})
+        body = self._send(connector)
+        assert body["result"] == "warnings"
+        assert body["warnings"] == [{"code": "heightmap_origin_moved", "dx": 2.0, "dy": 0.0}]
+        assert connector.calls == []
+
+    def test_unknown_origin_warns(self):
+        self.plugin._project = _leveled_project()
+        self.plugin._height_map = _probed_map(None)
+        body = self._send(_ConnectorStub(z_zeroed=True))
+        assert body["warnings"] == [{"code": "heightmap_origin_unknown"}]
+
+    def test_force_sends_despite_warnings(self):
+        self.plugin._project = _leveled_project()
+        self.plugin._height_map = _probed_map(None)
+        connector = _ConnectorStub(z_zeroed=False)
+        self.plugin._get_grbl_connector = lambda: connector
+        with self.app.app_context():
+            body = self.plugin._handle_send_to_cnc({"operation_index": 0, "force": True}).get_json()
+        assert body["result"] == "ok"
