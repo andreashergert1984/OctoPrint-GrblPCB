@@ -685,7 +685,6 @@ class GrblPcbPlugin(
         if connector is not None:
             connector.request_status()
             time.sleep(0.05)
-            connector.process_responses()
 
         report = self._build_machine_check_report(connector)
         return flask.jsonify(result="machine_check", report=report)
@@ -1754,7 +1753,6 @@ class GrblPcbPlugin(
                     try:
                         resp = comm._response_queue.get(timeout=1.0)
                     except queue.Empty:
-                        comm.process_responses()
                         continue
                     
                     if resp[0] == "probe":
@@ -1857,7 +1855,6 @@ class GrblPcbPlugin(
                     try:
                         resp = comm._response_queue.get(timeout=1.0)
                     except queue.Empty:
-                        comm.process_responses()
                         continue
                     if resp[0] == "probe":
                         pd = resp[1]
@@ -1946,7 +1943,6 @@ class GrblPcbPlugin(
             try:
                 resp = comm._response_queue.get(timeout=0.5)
             except queue.Empty:
-                comm.process_responses()
                 continue
             if resp[0] == "ok":
                 return True
@@ -2306,7 +2302,6 @@ class GrblPcbPlugin(
             try:
                 resp = comm._response_queue.get(timeout=0.5)
             except queue.Empty:
-                comm.process_responses()
                 continue
 
             if resp[0] == "probe":

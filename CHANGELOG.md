@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] — Unreleased
 
+### Fixed
+
+- Streaming was throttled to about 15 lines/s because GRBL responses were
+  only read by the 4 Hz status poll; a reader thread now handles every
+  response as it arrives (about 370 lines/s against the simulator)
+- Status reports with additional fields (`Bf`, `Ln`, `Pn`) lost the work
+  offset and overrides; fields are now parsed in any order
+
 ### Added
+
+- GRBL simulator (`tools/grbl_simulator.py`) for testing without hardware
+- GRBL port list honours OctoPrint's additional serial ports setting
 
 - **Gerber & Excellon Import** — parse Gerber RS-274X and Excellon drill files
   via pygerber + Shapely; automatic unit / format detection; SVG preview

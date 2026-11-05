@@ -90,8 +90,23 @@ def grbl_serial_list() -> list[str]:
     ports = [p for p in ports if not any(
         exclude in p for exclude in ["Bluetooth", "MALS", "SOC"]
     )]
-    
+
+    # Ports configured in OctoPrint under Serial Connection > Additional serial
+    # ports (globs), e.g. virtual ports of the GRBL simulator
+    for pattern in _additional_port_patterns():
+        ports.extend(glob.glob(pattern))
+
     return sorted(set(ports))
+
+
+def _additional_port_patterns() -> list[str]:
+    """Return the additional serial port globs from OctoPrint's settings."""
+    try:
+        from octoprint.settings import settings
+        return settings().get(["plugins", "serial_connector", "additionalPorts"]) or []
+    except Exception:
+        # Settings are not initialised (e.g. in unit tests)
+        return []
 
 
 class GrblComm:
@@ -106,15 +121,9 @@ class GrblComm:
     - Response buffering
     """
     
-    # Status report patterns
-    STATUS_PATTERN = re.compile(
-        r"<([^|,]+)"  # State
-        r"(?:\|([WM])Pos:([+-]?\d+\.?\d*),([+-]?\d+\.?\d*),([+-]?\d+\.?\d*))?"  # Position
-        r"(?:\|(?:FS|F):(\d+)(?:,(\d+))?)?"  # Feed/Spindle
-        r"(?:\|WCO:([+-]?\d+\.?\d*),([+-]?\d+\.?\d*),([+-]?\d+\.?\d*))?"  # Work offset
-        r"(?:\|Ov:(\d+),(\d+),(\d+))?"  # Overrides
-    )
-    
+    # Status report: <State|Field:values|...>, fields in any order
+    STATUS_PATTERN = re.compile(r"<([^>]*)>")
+
     ERROR_PATTERN = re.compile(r"error:(\d+)")
     ALARM_PATTERN = re.compile(r"ALARM:(\d+)")
     
@@ -142,8 +151,13 @@ class GrblComm:
         
         # Response queue for streaming mode
         self._response_queue = queue.Queue()
-        # When True, process_responses will put 'ok' and 'error' into the queue
+        # When True, the reader puts 'ok' and 'error' into the queue
         self._stream_mode = False
+
+        # Background reader: handles every response as soon as it arrives, so
+        # the streaming loop is never throttled by a polling interval
+        self._reader_thread: Optional[threading.Thread] = None
+        self._reader_stop = threading.Event()
     
     def connect(self):
         """Open serial connection to GRBL controller."""
@@ -164,14 +178,24 @@ class GrblComm:
             
             # Flush input buffer
             self._serial.reset_input_buffer()
+
+            self._reader_stop.clear()
+            self._reader_thread = threading.Thread(
+                target=self._read_loop, args=(self._serial,), daemon=True
+            )
+            self._reader_thread.start()
     
     def disconnect(self):
         """Close serial connection."""
+        self._reader_stop.set()
         with self._lock:
             if self._serial is not None:
                 self._serial.close()
                 self._serial = None
                 self._logger.info("Serial port closed")
+        if self._reader_thread is not None and self._reader_thread is not threading.current_thread():
+            self._reader_thread.join(timeout=1.0)
+        self._reader_thread = None
     
     def is_connected(self) -> bool:
         """Check if serial connection is open."""
@@ -303,24 +327,27 @@ class GrblComm:
             if self._serial is not None:
                 self._serial.write(b"\x9D")
     
-    def process_responses(self):
-        """
-        Read and process any available responses from GRBL.
-        
-        This should be called periodically to handle incoming data.
-        """
-        with self._lock:
-            if self._serial is None:
-                return
-            
-            while self._serial.in_waiting > 0:
+    def _read_loop(self, port):
+        """Read and dispatch GRBL responses until disconnected."""
+        buffer = b""
+        while not self._reader_stop.is_set():
+            try:
+                # readline() would hand out partial lines on timeout
+                buffer += port.read(port.in_waiting or 1)
+            except (serial.SerialException, OSError, TypeError) as e:
+                # TypeError: pyserial on a port closed by disconnect()
+                if not self._reader_stop.is_set():
+                    self._logger.warning(f"Serial read failed: {e}")
+                break
+            while b"\n" in buffer:
+                raw, buffer = buffer.split(b"\n", 1)
+                line = raw.decode("utf-8", errors="replace").strip()
+                if not line:
+                    continue
                 try:
-                    line = self._serial.readline().decode("utf-8", errors="replace").strip()
-                    if line:
-                        self._process_line(line)
-                except (serial.SerialException, OSError) as e:
-                    self._logger.debug(f"Error reading serial: {e}")
-                    break
+                    self._process_line(line)
+                except Exception:
+                    self._logger.exception(f"Error while handling GRBL response {line!r}")
     
     def _process_line(self, line: str):
         """Process a single line from GRBL."""
@@ -388,51 +415,39 @@ class GrblComm:
         if not match:
             self._logger.debug(f"Could not parse status: {line}")
             return
-        
+
+        state, *fields = match.group(1).split("|")
         status = {
-            "state": match.group(1),
+            "state": state,
             "raw": line,
         }
-        
-        # Parse position
-        pos_type = match.group(2)
-        if pos_type:
-            x = float(match.group(3))
-            y = float(match.group(4))
-            z = float(match.group(5))
-            
-            if pos_type == "M":
-                status["mpos"] = {"x": x, "y": y, "z": z}
-            else:
-                status["wpos"] = {"x": x, "y": y, "z": z}
-        
-        # Parse feed/spindle
-        if match.group(6):
-            status["fs"] = {
-                "feed": int(match.group(6)),
-                "spindle": int(match.group(7) or 0),
-            }
-        
-        # Parse work coordinate offset
-        if match.group(8):
-            status["wco"] = {
-                "x": float(match.group(8)),
-                "y": float(match.group(9)),
-                "z": float(match.group(10)),
-            }
-            # Remember WCO for calculating position
+
+        for field in fields:
+            name, _, value = field.partition(":")
+            try:
+                if name in ("MPos", "WPos", "WCO"):
+                    x, y, z = (float(v) for v in value.split(",")[:3])
+                    key = {"MPos": "mpos", "WPos": "wpos", "WCO": "wco"}[name]
+                    status[key] = {"x": x, "y": y, "z": z}
+                elif name in ("FS", "F"):
+                    values = [int(float(v)) for v in value.split(",")]
+                    status["fs"] = {
+                        "feed": values[0],
+                        "spindle": values[1] if len(values) > 1 else 0,
+                    }
+                elif name == "Ov":
+                    feed, rapid, spindle = (int(v) for v in value.split(",")[:3])
+                    status["overrides"] = {"feed": feed, "rapid": rapid, "spindle": spindle}
+                elif name == "Pn":
+                    status["pins"] = value
+            except ValueError:
+                self._logger.debug(f"Could not parse status field {field!r} in {line}")
+
+        # GRBL sends WCO only every few reports; remember it for the others
+        if "wco" in status:
             self._last_wco = status["wco"]
         else:
-            # Use last known WCO
             status["wco"] = self._last_wco
-        
-        # Parse overrides
-        if match.group(11):
-            status["overrides"] = {
-                "feed": int(match.group(11)),
-                "rapid": int(match.group(12)),
-                "spindle": int(match.group(13)),
-            }
-        
+
         if self._status_callback:
             self._status_callback(status)

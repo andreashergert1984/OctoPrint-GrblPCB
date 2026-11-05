@@ -137,6 +137,21 @@ All settings are accessible from the OctoPrint Settings panel under **GrblPCB**.
 5. Compute alignment transform — the plugin calculates rotation + offset
 6. All subsequent coordinates are automatically corrected
 
+## Testing Without Hardware
+
+`tools/grbl_simulator.py` simulates a GRBL 1.1 controller on a pseudo terminal:
+real-time commands, planner buffer, status reports with `WCO`, probing against a
+slightly warped surface (`[PRB:...]`), alarms.
+
+```bash
+python tools/grbl_simulator.py /tmp/ttyGRBL --verbose
+```
+
+Add the path (or a glob such as `/tmp/ttyGRBL*`) under **Settings → Serial
+Connection → Additional serial ports** (`plugins.serial_connector.additionalPorts`);
+the GRBL connection then lists it. `--homing` starts in `Alarm` like a machine
+with `$22=1`, `--time-scale` sets how fast moves run (default 5 % of real time).
+
 ## Plugin Structure
 
 ```
@@ -161,6 +176,7 @@ OctoPrint-GrblPCB/
 │   │   └── grblpcb_tab.jinja2
 │   └── translations/          # Bundled i18n files
 ├── tests/                     # Automated test suite (pytest)
+├── tools/grbl_simulator.py    # GRBL 1.1 simulator for testing without hardware
 ├── .github/workflows/ci.yml   # CI: lint, test, build
 ├── babel.cfg                  # i18n string extraction config
 ├── CHANGELOG.md

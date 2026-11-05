@@ -134,9 +134,6 @@ class ConnectedGrblPrinter(ConnectedPrinter):
             # Wait for GRBL to wake up and send banner
             time.sleep(2)
             
-            # Read any startup messages
-            self._comm.process_responses()
-            
             # Send soft reset and get status
             self._comm.soft_reset()
             time.sleep(0.5)
@@ -209,7 +206,6 @@ class ConnectedGrblPrinter(ConnectedPrinter):
             try:
                 if self._comm and self._comm.is_connected():
                     self._comm.request_status()
-                    self._comm.process_responses()
             except (OSError, RuntimeError) as e:
                 self._logger.debug(f"Status poll error: {e}")
             
@@ -484,11 +480,6 @@ class ConnectedGrblPrinter(ConnectedPrinter):
     def is_streaming(self):
         return self._stream_thread is not None and self._stream_thread.is_alive()
 
-    def process_responses(self):
-        """Process any buffered GRBL responses."""
-        if self._comm is not None:
-            self._comm.process_responses()
-
     def machine_snapshot(self) -> dict:
         """Return a point-in-time snapshot of the current machine state."""
         return {
@@ -661,12 +652,7 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         try:
             return self._comm._response_queue.get(timeout=timeout)
         except queue.Empty:
-            # Process any buffered serial data
-            self._comm.process_responses()
-            try:
-                return self._comm._response_queue.get_nowait()
-            except queue.Empty:
-                return None
+            return None
     
     def _drain_buffer(self, sent_lengths, buffer_fill):
         """Wait for all sent commands to be acknowledged."""
@@ -675,8 +661,6 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                 break
             resp = self._wait_response(timeout=10.0)
             if resp is None:
-                # Timeout - try processing
-                self._comm.process_responses()
                 continue
             if resp[0] in ("ok", "error") and sent_lengths:
                 sent_lengths.pop(0)

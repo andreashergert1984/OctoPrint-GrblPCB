@@ -25,16 +25,12 @@ class _ConnectorStub:
         self._state = state
         self.calls = []
         self.status_requests = 0
-        self.processed_responses = 0
 
     def is_streaming(self):
         return self._streaming
 
     def request_status(self):
         self.status_requests += 1
-
-    def process_responses(self):
-        self.processed_responses += 1
 
     def machine_snapshot(self):
         return {
@@ -205,7 +201,6 @@ class TestPluginSafety:
         assert report["ready"] is True
         assert report["summary"] == "ready"
         assert connector.status_requests == 1
-        assert connector.processed_responses == 1
         assert report["snapshot"]["state"] == "Idle"
         assert any(check["name"] == "connection" and check["ok"] for check in report["checks"])
 
