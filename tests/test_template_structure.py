@@ -1,0 +1,52 @@
+"""Guard: plugin templates must have balanced tags.
+
+OctoPrint wraps every template in Knockout comments; one stray closing tag
+makes the browser move the closing comment out of its container and breaks
+view model binding for the whole page.
+"""
+import pathlib
+import re
+
+import pytest
+
+TEMPLATES = sorted((pathlib.Path(__file__).parent.parent / "octoprint_grblpcb" / "templates").glob("*.jinja2"))
+VOID = {"input", "br", "hr", "img", "meta", "link", "col", "source", "area", "base", "wbr"}
+TAG = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9]*)\b(?:[^>\"']|\"[^\"]*\"|'[^']*')*?(/?)>")
+
+
+def _unbalanced(text):
+    text = re.sub(r"\{#.*?#\}", "", text, flags=re.S)
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+    stack, problems = [], []
+    for m in TAG.finditer(text):
+        closing, tag, self_closing = m.group(1), m.group(2).lower(), m.group(3)
+        line = text.count("\n", 0, m.start()) + 1
+        if tag in VOID or self_closing:
+            continue
+        if not closing:
+            stack.append((tag, line))
+        elif not stack:
+            problems.append(f"stray </{tag}> at line {line}")
+        elif stack[-1][0] != tag:
+            problems.append(f"</{tag}> at line {line} closes <{stack[-1][0]}> from line {stack[-1][1]}")
+            stack.pop()
+        else:
+            stack.pop()
+    problems += [f"<{tag}> from line {line} never closed" for tag, line in stack]
+    return problems
+
+
+def _knockout_balanced(text):
+    opened = len(re.findall(r"<!--\s*ko\s", text))
+    closed = len(re.findall(r"<!--\s*/ko\s*-->", text))
+    return opened == closed
+
+
+@pytest.mark.parametrize("template", TEMPLATES, ids=lambda p: p.name)
+def test_template_tags_are_balanced(template):
+    assert _unbalanced(template.read_text()) == []
+
+
+@pytest.mark.parametrize("template", TEMPLATES, ids=lambda p: p.name)
+def test_template_knockout_comments_are_balanced(template):
+    assert _knockout_balanced(template.read_text())
