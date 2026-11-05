@@ -3,6 +3,7 @@ import logging
 import queue
 
 import pytest
+from shapely.geometry import box
 from flask import Flask
 from flask_babel import Babel
 
@@ -159,3 +160,41 @@ def test_probe_axis_without_wall_returns_none():
 
     connector.commands = commands
     assert plugin._probe_axis(comm, connector, "X", 14.0, 25.0) is None
+
+
+def test_mirror_regenerates_from_geometry(app):
+    from octoprint_grblpcb.pcb_project import LayerType
+
+    plugin = _plugin()
+    plugin._settings = type("S", (), {
+        "get_float": lambda self, path: {"tool_diameter": 0.1, "tool_angle": 60, "cut_depth": 0.1}.get(path[0], 1.0),
+        "get_int": lambda self, path: 1,
+        "get_boolean": lambda self, path: False,
+        "get": lambda self, path: "G54",
+    })()
+    p = plugin._project
+    p.operations = []
+    p.board_min_x, p.board_min_y, p.board_width, p.board_height = 0.0, 0.0, 50.0, 30.0
+    p.flip_axis = "X"
+    plugin._geometries = {LayerType.BOTTOM_COPPER: [box(9, 9, 11, 11)]}
+    with app.app_context():
+        plugin._handle_generate_isolation({"layer_type": "bottom_copper"})
+        body = plugin._handle_mirror_gcode({"operation_index": 0}).get_json()
+    assert len(p.operations) == 2
+    front, back = p.operations
+    assert not front.mirrored and back.mirrored
+    assert body["operation"]["mirrored"] is True
+    assert "Back side: mirrored in X" in back.gcode
+    # mirroring twice replaces the back-side operation instead of adding one
+    with app.app_context():
+        plugin._handle_mirror_gcode({"operation_index": 0})
+    assert len(p.operations) == 2
+
+
+def test_old_operation_without_generation_cannot_be_mirrored(app):
+    plugin = _plugin()
+    plugin._project.operations[0].mirrored = False
+    plugin._project.operations[0].generation = None
+    with app.app_context():
+        response, status = plugin._handle_mirror_gcode({"operation_index": 0})
+    assert status == 400

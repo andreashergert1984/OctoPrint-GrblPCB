@@ -163,3 +163,23 @@ def test_alarm_during_pause_requires_new_confirmation(setup):
     assert _wait_status(connector, "completed")
     assert received[-1] == "G1 X1 F600"
     assert not connector.accepts_manual_commands() or not connector.is_streaming()
+
+
+@pytest.mark.parametrize("line, kind", [
+    ("T2 M6", "tool_change"), ("M06", "tool_change"), ("M6", "tool_change"),
+    ("M0", "pause"), ("M00", "pause"), ("M05", None), ("M5", None), ("G1 X6 F600", None),
+])
+def test_pause_kind(line, kind):
+    assert ConnectedGrblPrinter._pause_kind(line) == kind
+
+
+def test_tool_change_note_reaches_the_ui(setup):
+    connector, received = setup
+    gcode = "G21\nG1 Z5 F100\nM5\nT2 M6 ; drill 1.00 mm\nM3 S1000\nG1 X1 F600\n"
+    assert connector.stream_gcode(gcode, operation_name="test")
+    assert _wait_status(connector, "tool_change")
+    msg = [m for m in connector._plugin_manager.messages if m.get("status") == "tool_change"][0]
+    assert msg["command"] == "T2 M6" and msg["note"] == "drill 1.00 mm"
+    assert not any("M6" in line for line in received)
+    connector.confirm_tool_change()
+    assert _wait_status(connector, "completed")

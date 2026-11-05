@@ -49,4 +49,4 @@ def test_sample_gerber_and_drill_fixtures_roundtrip():
     assert "M2" in drill_gcode
     assert "G21" in isolation_gcode
     assert "G21" in drill_gcode
-    assert "M0" in drill_gcode
+    assert "M6" in drill_gcode

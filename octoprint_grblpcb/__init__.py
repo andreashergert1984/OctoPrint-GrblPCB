@@ -41,8 +41,7 @@ from .toolpath import (
     generate_drill_gcode,
     generate_outline_gcode,
     generate_mask_expose_gcode,
-    mirror_coordinates_x,
-    mirror_coordinates_y,
+    find_unisolatable_gaps,
     AlignmentTransform,
     back_side_alignment_holes,
     compute_alignment_transform,
@@ -243,7 +242,7 @@ class GrblPcbPlugin(
             
             # Isolation milling
             isolation_passes=1,
-            isolation_overlap=0.0,  # mm extra offset per pass
+            isolation_overlap=40.0,  # % of the trench width neighbouring passes share
             isolation_max_width=0.0,  # mm total clearance width (0 = use fixed passes)
             isolation_clear_gaps=False,  # auto-detect and clear all gaps
             depth_per_pass=0.0,  # mm per Z-depth pass (0 = full depth in one pass)
@@ -255,6 +254,7 @@ class GrblPcbPlugin(
             breakthrough_depth=0.2,  # mm below the board for drilling and outline
             
             # Outline
+            outline_depth_per_pass=0.5,  # mm step down per outline pass
             outline_tab_width=2.0,  # mm
             outline_tab_height=0.5,  # mm
             outline_num_tabs=4,
@@ -293,6 +293,16 @@ class GrblPcbPlugin(
             show_work_position=True,
             ui_help_mode="compact",
         )
+
+    def get_settings_version(self):
+        return 2
+
+    def on_settings_migrate(self, target, current):
+        # Version 2: isolation_overlap is a percentage of the trench width;
+        # before it was a step in mm (often 0), which cannot be converted
+        if current is None or current < 2:
+            if self._settings.get(["isolation_overlap"]) is not None:
+                self._settings.set_float(["isolation_overlap"], 40.0)
 
     def on_settings_save(self, data):
         octoprint.plugin.SettingsPlugin.on_settings_save(self, data)
@@ -1313,6 +1323,7 @@ class GrblPcbPlugin(
             peck_depth=self._settings.get_float(["peck_depth"]),
             drill_feed=self._settings.get_float(["drill_feed"]),
             breakthrough_depth=self._settings.get_float(["breakthrough_depth"]),
+            outline_step_down=self._settings.get_float(["outline_depth_per_pass"]),
             tab_width=self._settings.get_float(["outline_tab_width"]),
             tab_height=self._settings.get_float(["outline_tab_height"]),
             num_tabs=self._settings.get_int(["outline_num_tabs"]),
@@ -1334,7 +1345,7 @@ class GrblPcbPlugin(
                 "feed_rate", "plunge_rate", "spindle_speed",
                 "passes", "pass_overlap", "max_width", "clear_gaps", "safe_z", "travel_z",
                 "peck_depth", "drill_feed", "breakthrough_depth",
-                "tab_width", "tab_height", "num_tabs",
+                "outline_step_down", "tab_width", "tab_height", "num_tabs",
                 "spindle_dwell",
                 "wcs",
                 "z_max_feed",
@@ -1344,6 +1355,30 @@ class GrblPcbPlugin(
                 if key in data:
                     setattr(s, key, type(getattr(s, key))(data[key]))
         return s
+
+    def _mirror_args(self, data):
+        """Generator arguments for the back side if data asks for it."""
+        if not data.get("mirror"):
+            return {}
+        return {
+            "mirror": self._project.flip_axis,
+            "board_size": (self._project.board_width, self._project.board_height),
+        }
+
+    @staticmethod
+    def _generation(command, data):
+        return {"command": command, "data": {k: v for k, v in data.items() if k != "mirror"}}
+
+    def _store_operation(self, op):
+        """Replace the operation of the same kind and side, or append it."""
+        for i, existing in enumerate(self._project.operations):
+            if (existing.operation_type, existing.layer_type, existing.mirrored) == (
+                op.operation_type, op.layer_type, op.mirrored
+            ):
+                self._project.operations[i] = op
+                return i
+        self._project.operations.append(op)
+        return len(self._project.operations) - 1
 
     def _handle_generate_isolation(self, data):
         """Generate isolation milling G-code."""
@@ -1362,16 +1397,21 @@ class GrblPcbPlugin(
 
         # Merge geometries and generate toolpath
         copper = merge_geometries(geometries)
+        mirror_args = self._mirror_args(data)
         gcode = generate_isolation_gcode(
             copper,
             settings,
             origin_x=self._project.board_min_x,
             origin_y=self._project.board_min_y,
+            **mirror_args,
         )
+        gaps = find_unisolatable_gaps(copper, settings.tool_diameter)
 
         # Create operation
         op = MillingOperation(
-            name=f"Isolation - {layer_type.value}",
+            name=f"Isolation - {layer_type.value}" + (" (mirrored)" if mirror_args else ""),
+            mirrored=bool(mirror_args),
+            generation=self._generation("generate_isolation", data),
             operation_type="isolation",
             layer_type=layer_type.value,
             gcode=gcode,
@@ -1383,27 +1423,28 @@ class GrblPcbPlugin(
             passes=settings.passes,
             pass_overlap=settings.pass_overlap,
         )
-        # Replace existing operation of the same type/layer, or append
-        replaced = False
-        operation_index = len(self._project.operations)  # default: will be appended
-        for i, existing in enumerate(self._project.operations):
-            if existing.operation_type == "isolation" and existing.layer_type == layer_type.value:
-                self._project.operations[i] = op
-                replaced = True
-                operation_index = i
-                break
-        if not replaced:
-            self._project.operations.append(op)
+        operation_index = self._store_operation(op)
         self._project.state = ProjectState.TOOLPATHS_GENERATED
         self._save_project()
 
         self._logger.info(f"Generated isolation G-code: {len(gcode)} chars")
 
+        warnings = []
+        if gaps:
+            warnings.append({
+                "code": "unisolatable_gaps",
+                "count": len(gaps),
+                "min_gap": round(gaps[0][0], 3),
+                "x": round(gaps[0][1][0] - self._project.board_min_x, 2),
+                "y": round(gaps[0][1][1] - self._project.board_min_y, 2),
+                "tool": settings.tool_diameter,
+            })
         return flask.jsonify(
             result="ok",
             operation=op.to_dict(),
             operation_index=operation_index,
             gcode_lines=gcode.count("\n") + 1,
+            warnings=warnings,
         )
 
     def _handle_get_layer_geometry(self, data):
@@ -1471,15 +1512,19 @@ class GrblPcbPlugin(
             self._settings.get_float(["board_thickness"]),
         ))
 
+        mirror_args = self._mirror_args(data)
         gcode = generate_drill_gcode(
             self._project.drills,
             settings,
             origin_x=self._project.board_min_x,
             origin_y=self._project.board_min_y,
+            **mirror_args,
         )
 
         op = MillingOperation(
-            name="Drilling",
+            name="Drilling" + (" (mirrored)" if mirror_args else ""),
+            mirrored=bool(mirror_args),
+            generation=self._generation("generate_drill", data),
             operation_type="drill",
             layer_type="drill",
             gcode=gcode,
@@ -1488,17 +1533,7 @@ class GrblPcbPlugin(
             feed_rate=settings.drill_feed,
             spindle_speed=settings.spindle_speed,
         )
-        # Replace existing drill operation, or append
-        replaced = False
-        operation_index = len(self._project.operations)  # default: will be appended
-        for i, existing in enumerate(self._project.operations):
-            if existing.operation_type == "drill":
-                self._project.operations[i] = op
-                replaced = True
-                operation_index = i
-                break
-        if not replaced:
-            self._project.operations.append(op)
+        operation_index = self._store_operation(op)
         self._save_project()
 
         return flask.jsonify(
@@ -1548,16 +1583,22 @@ class GrblPcbPlugin(
             self._settings.get_float(["board_thickness"]),
         )
 
+        mirror_args = self._mirror_args(data)
         gcode = generate_outline_gcode(
             outline_geom,
             settings,
             board_thickness=board_thickness,
             origin_x=self._project.board_min_x,
             origin_y=self._project.board_min_y,
+            **mirror_args,
         )
+        if not gcode:
+            return flask.jsonify(error=gettext("No outline layer and no board dimensions")), 400
 
         op = MillingOperation(
-            name="Outline Cut",
+            name="Outline Cut" + (" (mirrored)" if mirror_args else ""),
+            mirrored=bool(mirror_args),
+            generation=self._generation("generate_outline", data),
             operation_type="outline",
             layer_type="outline",
             gcode=gcode,
@@ -1566,17 +1607,7 @@ class GrblPcbPlugin(
             feed_rate=settings.feed_rate,
             spindle_speed=settings.spindle_speed,
         )
-        # Replace existing outline operation, or append
-        replaced = False
-        operation_index = len(self._project.operations)  # default: will be appended
-        for i, existing in enumerate(self._project.operations):
-            if existing.operation_type == "outline":
-                self._project.operations[i] = op
-                replaced = True
-                operation_index = i
-                break
-        if not replaced:
-            self._project.operations.append(op)
+        operation_index = self._store_operation(op)
         self._save_project()
 
         return flask.jsonify(
@@ -1617,12 +1648,14 @@ class GrblPcbPlugin(
 
         settings = self._get_toolpath_settings(data)
 
+        mirror_args = self._mirror_args(data)
         gcode = generate_mask_expose_gcode(
             mask_merged,
             board_bounds,
             settings,
             origin_x=self._project.board_min_x,
             origin_y=self._project.board_min_y,
+            **mirror_args,
         )
 
         if not gcode:
@@ -1631,7 +1664,9 @@ class GrblPcbPlugin(
             ), 400
 
         op = MillingOperation(
-            name=f"Mask Expose - {layer_type.value}",
+            name=f"Mask Expose - {layer_type.value}" + (" (mirrored)" if mirror_args else ""),
+            mirrored=bool(mirror_args),
+            generation=self._generation("generate_mask_expose", data),
             operation_type="mask_expose",
             layer_type=layer_type.value,
             gcode=gcode,
@@ -1639,20 +1674,7 @@ class GrblPcbPlugin(
             feed_rate=settings.uv_expose_speed,
             spindle_speed=settings.uv_power,
         )
-        # Replace existing operation of the same type/layer, or append
-        replaced = False
-        operation_index = len(self._project.operations)
-        for i, existing in enumerate(self._project.operations):
-            if (
-                existing.operation_type == "mask_expose"
-                and existing.layer_type == layer_type.value
-            ):
-                self._project.operations[i] = op
-                replaced = True
-                operation_index = i
-                break
-        if not replaced:
-            self._project.operations.append(op)
+        operation_index = self._store_operation(op)
         self._save_project()
 
         return flask.jsonify(
@@ -2053,7 +2075,13 @@ class GrblPcbPlugin(
     # -------------------------------------------------------------------------
 
     def _handle_mirror_gcode(self, data):
-        """Mirror G-code for bottom-side milling."""
+        """
+        Create the back-side version of an operation.
+
+        The operation is generated again from the mirrored geometry with the
+        same parameters, so the milling direction stays climb milling (a
+        text mirror of the G-code would reverse it).
+        """
         import flask
 
         if self._project is None:
@@ -2064,50 +2092,15 @@ class GrblPcbPlugin(
             return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
-        source = op.gcode  # Always mirror raw gcode, not leveled (to avoid double-correction)
-        if not source:
-            return flask.jsonify(error=gettext("No G-code to mirror")), 400
+        if op.mirrored:
+            return flask.jsonify(error=gettext("This operation is already the back-side version")), 400
+        if not op.generation:
+            return flask.jsonify(error=gettext(
+                "Generate this operation again, then it can be mirrored for the back side."
+            )), 400
 
-        flip_axis = data.get("flip_axis", self._project.flip_axis)
-        if flip_axis == "X":
-            mirrored = mirror_coordinates_x(source, self._project.board_width)
-        else:
-            mirrored = mirror_coordinates_y(source, self._project.board_height)
-
-        # Create new operation for mirrored version
-        mirrored_op = MillingOperation(
-            name=f"{op.name} (mirrored)",
-            operation_type=op.operation_type,
-            layer_type=op.layer_type,
-            gcode=mirrored,
-            tool_diameter=op.tool_diameter,
-            tool_angle=op.tool_angle,
-            cut_depth=op.cut_depth,
-            feed_rate=op.feed_rate,
-            spindle_speed=op.spindle_speed,
-            passes=op.passes,
-            mirrored=True,
-        )
-
-        # Replace existing mirrored version if found, otherwise insert after source
-        existing_idx = None
-        for i, existing_op in enumerate(self._project.operations):
-            if existing_op.name == mirrored_op.name and i != op_index:
-                existing_idx = i
-                break
-        if existing_idx is not None:
-            self._project.operations[existing_idx] = mirrored_op
-            mirror_index = existing_idx
-        else:
-            self._project.operations.insert(op_index + 1, mirrored_op)
-            mirror_index = op_index + 1
-        self._save_project()
-
-        return flask.jsonify(
-            result="ok",
-            operation=mirrored_op.to_dict(),
-            operation_index=mirror_index,
-        )
+        handler = getattr(self, f"_handle_{op.generation['command']}")
+        return handler(dict(op.generation["data"], mirror=True))
 
     # -------------------------------------------------------------------------
     # Alignment (double-sided board compensation)

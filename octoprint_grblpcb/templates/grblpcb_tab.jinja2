@@ -395,7 +395,7 @@
                                 <label>{{ _("Passes") }}</label>
                                 <input type="number" min="1" class="input-mini grblpcb-w-40" data-bind="value: genPasses, disable: genClearGaps" title="{{ _('Number of lateral isolation passes') }}">
                                 <label class="grblpcb-ml-4">{{ _("Overlap") }}</label>
-                                <div class="input-append"><input type="number" step="0.01" class="input-mini grblpcb-w-40" data-bind="value: genPassOverlap" title="{{ _('Extra lateral offset per pass') }}"><span class="add-on">mm</span></div>
+                                <div class="input-append"><input type="number" step="5" min="10" max="90" class="input-mini grblpcb-w-40" data-bind="value: genPassOverlap" title="{{ _('Share of the trench width that neighbouring passes overlap (10 to 90 percent)') }}"><span class="add-on">%</span></div>
                             </div>
                             <div class="grblpcb-param-row">
                                 <label class="checkbox" title="{{ _('Automatically add passes until all gaps between copper features are fully cleared') }}">
@@ -459,6 +459,10 @@
                                     <input type="number" step="0.1" min="0.1" class="input-mini grblpcb-w-45" data-bind="value: genOutlineDiameter">
                                     <span class="add-on">mm</span>
                                 </div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Step down") }}</label>
+                                <div class="input-append"><input type="number" step="0.1" min="0.1" class="input-mini grblpcb-w-45" data-bind="value: genOutlineStepDown" title="{{ _('Depth per outline pass') }}"><span class="add-on">mm</span></div>
                             </div>
                             <div class="grblpcb-param-row">
                                 <label>{{ _("Tabs") }}</label>
@@ -728,7 +732,7 @@
                                         <i class="fas fa-level-up-alt"></i>
                                     </button>
                                     <button class="btn btn-mini" title="{{ _('Mirror for the back side') }}"
-                                            data-bind="click: function() { $parent.mirrorGcode($index()); }, enable: has_gcode, visible: !mirrored">
+                                            data-bind="click: function() { $parent.mirrorGcode($index()); }, enable: has_gcode, visible: can_mirror">
                                         <i class="fas fa-arrows-alt-h"></i>
                                     </button>
                                     <button class="btn btn-mini" title="{{ _('Download') }}"

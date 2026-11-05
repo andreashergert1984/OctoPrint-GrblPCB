@@ -13,15 +13,12 @@ from octoprint_grblpcb.toolpath import (
     _generate_tab_positions,
     _extract_line_segments,
     _optimize_drill_order,
-    _points_close,
     apply_alignment_transform,
     compute_alignment_transform,
     generate_drill_gcode,
     generate_isolation_gcode,
     generate_mask_expose_gcode,
     generate_outline_gcode,
-    mirror_coordinates_x,
-    mirror_coordinates_y,
 )
 
 
@@ -40,19 +37,6 @@ class TestToolpathSettings:
     def test_effective_width_isolation_override(self):
         s = ToolpathSettings(isolation_width=0.5)
         assert s.effective_width == 0.5
-
-
-# =========================================================================
-# _points_close
-# =========================================================================
-
-
-class TestPointsClose:
-    def test_close(self):
-        assert _points_close((0.0, 0.0), (0.0005, 0.0005))
-
-    def test_not_close(self):
-        assert not _points_close((0.0, 0.0), (0.01, 0.01))
 
 
 # =========================================================================
@@ -124,8 +108,8 @@ class TestGenerateIsolation:
         )
         ew = settings.effective_width  # ~0.2155 mm
         gcode = generate_isolation_gcode(copper, settings)
-        # step_over = ew * 0.5 since pass_overlap == 0
-        step_over = ew * 0.5
+        # default overlap 40 %: step = 60 % of the trench width
+        step_over = ew * 0.6
         expected = math.ceil((1.0 - ew) / step_over) + 1
         pass_comments = [line for line in gcode.splitlines() if "; --- Lateral Pass" in line]
         assert len(pass_comments) == expected
@@ -307,7 +291,7 @@ class TestGenerateDrill:
         drills = self._make_drills()
         gcode = generate_drill_gcode(drills, ToolpathSettings())
         assert "G21" in gcode
-        assert "M0" in gcode  # tool change pause
+        assert "T1 M6" in gcode  # tool change
         assert "M2" in gcode  # program end
 
     def test_drill_origin_offset(self):
@@ -433,34 +417,6 @@ class TestTabPositions:
 # =========================================================================
 # Mirror coordinates
 # =========================================================================
-
-
-class TestMirrorCoordinates:
-    def test_mirror_x(self):
-        gcode = "G1 X10.0000 Y5.0000\nG1 X20.0000 Y10.0000"
-        result = mirror_coordinates_x(gcode, board_width=50.0)
-        lines = result.splitlines()
-        assert "X40.0000" in lines[0]  # 50 - 10 = 40
-        assert "Y5.0000" in lines[0]  # Y unchanged
-        assert "X30.0000" in lines[1]  # 50 - 20 = 30
-
-    def test_mirror_x_with_offset(self):
-        gcode = "G1 X10.0000 Y5.0000"
-        result = mirror_coordinates_x(gcode, board_width=50.0, flip_offset=2.0)
-        assert "X42.0000" in result  # 50 - 10 + 2 = 42
-
-    def test_mirror_y(self):
-        gcode = "G1 X10.0000 Y5.0000"
-        result = mirror_coordinates_y(gcode, board_height=30.0)
-        assert "Y25.0000" in result  # 30 - 5 = 25
-        assert "X10.0000" in result  # X unchanged
-
-    def test_preserves_comments(self):
-        gcode = "; comment line\n\nG1 X10 Y5"
-        result = mirror_coordinates_x(gcode, board_width=50.0)
-        lines = result.splitlines()
-        assert lines[0] == "; comment line"
-        assert lines[1] == ""
 
 
 # =========================================================================

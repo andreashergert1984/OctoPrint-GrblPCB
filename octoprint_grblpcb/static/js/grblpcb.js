@@ -153,7 +153,8 @@ $(function() {
         self.genCutDepth = ko.observable(0.1);
         self.genDepthPerPass = ko.observable(0);  // 0 = full depth in one pass
         self.genPasses = ko.observable(1);
-        self.genPassOverlap = ko.observable(0.0);
+        self.genPassOverlap = ko.observable(40);
+        self.genOutlineStepDown = ko.observable(0.5);
         self.genMaxWidth = ko.observable(0.0);  // 0 = use fixed passes
         self.genClearGaps = ko.observable(false);  // auto-detect and clear all gaps
         // -- Speeds --
@@ -822,6 +823,18 @@ $(function() {
                 self.uploadMessage(
                     _.sprintf(gettext("Isolation G-code generated: %d lines"), response.gcode_lines)
                 );
+                _.each(response.warnings || [], function(w) {
+                    if (w.code !== "unisolatable_gaps") return;
+                    new PNotify({
+                        title: gettext("Copper stays connected"),
+                        text: _.sprintf(
+                            gettext("%(count)d gap(s) are narrower than the tool tip (%(tool)s mm) and cannot be milled. The narrowest is %(gap)s mm at X %(x)s, Y %(y)s. Use a finer tool or fix the layout."),
+                            {count: w.count, tool: w.tool, gap: w.min_gap, x: w.x, y: w.y}
+                        ),
+                        type: "error",
+                        hide: false
+                    });
+                });
                 self._refreshProject();
             }).fail(function(xhr) {
                 self.uploadMessage(gettext("Error: ") + (xhr.responseJSON?.error || gettext("failed")));
@@ -869,6 +882,7 @@ $(function() {
                 board_thickness: parseFloat(self.genBoardThickness()),
                 breakthrough_depth: parseFloat(self.genBreakthrough()),
                 tab_width: parseFloat(self.genTabWidth()),
+                outline_step_down: parseFloat(self.genOutlineStepDown()),
                 tab_height: parseFloat(self.genTabHeight()),
                 num_tabs: parseInt(self.genNumTabs())
             })
@@ -1180,8 +1194,10 @@ $(function() {
             OctoPrint.simpleApiCommand("grblpcb", "mirror_gcode", {
                 operation_index: operationIndex
             }).done(function(response) {
-                self.uploadMessage(gettext("Mirrored G-code created"));
+                new PNotify({title: gettext("Back side created"), text: GrblPcbLabels.operation(response.operation), type: "success"});
                 self._refreshProject();
+            }).fail(function(xhr) {
+                new PNotify({title: gettext("Mirroring not possible"), text: xhr.responseJSON?.error || gettext("failed"), type: "error"});
             });
         };
 
@@ -1336,8 +1352,31 @@ $(function() {
         // G-code Execution
         // =====================================================================
 
+        // Which tool an operation needs, for the confirmation before sending
+        self.requiredToolText = function(op) {
+            switch (op.operation_type) {
+                case "isolation":
+                    return _.sprintf(gettext("V-bit, tip %(tip)s mm, %(angle)s°"), {tip: op.tool_diameter, angle: op.tool_angle});
+                case "outline":
+                    return _.sprintf(gettext("End mill %(d)s mm"), {d: op.tool_diameter});
+                case "drill":
+                    return gettext("Drills: the job pauses before each drill size");
+                case "mask_expose":
+                    return gettext("UV LED instead of the spindle");
+                default:
+                    return "";
+            }
+        };
+
         self.sendToCnc = function(operationIndex, force) {
-            if (!force && !confirm(gettext("Send this operation to the CNC machine for execution?"))) return;
+            var op = self.projectOperations()[operationIndex];
+            var question = gettext("Send this operation to the CNC machine for execution?");
+            var tool = op ? self.requiredToolText(op) : "";
+            if (tool) {
+                question += "\n\n" + _.sprintf(gettext("Tool: %s"), tool)
+                    + "\n" + gettext("Is this tool in the spindle and Z zeroed with it?");
+            }
+            if (!force && !confirm(question)) return;
             self.executionOperationLabel = GrblPcbLabels.operation(self.projectOperations()[operationIndex]);
             self.executionActive(true);
             self.executionProgress(0);
@@ -1475,6 +1514,7 @@ $(function() {
             self.genBreakthrough(s.breakthrough_depth());
             self.genTabWidth(s.outline_tab_width());
             self.genTabHeight(s.outline_tab_height());
+            self.genOutlineStepDown(s.outline_depth_per_pass());
             self.genNumTabs(s.outline_num_tabs());
             // UV Mask Exposure
             self.genUvOffsetX(s.uv_led_offset_x());
@@ -1664,7 +1704,8 @@ $(function() {
                     self.executionActive(false);
                     self.executionStatus(_.sprintf(gettext("Stopped at line %d"), data.current_line) + errorSuffix);
                 } else if (data.status === "tool_change") {
-                    self.executionStatus(_.sprintf(gettext("⚠️ TOOL CHANGE required at line %d. After changing the tool, probe and zero Z, then click Confirm."), data.current_line + 1));
+                    self.executionStatus(_.sprintf(gettext("⚠️ TOOL CHANGE required at line %d. After changing the tool, probe and zero Z, then click Confirm."), data.current_line + 1)
+                        + (data.command || data.note ? " " + _.sprintf(gettext("Next tool: %s"), [data.command, data.note].filter(Boolean).join(", ")) : ""));
                 } else if (data.status === "pause") {
                     self.executionStatus(_.sprintf(gettext("⏸ Program pause at line %d. Click Confirm to continue."), data.current_line + 1));
                 } else if (data.status === "confirm_again") {

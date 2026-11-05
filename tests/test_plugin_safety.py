@@ -366,3 +366,21 @@ class TestAlarmBlocksJobs:
         with self.app.app_context():
             response, status = self.plugin._handle_start_autolevel({})
         assert status == 409
+
+
+def test_settings_migration_sets_overlap_in_percent():
+    class _S:
+        def __init__(self):
+            self.values = {"isolation_overlap": 0.0}
+
+        def get(self, path):
+            return self.values.get(path[0])
+
+        def set_float(self, path, value):
+            self.values[path[0]] = value
+
+    plugin = GrblPcbPlugin()
+    plugin._settings = _S()
+    plugin.on_settings_migrate(2, 1)
+    assert plugin._settings.values["isolation_overlap"] == 40.0
+    assert plugin.get_settings_version() == 2

@@ -8,6 +8,7 @@ It registers as a separate connector type in OctoPrint's connection system.
 
 import logging
 import queue
+import re
 import threading
 import time
 from gettext import gettext
@@ -443,17 +444,21 @@ class ConnectedGrblPrinter(ConnectedPrinter):
             self._logger.warning("Cannot start stream: another stream is already active")
             return False
         
-        # Parse lines
+        # Parse lines; keep the comment of pause lines (e.g. which drill)
         lines = []
+        self._stream_notes = {}
         for line in gcode_text.splitlines():
             line = line.strip()
-            # Remove comments
+            comment = ""
             if ";" in line:
+                comment = line[line.index(";") + 1:].strip()
                 line = line[:line.index(";")].strip()
             if line.startswith("(") and line.endswith(")"):
                 continue
             if not line:
                 continue
+            if comment and self._pause_kind(line):
+                self._stream_notes[len(lines)] = comment
             lines.append(line)
         
         if not lines:
@@ -553,7 +558,6 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         GRBL has a 128-byte serial RX buffer. We track how many bytes we've sent
         and wait for 'ok' responses to free buffer space before sending more.
         """
-        import re
         
         RX_BUFFER_SIZE = 127
         buffer_fill = 0  # bytes currently in GRBL's RX buffer
@@ -583,14 +587,9 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                 if self._stream_stop.is_set():
                     break
                 
-                # Handle M6 tool change
                 # M6 tool change and M0 program pause: neither goes to GRBL
                 # (it rejects M6); the user works on the machine and confirms
-                pause_status = None
-                if re.match(r"M0?6\b", line, re.IGNORECASE):
-                    pause_status = "tool_change"
-                elif re.match(r"M0\b", line, re.IGNORECASE):
-                    pause_status = "pause"
+                pause_status = self._pause_kind(line)
                 if pause_status:
                     self._drain_buffer(sent_lengths, buffer_fill)
                     buffer_fill = 0
@@ -656,6 +655,15 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                 self._send_stream_progress("completed", operation_name)
     
     SETTLE_QUIET = 0.5  # seconds without responses before streaming resumes
+
+    @staticmethod
+    def _pause_kind(line: str):
+        """"tool_change" for M6 (also "T2 M6"), "pause" for M0, else None."""
+        if re.search(r"\bM0?6\b", line, re.IGNORECASE):
+            return "tool_change"
+        if re.search(r"\bM0{1,2}\b", line, re.IGNORECASE):
+            return "pause"
+        return None
 
     def is_paused_for_intervention(self) -> bool:
         """True while a job waits at M0/M6 for the user."""
@@ -767,6 +775,8 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                     "elapsed": round(elapsed, 1),
                     "eta": round(eta, 1),
                     "errors": getattr(self, "_stream_error_count", 0),
+                    "note": getattr(self, "_stream_notes", {}).get(line_num, ""),
+                    "command": self._stream_lines[line_num] if status in ("tool_change", "pause") and line_num < len(self._stream_lines) else "",
                 }
             )
     

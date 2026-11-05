@@ -140,6 +140,9 @@ class MillingOperation:
     gcode_aligned: str = ""
     gcode_leveled: str = ""  # G-code with autolevel correction
     mirrored: bool = False  # bottom-side copy made by mirror_gcode
+    # How the G-code was generated ({"command", "data"}); lets mirror_gcode
+    # regenerate the back side from the geometry
+    generation: Optional[dict] = None
     tool_diameter: float = 0.1  # mm
     tool_angle: float = 60.0  # degrees (for V-bits)
     cut_depth: float = -0.1  # mm
@@ -178,12 +181,14 @@ class MillingOperation:
             "has_aligned_gcode": bool(self.gcode_aligned),
             "has_leveled_gcode": bool(self.gcode_leveled),
             "mirrored": self.mirrored,
+            "can_mirror": self.generation is not None and not self.mirrored,
             "gcode_lines": self.gcode.count("\n") + 1 if self.gcode else 0,
         }
         if include_gcode:
             d["gcode"] = self.gcode
             d["gcode_aligned"] = self.gcode_aligned
             d["gcode_leveled"] = self.gcode_leveled
+            d["generation"] = self.generation
         return d
 
     @classmethod
@@ -197,6 +202,7 @@ class MillingOperation:
             gcode_leveled=data.get("gcode_leveled", ""),
             # Older projects only marked mirrored copies by name
             mirrored=data.get("mirrored", "(mirrored)" in data.get("name", "")),
+            generation=data.get("generation"),
             tool_diameter=data.get("tool_diameter", 0.1),
             tool_angle=data.get("tool_angle", 60.0),
             cut_depth=data.get("cut_depth", -0.1),

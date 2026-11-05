@@ -13,7 +13,9 @@ import logging
 import math
 import re
 from dataclasses import dataclass
+from typing import Optional
 
+from shapely import affinity
 from shapely.geometry import (
     LinearRing,
     LineString,
@@ -22,6 +24,7 @@ from shapely.geometry import (
     Polygon,
     box,
 )
+from shapely.geometry.polygon import orient
 
 _logger = logging.getLogger(__name__)
 
@@ -49,7 +52,7 @@ class ToolpathSettings:
 
     # Isolation
     passes: int = 1  # number of isolation passes
-    pass_overlap: float = 0.0  # mm extra offset per pass (0 = no overlap)
+    pass_overlap: float = 40.0  # % of the trench width that neighbouring passes share
     isolation_width: float = 0.0  # if > 0, overrides tool_diameter for offset
     depth_per_pass: float = 0.0  # mm per depth pass (0 = full depth in one pass)
     max_width: float = 0.0  # mm total clearance width (0 = use fixed passes)
@@ -64,6 +67,7 @@ class ToolpathSettings:
     breakthrough_depth: float = 0.2  # mm
 
     # Outline
+    outline_step_down: float = 0.5  # mm depth per outline pass
     tab_width: float = 2.0  # mm
     tab_height: float = 0.5  # mm (how much material left in tab)
     num_tabs: int = 4
@@ -84,6 +88,7 @@ class ToolpathSettings:
     uv_expose_speed: float = 200.0  # mm/min
     uv_expose_z: float = 5.0      # mm above board during exposure
     uv_power: int = 255           # S-value for M3 command (LED power)
+    uv_line_overlap: float = 20.0  # % of the spot that neighbouring scan lines share
 
     @property
     def effective_width(self) -> float:
@@ -94,6 +99,12 @@ class ToolpathSettings:
         half_angle = math.radians(self.tool_angle / 2)
         return 2 * self.cut_depth * math.tan(half_angle) + self.tool_diameter
 
+    @property
+    def step_over(self) -> float:
+        """Distance between neighbouring isolation passes (always overlapping)."""
+        overlap = min(max(self.pass_overlap, 10.0), 90.0) / 100.0
+        return self.effective_width * (1.0 - overlap)
+
     def z_move(self, z: float, comment: str = "") -> str:
         """Generate a rate-limited Z move (G1 instead of G0) to avoid lost steps."""
         cmd = f"G1 Z{z:.3f} F{self.z_max_feed:.0f}"
@@ -102,85 +113,182 @@ class ToolpathSettings:
         return cmd
 
 
+# Milling direction: climb milling with a clockwise spindle (M3) keeps the
+# material that stays (copper, board) on the left of the direction of travel.
+# shapely's orient(sign=1) gives exteriors counter-clockwise and holes
+# clockwise, which is exactly that for every ring of a "material" polygon.
+CLIMB_NOTE = "; Direction: climb milling (M3), the remaining material on the left"
+
+
+def _rings(geometry) -> list[list[tuple]]:
+    """Closed rings of a (Multi)Polygon, oriented for climb milling."""
+    polys = []
+    if isinstance(geometry, Polygon):
+        polys = [geometry]
+    elif hasattr(geometry, "geoms"):
+        polys = [g for g in geometry.geoms if isinstance(g, Polygon)]
+    rings = []
+    for poly in polys:
+        if poly.is_empty:
+            continue
+        poly = orient(poly, sign=1.0)
+        for ring in [poly.exterior, *poly.interiors]:
+            coords = list(ring.coords)
+            if len(coords) >= 4:
+                rings.append(coords)
+    return rings
+
+
+def _order_rings(rings: list[list[tuple]], start=(0.0, 0.0)) -> list[list[tuple]]:
+    """
+    Visit closed rings nearest-first and start each at the vertex closest
+    to where the tool is, to cut down travel moves.
+    """
+    remaining = [r[:-1] if r[0] == r[-1] else list(r) for r in rings]
+    ordered = []
+    pos = start
+    while remaining:
+        best = None
+        for ri, ring in enumerate(remaining):
+            for vi, (x, y) in enumerate(ring):
+                d = (x - pos[0]) ** 2 + (y - pos[1]) ** 2
+                if best is None or d < best[0]:
+                    best = (d, ri, vi)
+        _, ri, vi = best
+        ring = remaining.pop(ri)
+        ring = ring[vi:] + ring[:vi]
+        ring.append(ring[0])
+        ordered.append(ring)
+        pos = ring[0]
+    return ordered
+
+
+def mirror_geometry(geometry, axis: str, origin: tuple, size: tuple):
+    """
+    Mirror design geometry for the back side.
+
+    The G-code places design point p at p - origin; after flipping the board
+    around the Y axis (axis "X") it is milled at width - (x - origin_x).
+    Mirroring the geometry itself (instead of the G-code text) keeps the
+    milling direction, because rings are oriented after mirroring.
+    """
+    if axis == "X":
+        return affinity.scale(geometry, xfact=-1, yfact=1, origin=(origin[0] + size[0] / 2, 0))
+    return affinity.scale(geometry, xfact=1, yfact=-1, origin=(0, origin[1] + size[1] / 2))
+
+
+def mirror_point(x: float, y: float, axis: str, origin: tuple, size: tuple) -> tuple:
+    """Mirror one design point like mirror_geometry."""
+    if axis == "X":
+        return 2 * origin[0] + size[0] - x, y
+    return x, 2 * origin[1] + size[1] - y
+
+
+def find_unisolatable_gaps(copper, tool_diameter: float) -> list[tuple]:
+    """
+    Gaps between separate copper areas that are narrower than the tool tip.
+
+    The tool cannot cut there, so the areas stay connected (a short).
+    Returns [(gap_mm, (x, y)), ...] with the location of the narrowest spot.
+    """
+    from shapely.ops import nearest_points
+    from shapely.strtree import STRtree
+
+    polys = list(copper.geoms) if hasattr(copper, "geoms") else [copper]
+    if len(polys) < 2:
+        return []
+    tree = STRtree(polys)
+    found = []
+    for i, poly in enumerate(polys):
+        for j in tree.query(poly.buffer(tool_diameter)):
+            if j <= i:
+                continue
+            dist = poly.distance(polys[j])
+            if dist < tool_diameter:
+                a, b = nearest_points(poly, polys[j])
+                found.append((dist, ((a.x + b.x) / 2, (a.y + b.y) / 2)))
+    return sorted(found)
+
+
 def generate_isolation_gcode(
     copper_geometry: MultiPolygon,
     settings: ToolpathSettings,
     origin_x: float = 0.0,
     origin_y: float = 0.0,
+    mirror: Optional[str] = None,
+    board_size: tuple = (0.0, 0.0),
 ) -> str:
     """
     Generate isolation milling G-code from copper geometry.
 
-    Creates toolpaths that trace around copper features to isolate them.
-    Uses Shapely's buffer/offset to generate tool center paths.
+    Tool centre paths are offsets of the copper outline: the first pass at
+    half the trench width (the trench edge touches the copper), further
+    passes step outwards by ``settings.step_over`` so neighbouring trenches
+    always overlap. ``mirror`` ("X"/"Y") mills the back side of a flipped
+    board; see mirror_geometry.
     """
-    # Auto-compute passes from max_width if set
-    step_over = (
-        settings.pass_overlap if settings.pass_overlap > 0
-        else settings.effective_width * 0.5
-    )
+    if mirror:
+        copper_geometry = mirror_geometry(copper_geometry, mirror, (origin_x, origin_y), board_size)
+        if isinstance(copper_geometry, Polygon):
+            copper_geometry = MultiPolygon([copper_geometry])
+
+    ew = settings.effective_width
+    step_over = settings.step_over
     if settings.max_width > 0:
-        ew = settings.effective_width
         if settings.max_width <= ew:
             settings.passes = 1
         else:
             settings.passes = math.ceil((settings.max_width - ew) / step_over) + 1
-        # Safety cap
-        settings.passes = min(settings.passes, 200)
+        settings.passes = min(settings.passes, 200)  # safety cap
 
-    # Dynamic mode: clear_gaps overrides fixed pass count.
-    # Check whether the geometry actually has gaps worth clearing.
+    # Dynamic mode: clear_gaps overrides the fixed pass count
     dynamic_mode = settings.clear_gaps
     max_dynamic_passes = 200  # safety cap
-    MAX_CLEAR_GAPS_OFFSET = 5.0  # mm — practical limit for PCB isolation
-
+    MAX_CLEAR_GAPS_OFFSET = 5.0  # mm, practical limit for PCB isolation
     if dynamic_mode:
         polys = list(copper_geometry.geoms) if not copper_geometry.is_empty else []
-        has_gaps = len(polys) > 1 or any(
-            len(list(p.interiors)) > 0 for p in polys
-        )
-        if not has_gaps:
-            # Single feature with no holes — nothing to clear, just isolate.
+        if not (len(polys) > 1 or any(len(p.interiors) > 0 for p in polys)):
             dynamic_mode = False
             settings.passes = 1
 
-    _logger.info(
-        f"Generating isolation toolpaths: "
-        f"{len(copper_geometry.geoms)} polygons, "
-        + ("clear_gaps mode, " if dynamic_mode else f"{settings.passes} pass(es), ")
-        + f"tool={settings.tool_diameter}mm"
-        + (f", max_width={settings.max_width}mm" if settings.max_width > 0 else "")
-    )
-
-    # Calculate depth passes
+    # Depth steps
     dpp = settings.depth_per_pass
-    if dpp > 0 and dpp < settings.cut_depth:
+    if 0 < dpp < settings.cut_depth:
         depth_steps = []
         z = dpp
-        while z < settings.cut_depth:
+        while z < settings.cut_depth - 1e-9:
             depth_steps.append(z)
             z += dpp
-        depth_steps.append(settings.cut_depth)  # final pass at full depth
+        depth_steps.append(settings.cut_depth)
     else:
         depth_steps = [settings.cut_depth]
 
+    gaps = find_unisolatable_gaps(copper_geometry, settings.tool_diameter)
+
     lines = []
     lines.append("; === Isolation Milling G-code ===")
+    if mirror:
+        lines.append(f"; Back side: mirrored in {mirror} (board flipped)")
     lines.append(f"; Tool diameter: {settings.tool_diameter} mm")
     lines.append(f"; V-bit angle: {settings.tool_angle}°")
-    lines.append(f"; Effective width: {settings.effective_width:.3f} mm")
+    lines.append(f"; Effective width: {ew:.3f} mm")
     lines.append(f"; Cut depth: {settings.cut_depth} mm")
     lines.append(f"; Depth per pass: {dpp if dpp > 0 else settings.cut_depth} mm ({len(depth_steps)} depth pass(es))")
     lines.append(f"; Feed rate: {settings.feed_rate} mm/min")
     lines.append(f"; Plunge rate: {settings.plunge_rate} mm/min")
     lines.append(f"; Spindle speed: {settings.spindle_speed} RPM")
     lines.append(f"; Lateral passes: {'auto (clear gaps)' if dynamic_mode else settings.passes}")
-    lines.append(f"; Pass overlap: {settings.pass_overlap} mm")
+    lines.append(f"; Pass overlap: {min(max(settings.pass_overlap, 10.0), 90.0):.0f} % (step {step_over:.3f} mm)")
     if settings.max_width > 0 and not dynamic_mode:
         lines.append(f"; Clearance width: {settings.max_width} mm (auto {settings.passes} passes)")
+    lines.append(CLIMB_NOTE)
+    for gap, (gx, gy) in gaps:
+        lines.append(
+            f"; WARNING: gap {gap:.3f} mm < tool tip {settings.tool_diameter} mm at "
+            f"X{gx - origin_x:.2f} Y{gy - origin_y:.2f}: not isolated, copper stays connected"
+        )
     lines.append("")
 
-    # Preamble
     lines.append("G21 ; mm mode")
     lines.append("G90 ; absolute positioning")
     lines.append(f"{settings.wcs} ; work coordinate system")
@@ -189,175 +297,87 @@ def generate_isolation_gcode(
     lines.append(f"G4 P{settings.spindle_dwell:.1f} ; dwell for spindle spinup")
     lines.append("")
 
-    offset = settings.effective_width / 2
     total_paths = 0
-    step_over_val = (
-        settings.pass_overlap if settings.pass_overlap > 0
-        else settings.effective_width * 0.5
-    )
+    pos = (0.0, 0.0)
 
-    # ------------------------------------------------------------------
-    # Narrow-gap pre-pass: detect gaps between copper features that are
-    # narrower than the effective V-bit width but wider than the tool tip.
-    # The union-based buffer collapses thin slits in these gaps, so we
-    # buffer each polygon individually and cut at a reduced depth that
-    # avoids undercutting the adjacent copper.
-    # ------------------------------------------------------------------
+    def emit_ring(ring, depths, label):
+        """Cut one closed ring; stay down between depth steps."""
+        nonlocal total_paths
+        coords = [(x - origin_x, y - origin_y) for x, y in ring]
+        total_paths += 1
+        lines.append(f"; Path {total_paths}{label}")
+        lines.append(settings.z_move(settings.travel_z))
+        lines.append(f"G0 X{coords[0][0]:.4f} Y{coords[0][1]:.4f}")
+        for depth_idx, z_depth in enumerate(depths):
+            if len(depths) > 1:
+                lines.append(f"; Depth pass {depth_idx + 1}/{len(depths)} (Z={-z_depth:.4f})")
+            lines.append(f"G1 Z{-z_depth:.4f} F{settings.plunge_rate:.0f}")
+            lines.append(f"G1 X{coords[1][0]:.4f} Y{coords[1][1]:.4f} F{settings.feed_rate:.0f}")
+            for x, y in coords[2:]:
+                lines.append(f"G1 X{x:.4f} Y{y:.4f}")
+        lines.append(settings.z_move(settings.travel_z))
+        lines.append("")
+
+    # Narrow-gap pre-pass: gaps between tool tip and trench width collapse
+    # in the union buffer below. Cut them shallower, at an offset where the
+    # V groove is exactly as wide as the narrowest such gap (no undercut).
     half_angle = math.radians(settings.tool_angle / 2)
-    min_gap = _find_min_processable_gap(
-        copper_geometry, settings.tool_diameter, settings.effective_width
-    )
+    min_gap = _find_min_processable_gap(copper_geometry, settings.tool_diameter, ew)
     if min_gap > 0:
         tight_offset = min_gap / 2
-        # Maximum depth where groove width equals gap width (no undercut)
-        tight_depth = (tight_offset - settings.tool_diameter / 2) / math.tan(
-            half_angle
-        )
-        # Ensure depth is at least enough to cut through copper (~35 µm)
-        if tight_depth >= 0.035:
-            tight_paths = _buffer_individual_paths(
-                copper_geometry, tight_offset
+        tight_depth = (tight_offset - settings.tool_diameter / 2) / math.tan(half_angle)
+        if tight_depth >= 0.035:  # deep enough to cut through ~35 µm copper
+            tight_paths = _order_rings(
+                _buffer_individual_paths(copper_geometry, tight_offset), pos
             )
             if tight_paths:
                 lines.append(
                     f"; --- Narrow-gap pre-pass (offset {tight_offset:.3f} mm, "
                     f"depth {tight_depth:.3f} mm) ---"
                 )
-                lines.append(
-                    f"; Gap width {min_gap:.3f} mm < effective width "
-                    f"{settings.effective_width:.3f} mm"
-                )
-                _logger.info(
-                    f"Narrow-gap pre-pass: {len(tight_paths)} paths at "
-                    f"offset {tight_offset:.3f} mm, depth {tight_depth:.3f} mm "
-                    f"(min gap {min_gap:.3f} mm)"
-                )
-                for path_coords in tight_paths:
-                    if len(path_coords) < 2:
-                        continue
-                    total_paths += 1
-                    lines.append(f"; Path {total_paths} (narrow-gap)")
-                    coords = [
-                        (x - origin_x, y - origin_y)
-                        for x, y in path_coords
-                    ]
-                    lines.append(settings.z_move(settings.travel_z))
-                    lines.append(
-                        f"G0 X{coords[0][0]:.4f} Y{coords[0][1]:.4f}"
-                    )
-                    lines.append(
-                        f"G1 Z{-tight_depth:.4f} F{settings.plunge_rate:.0f}"
-                    )
-                    for ci, (x, y) in enumerate(coords[1:]):
-                        if ci == 0:
-                            lines.append(f"G1 X{x:.4f} Y{y:.4f} F{settings.feed_rate:.0f}")
-                        else:
-                            lines.append(f"G1 X{x:.4f} Y{y:.4f}")
-                    if _points_close(coords[0], coords[-1]):
-                        lines.append(
-                            f"G1 X{coords[0][0]:.4f} Y{coords[0][1]:.4f}"
-                        )
-                    lines.append(settings.z_move(settings.travel_z))
-                    lines.append("")
+                lines.append(f"; Gap width {min_gap:.3f} mm < effective width {ew:.3f} mm")
+                for ring in tight_paths:
+                    emit_ring(ring, [tight_depth], " (narrow-gap)")
+                pos = tight_paths[-1][0]
         else:
             _logger.info(
                 f"Narrow gaps found (min {min_gap:.3f} mm) but depth "
-                f"{tight_depth:.4f} mm is too shallow — skipping pre-pass"
+                f"{tight_depth:.4f} mm is too shallow: skipping pre-pass"
             )
 
-    # Determine number of passes to run
-    if dynamic_mode:
-        num_passes = max_dynamic_passes  # will break early when gaps filled
-    else:
-        num_passes = settings.passes
-
+    num_passes = max_dynamic_passes if dynamic_mode else settings.passes
     actual_passes = 0
-
     for pass_num in range(num_passes):
-        current_offset = offset + pass_num * step_over_val
-
-        # In clear-gaps mode, stop if offset exceeds practical limit
+        current_offset = ew / 2 + pass_num * step_over
         if dynamic_mode and current_offset > MAX_CLEAR_GAPS_OFFSET:
-            _logger.info(
-                f"Clear-gaps: reached max offset limit "
-                f"({MAX_CLEAR_GAPS_OFFSET} mm) after {actual_passes} pass(es)"
-            )
             break
 
-        # Buffer the entire copper union at once — this correctly merges
-        # overlapping offset zones between nearby features (pads inside
-        # ground plane clearances) so the tool doesn't double-cut.
-        paths, n_polys, n_interiors = _buffer_copper_paths(
-            copper_geometry, current_offset
-        )
-
+        # Buffer the whole copper union at once so offset zones of nearby
+        # features merge instead of producing duplicate cuts
+        paths, n_polys, n_interiors = _buffer_copper_paths(copper_geometry, current_offset)
         if not paths:
-            if dynamic_mode:
-                _logger.info(
-                    f"Clear-gaps: no more paths at offset "
-                    f"{current_offset:.3f} mm after {actual_passes} pass(es)"
-                )
             break
 
         actual_passes += 1
         lines.append(f"; --- Lateral Pass {pass_num + 1} (offset {current_offset:.3f} mm) ---")
+        ordered = _order_rings(paths, pos)
+        for ring in ordered:
+            emit_ring(ring, depth_steps, "")
+        pos = ordered[-1][0]
 
-        for path_coords in paths:
-            if len(path_coords) < 2:
-                continue
-
-            total_paths += 1
-            lines.append(f"; Path {total_paths}")
-
-            # Apply origin offset
-            coords = [
-                (x - origin_x, y - origin_y) for x, y in path_coords
-            ]
-
-            # Multi-depth pass loop
-            for depth_idx, z_depth in enumerate(depth_steps):
-                if len(depth_steps) > 1:
-                    lines.append(f"; Depth pass {depth_idx + 1}/{len(depth_steps)} (Z={-z_depth:.4f})")
-
-                # Rapid to start
-                lines.append(settings.z_move(settings.travel_z))
-                lines.append(f"G0 X{coords[0][0]:.4f} Y{coords[0][1]:.4f}")
-
-                # Plunge
-                lines.append(f"G1 Z{-z_depth:.4f} F{settings.plunge_rate:.0f}")
-
-                # Cut path
-                for ci, (x, y) in enumerate(coords[1:]):
-                    if ci == 0:
-                        lines.append(f"G1 X{x:.4f} Y{y:.4f} F{settings.feed_rate:.0f}")
-                    else:
-                        lines.append(f"G1 X{x:.4f} Y{y:.4f}")
-
-                # Close the path if it's a loop (first == last)
-                if _points_close(coords[0], coords[-1]):
-                    lines.append(f"G1 X{coords[0][0]:.4f} Y{coords[0][1]:.4f}")
-
-            # Retract after all depth passes for this path
-            lines.append(settings.z_move(settings.travel_z))
-            lines.append("")
-
-        # In clear-gaps mode, stop once all features have merged into a
-        # single polygon with no interior holes — all gaps are filled.
         if dynamic_mode and n_polys <= 1 and n_interiors == 0:
-            _logger.info(
-                f"Clear-gaps: all gaps filled after {actual_passes} pass(es) "
-                f"at offset {current_offset:.3f} mm"
-            )
             break
 
-    # Postamble
     lines.append("; === End ===")
     lines.append(settings.z_move(settings.safe_z, "safe Z"))
     lines.append("M5 ; spindle off")
     lines.append("G0 X0 Y0 ; return to origin")
     lines.append("M2 ; end of program")
 
-    _logger.info(f"Generated {total_paths} toolpaths ({actual_passes} lateral pass(es)), {len(lines)} lines of G-code")
+    _logger.info(
+        f"Generated {total_paths} toolpaths ({actual_passes} lateral pass(es)), "
+        f"{len(lines)} lines of G-code, {len(gaps)} unisolatable gap(s)"
+    )
     return "\n".join(lines)
 
 
@@ -401,37 +421,13 @@ def _buffer_individual_paths(
 
     Unlike `_buffer_copper_paths` this does **not** union the results,
     so thin slits between adjacent buffered features are preserved as
-    separate exterior rings.  This is essential for narrow-gap isolation
+    separate exterior rings. This is essential for narrow-gap isolation
     where the union-based approach collapses near-zero-width slits.
     """
+    polys = list(copper.geoms) if isinstance(copper, MultiPolygon) else [copper]
     paths: list[list[tuple]] = []
-
-    polys = (
-        list(copper.geoms) if isinstance(copper, MultiPolygon) else [copper]
-    )
-
     for poly in polys:
-        buffered = poly.buffer(offset, join_style=2, quad_segs=16)
-        if buffered.is_empty:
-            continue
-        if isinstance(buffered, Polygon):
-            ext = list(buffered.exterior.coords)
-            if len(ext) >= 3:
-                paths.append(ext)
-            for interior in buffered.interiors:
-                ring = list(interior.coords)
-                if len(ring) >= 3:
-                    paths.append(ring)
-        elif isinstance(buffered, MultiPolygon):
-            for p in buffered.geoms:
-                ext = list(p.exterior.coords)
-                if len(ext) >= 3:
-                    paths.append(ext)
-                for interior in p.interiors:
-                    ring = list(interior.coords)
-                    if len(ring) >= 3:
-                        paths.append(ring)
-
+        paths.extend(_rings(poly.buffer(offset, join_style=2, quad_segs=16)))
     return paths
 
 
@@ -441,57 +437,21 @@ def _buffer_copper_paths(
     """
     Generate isolation toolpaths by buffering the entire copper geometry.
 
-    Uses Shapely ``buffer()`` on the whole MultiPolygon at once so that
-    overlapping offset zones between nearby features (e.g. a pad sitting
-    inside a ground-plane clearance hole) merge into a single path instead
-    of producing duplicate/overlapping cuts.
+    Buffering the whole MultiPolygon at once merges overlapping offset zones
+    between nearby features (e.g. a pad inside a ground-plane clearance)
+    into one path instead of duplicate cuts.
 
-    Returns ``(paths, num_polygons, num_interiors)`` where *paths* is a list
-    of coordinate-ring lists, *num_polygons* is the polygon count in the
-    buffered result, and *num_interiors* is the total interior-ring count.
-    These topology counters let callers detect when gap merging has
-    stabilised (used by clear-gaps mode).
+    Returns ``(rings, num_polygons, num_interiors)``; the topology counters
+    let clear-gaps mode detect when all gaps are filled.
     """
     buffered = copper.buffer(offset, join_style=2, quad_segs=16)
-
     if buffered.is_empty:
         return [], 0, 0
-
-    paths: list[list[tuple]] = []
-    num_polygons = 0
-    num_interiors = 0
-
-    def _extract_polygon_rings(poly: Polygon):
-        nonlocal num_polygons, num_interiors
-        if poly.is_empty:
-            return
-        num_polygons += 1
-        num_interiors += len(list(poly.interiors))
-        ext = list(poly.exterior.coords)
-        if len(ext) >= 3:
-            paths.append(ext)
-        for interior in poly.interiors:
-            ring = list(interior.coords)
-            if len(ring) >= 3:
-                paths.append(ring)
-
-    if isinstance(buffered, Polygon):
-        _extract_polygon_rings(buffered)
-    elif isinstance(buffered, MultiPolygon):
-        for p in buffered.geoms:
-            _extract_polygon_rings(p)
-    elif hasattr(buffered, "geoms"):
-        # GeometryCollection fallback
-        for g in buffered.geoms:
-            if isinstance(g, Polygon):
-                _extract_polygon_rings(g)
-
-    return paths, num_polygons, num_interiors
-
-
-def _points_close(p1: tuple, p2: tuple, tol: float = 0.001) -> bool:
-    """Check if two points are approximately equal."""
-    return abs(p1[0] - p2[0]) < tol and abs(p1[1] - p2[1]) < tol
+    polys = [buffered] if isinstance(buffered, Polygon) else [
+        g for g in getattr(buffered, "geoms", []) if isinstance(g, Polygon)
+    ]
+    num_interiors = sum(len(p.interiors) for p in polys)
+    return _rings(buffered), len(polys), num_interiors
 
 
 # =============================================================================
@@ -504,77 +464,71 @@ def generate_drill_gcode(
     settings: ToolpathSettings,
     origin_x: float = 0.0,
     origin_y: float = 0.0,
+    mirror: Optional[str] = None,
+    board_size: tuple = (0.0, 0.0),
 ) -> str:
     """
     Generate drilling G-code from drill info list.
 
-    Supports peck drilling for deeper holes. Groups by tool for efficient
-    tool changes.
+    Tools run from the smallest to the largest diameter. Each tool starts
+    with a tool change: tool up, spindle off, ``T<n> M6`` (the plugin pauses
+    there and asks to change the drill and zero Z again), spindle on.
+    ``settings.cut_depth`` holds the board thickness.
     """
     _logger.info(f"Generating drill G-code: {len(drills)} tools")
+    depth = settings.cut_depth + settings.breakthrough_depth
 
     lines = []
     lines.append("; === Drilling G-code ===")
+    if mirror:
+        lines.append(f"; Back side: mirrored in {mirror} (board flipped)")
     lines.append(f"; Drill feed: {settings.drill_feed} mm/min")
     lines.append(
-        f"; Drill depth: {settings.cut_depth + settings.breakthrough_depth:.2f} mm "
+        f"; Drill depth: {depth:.2f} mm "
         f"(board {settings.cut_depth} mm + breakthrough {settings.breakthrough_depth} mm)"
     )
     lines.append(f"; Spindle speed: {settings.spindle_speed} RPM")
     lines.append("")
 
-    # Preamble
     lines.append("G21 ; mm mode")
     lines.append("G90 ; absolute positioning")
     lines.append(f"{settings.wcs} ; work coordinate system")
     lines.append(settings.z_move(settings.safe_z, "safe Z"))
-    lines.append(f"M3 S{settings.spindle_speed} ; spindle on")
-    lines.append(f"G4 P{settings.spindle_dwell:.1f} ; dwell for spindle spinup")
     lines.append("")
 
     total_holes = 0
-
-    for drill in drills:
-        if not drill.holes:
-            continue
-
-        lines.append(f"; --- Tool T{drill.tool_number}: {drill.diameter:.2f} mm ({drill.count} holes) ---")
-        lines.append(f"M0 ; Pause for tool change: {drill.diameter:.2f} mm drill")
-        lines.append(f"M3 S{settings.spindle_speed}")
-        lines.append(f"G4 P{settings.spindle_dwell:.1f}")
+    pos = (0.0, 0.0)
+    for drill in sorted((d for d in drills if d.holes), key=lambda d: d.diameter):
+        lines.append(f"; --- Tool T{drill.tool_number}: {drill.diameter:.2f} mm ({len(drill.holes)} holes) ---")
+        lines.append(settings.z_move(settings.safe_z, "tool change height"))
+        lines.append("M5 ; spindle off for the tool change")
+        lines.append(f"T{drill.tool_number} M6 ; drill {drill.diameter:.2f} mm")
+        lines.append(f"M3 S{settings.spindle_speed} ; spindle on")
+        lines.append(f"G4 P{settings.spindle_dwell:.1f} ; dwell for spindle spinup")
         lines.append("")
 
-        # Optimize hole order (nearest-neighbor)
-        ordered_holes = _optimize_drill_order(drill.holes)
-
-        for x, y in ordered_holes:
+        holes = [
+            (x - origin_x, y - origin_y) if not mirror
+            else tuple(c - o for c, o in zip(
+                mirror_point(x, y, mirror, (origin_x, origin_y), board_size), (origin_x, origin_y)))
+            for x, y in drill.holes
+        ]
+        for hx, hy in _optimize_drill_order(holes, pos):
             total_holes += 1
-            hx = x - origin_x
-            hy = y - origin_y
-
-            # Rapid to hole position
             lines.append(f"G0 X{hx:.4f} Y{hy:.4f}")
-
-            # cut_depth holds the board thickness for drilling
-            depth = settings.cut_depth + settings.breakthrough_depth
+            lines.append(settings.z_move(settings.retract_height))
             if depth <= settings.peck_depth or settings.peck_depth <= 0:
-                # Simple drill cycle
-                lines.append(settings.z_move(settings.retract_height))
                 lines.append(f"G1 Z{-depth:.4f} F{settings.drill_feed:.0f}")
-                lines.append(settings.z_move(settings.travel_z))
             else:
-                # Peck drilling
                 current_depth = 0.0
-                lines.append(settings.z_move(settings.retract_height))
-                while current_depth < depth:
+                while current_depth < depth - 1e-9:
                     current_depth = min(current_depth + settings.peck_depth, depth)
                     lines.append(f"G1 Z{-current_depth:.4f} F{settings.drill_feed:.0f}")
                     lines.append(settings.z_move(settings.retract_height, "retract"))
-                lines.append(settings.z_move(settings.travel_z))
-
+            lines.append(settings.z_move(settings.travel_z))
+            pos = (hx, hy)
         lines.append("")
 
-    # Postamble
     lines.append("; === End ===")
     lines.append(settings.z_move(settings.safe_z, "safe Z"))
     lines.append("M5 ; spindle off")
@@ -585,16 +539,21 @@ def generate_drill_gcode(
     return "\n".join(lines)
 
 
-def _optimize_drill_order(holes: list[tuple]) -> list[tuple]:
+def _optimize_drill_order(holes: list[tuple], start=None) -> list[tuple]:
     """
-    Optimize drill order using nearest-neighbor heuristic.
+    Optimize drill order using nearest-neighbor heuristic, starting at the
+    hole nearest to ``start`` (the current tool position) if given.
     Minimizes total travel distance between holes.
     """
-    if len(holes) <= 2:
+    if len(holes) <= 1:
         return list(holes)
 
     remaining = list(holes)
-    ordered = [remaining.pop(0)]
+    first = 0
+    if start is not None:
+        first = min(range(len(remaining)),
+                    key=lambda i: (remaining[i][0] - start[0]) ** 2 + (remaining[i][1] - start[1]) ** 2)
+    ordered = [remaining.pop(first)]
 
     while remaining:
         last = ordered[-1]
@@ -617,138 +576,172 @@ def _optimize_drill_order(holes: list[tuple]) -> list[tuple]:
 # =============================================================================
 
 
+def board_shape_from_outline(outline_geometry) -> Optional[Polygon]:
+    """
+    Board shape (with cutouts as holes) from the outline layer.
+
+    Edge.Cuts lines are strokes: merged they form thin rings whose hole is
+    the board. KiCad means the stroke centre line, so each closed stroke
+    ring becomes the polygon of its centre line. The largest one is the
+    board, rings inside it are cutouts. A filled polygon without holes (e.g.
+    the bounding-box fallback) is taken as the board itself.
+    """
+    if isinstance(outline_geometry, (LineString, LinearRing)):
+        try:
+            outline_geometry = Polygon(outline_geometry.coords)
+        except (ValueError, TypeError):
+            return None
+    polys = [outline_geometry] if isinstance(outline_geometry, Polygon) else [
+        g for g in getattr(outline_geometry, "geoms", []) if isinstance(g, Polygon)
+    ]
+    regions = []
+    for poly in polys:
+        if poly.is_empty:
+            continue
+        if poly.interiors:
+            # Stroke ring: width = area / mean of outer and inner length
+            perimeter = poly.exterior.length + sum(r.length for r in poly.interiors)
+            width = 2 * poly.area / perimeter if perimeter else 0.0
+            region = Polygon(poly.exterior).buffer(-width / 2, join_style=2)
+        else:
+            region = poly
+        if not region.is_empty:
+            regions.append(region)
+    if not regions:
+        return None
+    board = max(regions, key=lambda r: r.area)
+    for region in regions:
+        if region is not board and board.contains(region.representative_point()):
+            board = board.difference(region)
+    if isinstance(board, MultiPolygon):
+        board = max(board.geoms, key=lambda p: p.area)
+    return board
+
+
+def _split_at_tabs(coords: list[tuple], tabs: list[tuple]) -> list[tuple]:
+    """
+    Split a closed path at the tab boundaries.
+
+    Returns [(x, y, in_tab), ...]: the point reached and whether the
+    stretch leading to it lies inside a tab.
+    """
+    def in_tab(dist):
+        return any(start <= dist <= end for start, end in tabs)
+
+    out = []
+    walked = 0.0
+    for (x0, y0), (x1, y1) in zip(coords, coords[1:]):
+        seg = math.hypot(x1 - x0, y1 - y0)
+        if seg == 0:
+            continue
+        cuts = sorted({b - walked for t in tabs for b in t if walked < b < walked + seg})
+        prev = 0.0
+        for c in cuts + [seg]:
+            mid = walked + (prev + c) / 2
+            f = c / seg
+            out.append((x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, in_tab(mid)))
+            prev = c
+        walked += seg
+    return out
+
+
 def generate_outline_gcode(
     outline_geometry,
     settings: ToolpathSettings,
     board_thickness: float = 1.6,
     origin_x: float = 0.0,
     origin_y: float = 0.0,
+    mirror: Optional[str] = None,
+    board_size: tuple = (0.0, 0.0),
 ) -> str:
     """
     Generate outline/profile cutting G-code.
 
-    Cuts the board outline with optional holding tabs. The tool path
-    is offset outward by half the tool diameter.
+    Cutouts inside the board are milled first (tool inside them), then the
+    outer contour (tool outside the board) with holding tabs. Every path is
+    milled in steps of ``settings.outline_step_down`` down to board
+    thickness plus breakthrough.
     """
     _logger.info("Generating outline G-code")
+    board = board_shape_from_outline(outline_geometry)
+    if board is None:
+        _logger.error(f"Unsupported or empty outline geometry: {type(outline_geometry)}")
+        return ""
+    if mirror:
+        board = mirror_geometry(board, mirror, (origin_x, origin_y), board_size)
+
+    radius = settings.tool_diameter / 2
+    # Outward offset moves the outer contour away from the board and shrinks
+    # the cutouts, i.e. the tool stays outside the board everywhere
+    tool_area = board.buffer(radius, join_style=2) if radius > 0 else board
+    if isinstance(tool_area, MultiPolygon):
+        tool_area = max(tool_area.geoms, key=lambda p: p.area)
+    tool_area = orient(tool_area, sign=1.0)
+    outer = [(x - origin_x, y - origin_y) for x, y in tool_area.exterior.coords]
+    cutouts = [[(x - origin_x, y - origin_y) for x, y in r.coords] for r in tool_area.interiors]
+
+    total_depth = board_thickness + settings.breakthrough_depth
+    step = settings.outline_step_down if settings.outline_step_down > 0 else total_depth
+    depths = []
+    d = 0.0
+    while d < total_depth - 1e-9:
+        d = min(d + step, total_depth)
+        depths.append(d)
+    tab_bottom = board_thickness - settings.tab_height  # tab top, measured from the surface
 
     lines = []
     lines.append("; === Outline Cutting G-code ===")
-    total_depth = board_thickness + settings.breakthrough_depth
+    if mirror:
+        lines.append(f"; Back side: mirrored in {mirror} (board flipped)")
     lines.append(f"; Board thickness: {board_thickness} mm")
     lines.append(f"; Breakthrough: {settings.breakthrough_depth} mm (total depth {total_depth:.2f} mm)")
-    lines.append(f"; Tool diameter: {settings.tool_diameter} mm")
-    lines.append(f"; Tab width: {settings.tab_width} mm")
-    lines.append(f"; Tabs: {settings.num_tabs}")
+    lines.append(f"; Tool diameter: {settings.tool_diameter} mm, step down {step:.2f} mm ({len(depths)} passes)")
+    lines.append(f"; Tabs: {settings.num_tabs} x {settings.tab_width} mm, {settings.tab_height} mm high")
+    lines.append(f"; Cutouts: {len(cutouts)}")
+    lines.append(CLIMB_NOTE)
     lines.append("")
 
-    # Preamble
     lines.append("G21 ; mm mode")
     lines.append("G90 ; absolute positioning")
     lines.append(f"{settings.wcs} ; work coordinate system")
-    lines.append(settings.z_move(settings.safe_z))
-    lines.append(f"M3 S{settings.spindle_speed}")
-    lines.append(f"G4 P{settings.spindle_dwell:.1f}")
+    lines.append(settings.z_move(settings.safe_z, "safe Z"))
+    lines.append(f"M3 S{settings.spindle_speed} ; spindle on")
+    lines.append(f"G4 P{settings.spindle_dwell:.1f} ; dwell for spindle spinup")
     lines.append("")
 
-    # Get outline polygon and apply tool offset (outward by half tool diameter)
-    offset = settings.tool_diameter / 2
-
-    if isinstance(outline_geometry, Polygon):
-        base_poly = outline_geometry
-    elif isinstance(outline_geometry, MultiPolygon):
-        # Use the largest polygon
-        base_poly = max(outline_geometry.geoms, key=lambda p: p.area)
-    elif isinstance(outline_geometry, (LineString, LinearRing)):
-        # Convert line/ring to polygon, then offset
-        try:
-            base_poly = Polygon(outline_geometry.coords)
-        except (ValueError, TypeError) as e:
-            _logger.error(f"Cannot form polygon from outline line geometry: {e}")
-            return ""
-    else:
-        _logger.error(f"Unsupported outline geometry type: {type(outline_geometry)}")
-        return ""
-
-    # Buffer outward to offset tool center outside the board edge
-    if offset > 0:
-        offset_poly = base_poly.buffer(offset, join_style=2)  # mitre join
-        exterior_coords = list(offset_poly.exterior.coords)
-        _logger.info(
-            f"Outline offset: tool_diameter={settings.tool_diameter}, "
-            f"offset={offset:.3f}, "
-            f"original vertices={len(list(base_poly.exterior.coords))}, "
-            f"offset vertices={len(exterior_coords)}"
-        )
-    else:
-        exterior_coords = list(base_poly.exterior.coords)
-
-    # Generate tab positions along the outline
-    tab_positions = _generate_tab_positions(
-        exterior_coords, settings.num_tabs, settings.tab_width
-    )
-
-    # Multi-pass depth cutting
-    num_depth_passes = max(1, math.ceil(total_depth / settings.peck_depth))
-
-    for depth_pass in range(num_depth_passes):
-        current_depth = min(
-            (depth_pass + 1) * settings.peck_depth, total_depth
-        )
-        lines.append(f"; Depth pass {depth_pass + 1}: Z{-current_depth:.3f}")
-
-        # Apply origin offset
-        coords = [(x - origin_x, y - origin_y) for x, y in exterior_coords]
-
-        # Rapid to start
+    def cut_ring(coords, tabs, label):
+        lines.append(f"; --- {label} ---")
+        pieces = _split_at_tabs(coords, tabs)
         lines.append(settings.z_move(settings.travel_z))
         lines.append(f"G0 X{coords[0][0]:.4f} Y{coords[0][1]:.4f}")
-        lines.append(f"G1 Z{-current_depth:.4f} F{settings.plunge_rate:.0f}")
-
-        # Cut outline with tabs (first move sets feed rate)
-        accumulated_dist = 0.0
-        feed_set = False
-        for i in range(1, len(coords)):
-            x, y = coords[i]
-            prev_x, prev_y = coords[i - 1]
-            seg_len = math.sqrt((x - prev_x) ** 2 + (y - prev_y) ** 2)
-
-            # Check if this segment crosses a tab position
-            in_tab = False
-            for tab_start, tab_end in tab_positions:
-                if (
-                    accumulated_dist + seg_len > tab_start
-                    and accumulated_dist < tab_end
-                ):
-                    in_tab = True
-                    break
-
-            if in_tab and current_depth > (board_thickness - settings.tab_height):
-                # Raise Z for tab
-                tab_z = -(board_thickness - settings.tab_height)
-                lines.append(f"G1 Z{tab_z:.4f} F{settings.plunge_rate:.0f}")
-                lines.append(f"G1 X{x:.4f} Y{y:.4f} F{settings.feed_rate:.0f}")
-                lines.append(f"G1 Z{-current_depth:.4f} F{settings.plunge_rate:.0f}")
-                feed_set = True
-            else:
-                if not feed_set:
+        for depth in depths:
+            lines.append(f"; Depth pass Z{-depth:.3f}")
+            z = -depth
+            lines.append(f"G1 Z{z:.4f} F{settings.plunge_rate:.0f}")
+            feed_pending = True
+            for x, y, tab in pieces:
+                target = -min(depth, tab_bottom) if tab else -depth
+                if abs(target - z) > 1e-9:
+                    lines.append(f"G1 Z{target:.4f} F{settings.plunge_rate:.0f}")
+                    z = target
+                    feed_pending = True
+                if feed_pending:
                     lines.append(f"G1 X{x:.4f} Y{y:.4f} F{settings.feed_rate:.0f}")
-                    feed_set = True
+                    feed_pending = False
                 else:
                     lines.append(f"G1 X{x:.4f} Y{y:.4f}")
-
-            accumulated_dist += seg_len
-
-        # Retract
         lines.append(settings.z_move(settings.travel_z))
         lines.append("")
 
-    # Postamble
-    lines.append(settings.z_move(settings.safe_z))
-    lines.append("M5")
-    lines.append("G0 X0 Y0")
-    lines.append("M2")
+    # Cutouts first, while the board is still held all around
+    for n, ring in enumerate(cutouts, 1):
+        cut_ring(ring, [], f"Cutout {n}")
+    cut_ring(outer, _generate_tab_positions(outer, settings.num_tabs, settings.tab_width), "Outer contour")
 
+    lines.append(settings.z_move(settings.safe_z, "safe Z"))
+    lines.append("M5 ; spindle off")
+    lines.append("G0 X0 Y0 ; return to origin")
+    lines.append("M2 ; end of program")
     return "\n".join(lines)
 
 
@@ -759,13 +752,9 @@ def _generate_tab_positions(
     Generate tab positions along the outline path.
     Returns list of (start_distance, end_distance) tuples.
     """
-    # Calculate total perimeter
-    total_length = 0.0
-    for i in range(1, len(coords)):
-        dx = coords[i][0] - coords[i - 1][0]
-        dy = coords[i][1] - coords[i - 1][1]
-        total_length += math.sqrt(dx * dx + dy * dy)
-
+    total_length = sum(
+        math.hypot(x1 - x0, y1 - y0) for (x0, y0), (x1, y1) in zip(coords, coords[1:])
+    )
     if num_tabs <= 0 or total_length <= 0:
         return []
 
@@ -774,7 +763,6 @@ def _generate_tab_positions(
     for i in range(num_tabs):
         center = spacing * (i + 0.5)
         tabs.append((center - tab_width / 2, center + tab_width / 2))
-
     return tabs
 
 
@@ -789,6 +777,8 @@ def generate_mask_expose_gcode(
     settings: ToolpathSettings,
     origin_x: float = 0.0,
     origin_y: float = 0.0,
+    mirror: Optional[str] = None,
+    board_size: tuple = (0.0, 0.0),
 ) -> str:
     """
     Generate UV solder mask exposure G-code using raster fill.
@@ -817,6 +807,11 @@ def generate_mask_expose_gcode(
     """
     bx0, by0, bx1, by1 = board_bounds
     board_poly = box(bx0, by0, bx1, by1)
+    if mirror:
+        board_poly = mirror_geometry(board_poly, mirror, (origin_x, origin_y), board_size)
+        if mask_geometry is not None and not mask_geometry.is_empty:
+            mask_geometry = mirror_geometry(mask_geometry, mirror, (origin_x, origin_y), board_size)
+        bx0, by0, bx1, by1 = board_poly.bounds
 
     # keep_area = board minus mask openings
     if mask_geometry is not None and not mask_geometry.is_empty:
@@ -831,6 +826,9 @@ def generate_mask_expose_gcode(
     spot = settings.uv_spot_size
     if spot <= 0:
         spot = 0.5
+    # Neighbouring scan lines overlap: the spot is brighter in the middle,
+    # lines exactly one spot apart would leave under-cured stripes
+    line_spacing = spot * (1.0 - min(max(settings.uv_line_overlap, 0.0), 90.0) / 100.0)
 
     # Erode the keep area by half the spot size so the beam edge does not
     # bleed into pad openings.  The scan line tracks the beam *center*, so
@@ -854,7 +852,9 @@ def generate_mask_expose_gcode(
     lines: list[str] = []
     lines.append("; === UV Solder Mask Exposure G-code ===")
     lines.append(f"; Board: {bx1 - bx0:.2f} x {by1 - by0:.2f} mm")
-    lines.append(f"; UV spot size: {spot} mm")
+    lines.append(f"; UV spot size: {spot} mm, line spacing {line_spacing:.3f} mm")
+    if mirror:
+        lines.append(f"; Back side: mirrored in {mirror} (board flipped)")
     lines.append(f"; Exposure speed: {settings.uv_expose_speed} mm/min")
     lines.append(f"; Exposure Z: {settings.uv_expose_z} mm")
     lines.append(f"; LED offset: X={settings.uv_offset_x} Y={settings.uv_offset_y} mm")
@@ -921,7 +921,7 @@ def generate_mask_expose_gcode(
                 # LED off
                 lines.append("M5")
 
-        y += spot
+        y += line_spacing
         scan_idx += 1
 
     # Postamble
@@ -966,59 +966,6 @@ def _extract_line_segments(geometry) -> list[list[tuple]]:
 # =============================================================================
 # Double-sided board support
 # =============================================================================
-
-
-def mirror_coordinates_x(
-    gcode: str, board_width: float, flip_offset: float = 0.0
-) -> str:
-    """
-    Mirror G-code X coordinates for bottom-side milling.
-
-    Flips X coordinates: new_x = board_width - old_x + flip_offset
-    Used when the board is flipped along the Y axis.
-    """
-    import re
-
-    _logger.info(f"Mirroring G-code X coordinates (board_width={board_width})")
-
-    x_pattern = re.compile(r"X([+-]?\d+\.?\d*)")
-
-    def replace_x(match):
-        old_x = float(match.group(1))
-        new_x = board_width - old_x + flip_offset
-        return f"X{new_x:.4f}"
-
-    mirrored_lines = []
-    for line in gcode.splitlines():
-        if line.startswith(";") or not line.strip():
-            mirrored_lines.append(line)
-            continue
-        mirrored_lines.append(x_pattern.sub(replace_x, line))
-
-    return "\n".join(mirrored_lines)
-
-
-def mirror_coordinates_y(
-    gcode: str, board_height: float, flip_offset: float = 0.0
-) -> str:
-    """Mirror G-code Y coordinates for bottom-side milling (flip along X axis)."""
-    import re
-
-    y_pattern = re.compile(r"Y([+-]?\d+\.?\d*)")
-
-    def replace_y(match):
-        old_y = float(match.group(1))
-        new_y = board_height - old_y + flip_offset
-        return f"Y{new_y:.4f}"
-
-    mirrored_lines = []
-    for line in gcode.splitlines():
-        if line.startswith(";") or not line.strip():
-            mirrored_lines.append(line)
-            continue
-        mirrored_lines.append(y_pattern.sub(replace_y, line))
-
-    return "\n".join(mirrored_lines)
 
 
 # =============================================================================
