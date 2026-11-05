@@ -220,6 +220,9 @@ $(function() {
         // UI help mode: compact, mini, detailed
         self.uiHelpMode = ko.observable("detailed");
         self.showQuickGuide = ko.observable(true);
+        self.quickGuideToggleText = ko.pureComputed(function() {
+            return self.showQuickGuide() ? gettext("Hide") : gettext("Show");
+        });
         self.showQuickGuideDetails = ko.observable(true);
         self.showExperiencedUsersDetails = ko.observable(true);
         self.quickGuideToggleLabel = ko.pureComputed(function() {
@@ -285,6 +288,25 @@ $(function() {
             self.projectDrills().forEach(function(d) { total += (d.count || 0); });
             return total;
         });
+
+        self.drillHoleCountText = ko.pureComputed(function() {
+            return _.sprintf(gettext("(%(count)d holes)"), {count: self.drillHoleCount()});
+        });
+
+        self.drillButtonTitle = ko.pureComputed(function() {
+            return self.hasDrillLayer() && !self.hasDrillHoles() ? gettext("Drill file contains no holes") : "";
+        });
+
+        self.uploadMessageIsError = ko.pureComputed(function() {
+            return self.uploadMessage().indexOf(gettext("Error")) === 0;
+        });
+
+        self.projectSummaryText = function(project) {
+            return _.sprintf(gettext("%(layers)d layers, %(operations)d operations"), {
+                layers: project.layers.length,
+                operations: project.operations_count
+            });
+        };
 
         self.hasOutlineLayer = ko.computed(function() {
             var layers = self.projectLayers();
@@ -647,7 +669,7 @@ $(function() {
                 .done(function(response) {
                     self._updateProjectState(response.project);
                     self.uploadMessage(
-                        _.sprintf(gettext("Rotated %d° — board: %s × %s mm"),
+                        _.sprintf(gettext("Rotated %d°, board: %s × %s mm"),
                             angle,
                             response.board_width.toFixed(1),
                             response.board_height.toFixed(1))
@@ -983,7 +1005,7 @@ $(function() {
                         var vis = ko.observable(true);
                         vis.subscribe(function() { self._updateRendererToolpaths(); });
                         list.push({
-                            name: tp.name,
+                            name: GrblPcbLabels.operation(tp),
                             color: colors[i % colors.length],
                             points: tp.points,
                             visible: vis
@@ -1229,6 +1251,7 @@ $(function() {
 
         self.sendToCnc = function(operationIndex, force) {
             if (!force && !confirm(gettext("Send this operation to the CNC machine for execution?"))) return;
+            self.executionOperationLabel = GrblPcbLabels.operation(self.projectOperations()[operationIndex]);
             self.executionActive(true);
             self.executionProgress(0);
             self.executionStatus(gettext("Starting..."));
@@ -1247,7 +1270,7 @@ $(function() {
                     }
                     return;
                 }
-                self.executionStatus(gettext("Streaming: ") + (response.message || ""));
+                self.executionStatus(_.sprintf(gettext("Streaming: %s"), self.executionOperationLabel));
                 self.executionTotalLines(response.total_lines || 0);
             }).fail(function(xhr) {
                 self.executionActive(false);
@@ -1464,16 +1487,20 @@ $(function() {
             else if (data.type === "autolevel_complete") {
                 self.autolevelProgress(100);
                 var statusMsg = gettext("Probing complete! Height map ready.");
-                if (data.z_drift_warning) {
-                    statusMsg = "⚠ " + data.z_drift_warning;
+                if (data.z_drift_exceeded) {
+                    var driftWarning = _.sprintf(
+                        gettext("Z-axis drift of %(drift)s mm detected after probing %(points)d points. The Z motor lost steps. Zero Z again before milling and consider lowering Z acceleration ($122) or Z max rate ($112)."),
+                        {drift: Math.abs(data.z_drift).toFixed(3), points: data.probed_points}
+                    );
+                    statusMsg = "⚠ " + driftWarning;
                     new PNotify({
                         title: gettext("Z-axis drift detected"),
-                        text: data.z_drift_warning,
+                        text: driftWarning,
                         type: "error",
                         hide: false
                     });
                 } else if (data.z_drift !== undefined) {
-                    statusMsg += " (Z drift: " + (data.z_drift * 1000).toFixed(0) + "µm)";
+                    statusMsg += " " + _.sprintf(gettext("(Z drift: %(drift)d µm)"), {drift: Math.round(data.z_drift * 1000)});
                 }
                 self.autolevelStatus(statusMsg);
                 self.hasHeightmap(true);
@@ -1520,9 +1547,9 @@ $(function() {
                     self.executionActive(false);
                     self.executionStatus(_.sprintf(gettext("Stopped at line %d"), data.current_line) + errorSuffix);
                 } else if (data.status === "tool_change") {
-                    self.executionStatus(_.sprintf(gettext("⚠️ TOOL CHANGE required at line %d — click Confirm when ready"), data.current_line + 1));
+                    self.executionStatus(_.sprintf(gettext("⚠️ TOOL CHANGE required at line %d. Click Confirm when ready."), data.current_line + 1));
                 } else if (data.status === "pause") {
-                    self.executionStatus(_.sprintf(gettext("⏸ Program pause at line %d — click Confirm to continue"), data.current_line + 1));
+                    self.executionStatus(_.sprintf(gettext("⏸ Program pause at line %d. Click Confirm to continue."), data.current_line + 1));
                 } else if (data.status === "progress") {
                     var eta = data.eta > 0 ? " " + _.sprintf(gettext("ETA: %ds"), Math.round(data.eta)) : "";
                     self.executionStatus(
@@ -1530,7 +1557,7 @@ $(function() {
                     );
                 } else if (data.status === "started") {
                     self.executionActive(true);
-                    self.executionStatus(_.sprintf(gettext("Streaming started: %s"), data.operation));
+                    self.executionStatus(_.sprintf(gettext("Streaming started: %s"), self.executionOperationLabel || data.operation));
                 }
             }
         };

@@ -555,27 +555,25 @@
     // =========================================================================
 
     WorkspaceRenderer.prototype._layerColors = {
-        "top_copper":    { fill: "rgba(0, 200, 80, 0.12)", stroke: "#00cc55", label: "Top Cu" },
-        "bottom_copper": { fill: "rgba(60, 120, 255, 0.12)", stroke: "#3c78ff", label: "Bot Cu" },
-        "drill":         { fill: "rgba(255, 160, 0, 0.08)", stroke: "#ffa000", label: "Drill" },
-        "outline":       { fill: "rgba(255, 60, 60, 0.08)", stroke: "#ff4444", label: "Outline" },
-        "top_silk":      { fill: "rgba(255, 255, 100, 0.06)", stroke: "#cccc44", label: "Top Silk" },
-        "bottom_silk":   { fill: "rgba(180, 120, 255, 0.06)", stroke: "#b478ff", label: "Bot Silk" },
-        "top_mask":      { fill: "rgba(200, 50, 200, 0.06)", stroke: "#c832c8", label: "Top Mask" },
-        "bottom_mask":   { fill: "rgba(50, 200, 200, 0.06)", stroke: "#32c8c8", label: "Bot Mask" }
+        "top_copper":    { fill: "rgba(0, 200, 80, 0.12)", stroke: "#00cc55" },
+        "bottom_copper": { fill: "rgba(60, 120, 255, 0.12)", stroke: "#3c78ff" },
+        "drill":         { fill: "rgba(255, 160, 0, 0.08)", stroke: "#ffa000" },
+        "outline":       { fill: "rgba(255, 60, 60, 0.08)", stroke: "#ff4444" },
+        "top_silk":      { fill: "rgba(255, 255, 100, 0.06)", stroke: "#cccc44" },
+        "bottom_silk":   { fill: "rgba(180, 120, 255, 0.06)", stroke: "#b478ff" },
+        "top_mask":      { fill: "rgba(200, 50, 200, 0.06)", stroke: "#c832c8" },
+        "bottom_mask":   { fill: "rgba(50, 200, 200, 0.06)", stroke: "#32c8c8" }
     };
 
     WorkspaceRenderer.prototype._getLayerStyle = function(layerType) {
         var style = this._layerColors[layerType] || {
             fill: "rgba(180, 180, 180, 0.08)",
-            stroke: "#aaaaaa",
-            label: layerType
+            stroke: "#aaaaaa"
         };
-        // Translate label at access time (gettext not available at definition time)
         return {
             fill: style.fill,
             stroke: style.stroke,
-            label: (typeof gettext === "function") ? gettext(style.label) : style.label
+            label: GrblPcbLabels.layer(layerType)
         };
     };
 

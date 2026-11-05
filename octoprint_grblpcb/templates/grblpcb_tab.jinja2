@@ -106,7 +106,7 @@
             </div>
 
             <div class="grblpcb-help-box" data-bind="visible: showMiniGuide">
-                <h5>{{ _("Mini Guide") }} <button type="button" class="btn btn-mini pull-right" data-bind="click: function() { showQuickGuide(!showQuickGuide()); }"><span data-bind="text: showQuickGuide() ? 'Hide' : 'Show'"></span></button></h5>
+                <h5>{{ _("Mini Guide") }} <button type="button" class="btn btn-mini pull-right" data-bind="click: function() { showQuickGuide(!showQuickGuide()); }"><span data-bind="text: quickGuideToggleText"></span></button></h5>
                 <div data-bind="visible: showQuickGuide">
                     <ul>
                         <li>{{ _("Home the machine first.") }}</li>
@@ -247,8 +247,8 @@
                 <div class="grblpcb-compact-section">
                     <h4><i class="fas fa-sync-alt"></i> {{ _("Spindle") }}</h4>
                     <div class="grblpcb-btn-wrap">
-                        <button class="btn btn-small btn-success" data-bind="click: spindleOn, enable: isIdle">ON</button>
-                        <button class="btn btn-small btn-danger" data-bind="click: spindleOff">OFF</button>
+                        <button class="btn btn-small btn-success" data-bind="click: spindleOn, enable: isIdle">{{ _("On") }}</button>
+                        <button class="btn btn-small btn-danger" data-bind="click: spindleOff">{{ _("Off") }}</button>
                         <input type="number" class="input-mini grblpcb-w-55" data-bind="value: spindleSpeedTarget">
                         <button class="btn btn-mini" data-bind="click: setSpindleSpeed, enable: isIdle">{{ _("Set") }}</button>
                     </div>
@@ -315,7 +315,7 @@
                             </div>
                             <small class="grblpcb-text-muted">
                                 <span data-bind="visible: $data.board_width > 0, text: $data.board_width.toFixed(1) + '×' + $data.board_height.toFixed(1) + 'mm'"></span>
-                                <span data-bind="text: $data.layers.length + ' layers, ' + $data.operations_count + ' ops'"></span>
+                                <span data-bind="text: $parent.projectSummaryText($data)"></span>
                             </small>
                         </div>
                     </div>
@@ -330,7 +330,7 @@
                            class="grblpcb-file-input">
                     <div data-bind="visible: uploadMessage" class="grblpcb-mt-4">
                         <small data-bind="text: uploadMessage,
-                            style: { color: uploadMessage().indexOf('Error') === 0 ? '#b94a48' : '#555' }"
+                            style: { color: uploadMessageIsError() ? '#b94a48' : '#555' }"
                             class="grblpcb-word-break"></small>
                     </div>
                 </div>
@@ -343,7 +343,7 @@
                             <label class="checkbox grblpcb-mb-0">
                                 <input type="checkbox" checked data-bind="checked: $parent.wsLayerVisible($data.layer_type),
                                     click: function() { $parent.toggleGerberLayer($data.layer_type); return true; }">
-                                <span class="label grblpcb-text-xs" data-bind="text: layer_type, css: {
+                                <span class="label grblpcb-text-xs" data-bind="text: GrblPcbLabels.layer(layer_type), css: {
                                     'label-success': layer_type === 'top_copper',
                                     'label-info': layer_type === 'bottom_copper',
                                     'label-warning': layer_type === 'drill',
@@ -476,7 +476,7 @@
                             </div>
                             <div class="grblpcb-param-row">
                                 <label>{{ _("Breakthrough") }}</label>
-                                <div class="input-append"><input type="number" step="0.05" min="0" class="input-mini grblpcb-w-45" data-bind="value: genBreakthrough" title="{{ _('Drilling and outline cut go this far below the board so no skin is left. Also used for the outline cut.') }}"><span class="add-on">mm</span></div>
+                                <div class="input-append"><input type="number" step="0.05" min="0" class="input-mini grblpcb-w-45" data-bind="value: genBreakthrough" title="{{ _('Drilling and the outline cut go this far below the board so no skin is left.') }}"><span class="add-on">mm</span></div>
                             </div>
                         </div>
 
@@ -550,13 +550,13 @@
                     </button>
                     <button class="btn btn-small btn-info btn-block grblpcb-mb-4"
                             data-bind="click: generateDrill, enable: hasDrillHoles() && !busyGenerating(),
-                                       attr: { title: hasDrillLayer() && !hasDrillHoles() ? 'Drill file contains no holes' : '' }">
+                                       attr: { title: drillButtonTitle }">
                         <i class="fas" data-bind="css: {'fa-circle': !busyGenerating(), 'fa-spinner fa-spin': busyGenerating()}"></i> {{ _("Drilling") }}
                         <!-- ko if: hasDrillLayer() && !hasDrillHoles() -->
                         <small class="grblpcb-opacity-muted">{{ _("(no holes)") }}</small>
                         <!-- /ko -->
                         <!-- ko if: hasDrillHoles() -->
-                        <small class="grblpcb-opacity-muted" data-bind="text: '(' + drillHoleCount() + ' holes)'"></small>
+                        <small class="grblpcb-opacity-muted" data-bind="text: drillHoleCountText"></small>
                         <!-- /ko -->
                     </button>
                     <button class="btn btn-small btn-warning btn-block grblpcb-mb-4"
@@ -729,13 +729,13 @@
                         <div class="grblpcb-op-item">
                             <div class="grblpcb-flex-between">
                                 <div>
-                                    <span class="label grblpcb-text-xs" data-bind="text: operation_type, css: {
+                                    <span class="label grblpcb-text-xs" data-bind="text: GrblPcbLabels.operationType(operation_type), css: {
                                         'label-success': operation_type === 'isolation',
                                         'label-info': operation_type === 'drill',
                                         'label-warning': operation_type === 'outline',
                                         'label-important': operation_type === 'mask_expose'
                                     }"></span>
-                                    <small data-bind="text: name" class="grblpcb-text-light"></small>
+                                    <small data-bind="text: GrblPcbLabels.operation($data)" class="grblpcb-text-light"></small>
                                 </div>
                                 <div>
                                     <span class="label grblpcb-text-xs" data-bind="visible: !has_gcode">{{ _("No G-code") }}</span>

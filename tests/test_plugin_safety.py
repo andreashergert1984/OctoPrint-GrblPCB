@@ -4,6 +4,7 @@
 import threading
 
 from flask import Flask
+from flask_babel import Babel
 
 from octoprint_grblpcb import GrblPcbPlugin
 from octoprint_grblpcb.autolevel import HeightMap
@@ -55,6 +56,7 @@ class _ConnectorStub:
 class TestPluginSafety:
     def setup_method(self):
         self.app = Flask(__name__)
+        Babel(self.app)
         self.plugin = GrblPcbPlugin()
 
     def test_start_autolevel_blocked_while_streaming(self):
@@ -257,6 +259,7 @@ def _probed_map(work_offset):
 class TestLeveledGcodeSafety:
     def setup_method(self):
         self.app = Flask(__name__)
+        Babel(self.app)
         self.plugin = GrblPcbPlugin()
         self.plugin._settings = _Settings()
         self.plugin._save_project = lambda: None

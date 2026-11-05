@@ -339,7 +339,7 @@ class GrblPcbPlugin(
 
     def get_assets(self):
         return dict(
-            js=["js/workspace_renderer.js", "js/grblpcb.js"],
+            js=["js/labels.js", "js/workspace_renderer.js", "js/grblpcb.js"],
             css=["css/grblpcb.css"],
         )
 
@@ -464,7 +464,7 @@ class GrblPcbPlugin(
                 if handler:
                     return handler(data)
 
-        return flask.jsonify(error="Unknown command"), 400
+        return flask.jsonify(error=gettext("Unknown command")), 400
     
     # -----------------------------------------------------------------
     # Helper: require active GRBL connection
@@ -479,7 +479,7 @@ class GrblPcbPlugin(
         import flask
         connector = self._get_grbl_connector()
         if connector is None:
-            return None, (flask.jsonify(error="Not connected to GRBL"), 409)
+            return None, (flask.jsonify(error=gettext("Not connected to GRBL")), 409)
         return connector, None
 
     def _is_probe_active(self):
@@ -499,7 +499,7 @@ class GrblPcbPlugin(
         try:
             return LayerType(layer_type_raw), None
         except (TypeError, ValueError):
-            return None, (flask.jsonify(error=f"Invalid layer type: {layer_type_raw}"), 400)
+            return None, (flask.jsonify(error=gettext("Invalid layer type: %(value)s") % {"value": layer_type_raw}), 400)
 
     def _resolve_unique_upload_path(self, dest_dir, safe_name):
         """Return a non-colliding upload target path in dest_dir."""
@@ -519,7 +519,7 @@ class GrblPcbPlugin(
         import flask
         axis = data.get("axis", "Z")
         if axis not in self._VALID_AXES:
-            return flask.jsonify(error=f"Invalid probe axis: {axis}"), 400
+            return flask.jsonify(error=gettext("Invalid probe axis: %(value)s") % {"value": axis}), 400
         connector, err = self._require_grbl_connection()
         if err:
             return err
@@ -572,7 +572,7 @@ class GrblPcbPlugin(
         import flask
         wcs = data.get("wcs", "G54")
         if wcs not in self._VALID_WCS:
-            return flask.jsonify(error=f"Invalid WCS: {wcs}"), 400
+            return flask.jsonify(error=gettext("Invalid WCS: %(value)s") % {"value": wcs}), 400
         connector, err = self._require_grbl_connection()
         if err:
             return err
@@ -583,7 +583,7 @@ class GrblPcbPlugin(
         import flask
         axis = data.get("axis", "all")
         if axis not in self._VALID_ZERO_AXES:
-            return flask.jsonify(error=f"Invalid axis: {axis}"), 400
+            return flask.jsonify(error=gettext("Invalid axis: %(value)s") % {"value": axis}), 400
         connector, err = self._require_grbl_connection()
         if err:
             return err
@@ -639,29 +639,29 @@ class GrblPcbPlugin(
         add_check(
             "connection",
             connected,
-            "Connected to GRBL" if connected else "Not connected to GRBL",
+            gettext("Connected to GRBL") if connected else gettext("Not connected to GRBL"),
             "success" if connected else "error",
         )
 
         if not connected:
-            add_check("state", False, "Connection is required before machine checks can run", "error")
+            add_check("state", False, gettext("Connection is required before machine checks can run"), "error")
         elif state_upper == "ALARM":
-            add_check("state", False, f"GRBL is in ALARM state ({state})", "error")
+            add_check("state", False, gettext("GRBL is in ALARM state (%(state)s)") % {"state": state}, "error")
         elif state_upper == "IDLE":
-            add_check("state", True, "GRBL is idle and ready", "success")
+            add_check("state", True, gettext("GRBL is idle and ready"), "success")
         else:
-            add_check("state", False, f"GRBL is busy or paused ({state})", "warning")
+            add_check("state", False, gettext("GRBL is busy or paused (%(state)s)") % {"state": state}, "warning")
 
         add_check(
             "streaming",
             not streaming,
-            "No active stream" if not streaming else "A G-code stream is active",
+            gettext("No active stream") if not streaming else gettext("A G-code stream is active"),
             "success" if not streaming else "error",
         )
         add_check(
             "probing",
             not probing,
-            "No active probe" if not probing else "A probe run is active",
+            gettext("No active probe") if not probing else gettext("A probe run is active"),
             "success" if not probing else "error",
         )
 
@@ -674,8 +674,8 @@ class GrblPcbPlugin(
             "snapshot": snapshot,
             "checks": checks,
             "limitations": [
-                "This check verifies controller state and workflow safety.",
-                "Step loss, backlash, and absolute accuracy require external measurement such as a dial indicator, gauge block, or probe pad.",
+                gettext("This check verifies controller state and workflow safety."),
+                gettext("Step loss, backlash, and absolute accuracy require external measurement such as a dial indicator, gauge block, or probe pad."),
             ],
         }
 
@@ -695,9 +695,9 @@ class GrblPcbPlugin(
         try:
             speed = int(data.get("speed", 10000))
         except (TypeError, ValueError):
-            return flask.jsonify(error="Speed must be a number"), 400
+            return flask.jsonify(error=gettext("Speed must be a number")), 400
         if speed < 0 or speed > 30000:
-            return flask.jsonify(error=f"Speed out of range (0-30000): {speed}"), 400
+            return flask.jsonify(error=gettext("Speed out of range (0-30000): %(value)s") % {"value": speed}), 400
         connector, err = self._require_grbl_connection()
         if err:
             return err
@@ -725,19 +725,19 @@ class GrblPcbPlugin(
         import flask
         axis = data.get("axis", "X")
         if axis not in self._VALID_AXES:
-            return flask.jsonify(error=f"Invalid jog axis: {axis}"), 400
+            return flask.jsonify(error=gettext("Invalid jog axis: %(value)s") % {"value": axis}), 400
         try:
             distance = float(data.get("distance", 1.0))
         except (TypeError, ValueError):
-            return flask.jsonify(error="Distance must be a number"), 400
+            return flask.jsonify(error=gettext("Distance must be a number")), 400
         if abs(distance) > 500:
-            return flask.jsonify(error=f"Jog distance too large: {distance}"), 400
+            return flask.jsonify(error=gettext("Jog distance too large: %(value)s") % {"value": distance}), 400
         try:
             feed = int(data.get("feed", self._settings.get_int(["default_jog_feed"])))
         except (TypeError, ValueError):
-            return flask.jsonify(error="Feed must be a number"), 400
+            return flask.jsonify(error=gettext("Feed must be a number")), 400
         if feed < 1 or feed > 10000:
-            return flask.jsonify(error=f"Feed out of range (1-10000): {feed}"), 400
+            return flask.jsonify(error=gettext("Feed out of range (1-10000): %(value)s") % {"value": feed}), 400
         connector, err = self._require_grbl_connection()
         if err:
             return err
@@ -780,7 +780,7 @@ class GrblPcbPlugin(
     def _handle_remove_layer(self, data):
         import flask
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
         lt, err = self._parse_layer_type(data.get("layer_type"))
         if err:
             return err
@@ -807,12 +807,12 @@ class GrblPcbPlugin(
     def _handle_set_board_side(self, data):
         import flask
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
         side = data.get("side", "single")
         try:
             self._project.board_side = BoardSide(side)
         except (TypeError, ValueError):
-            return flask.jsonify(error=f"Invalid board side: {side}"), 400
+            return flask.jsonify(error=gettext("Invalid board side: %(value)s") % {"value": side}), 400
         self._project.flip_axis = data.get("flip_axis", "X")
         self._save_project()
         return flask.jsonify(result="ok", project=self._project.to_dict())
@@ -975,7 +975,7 @@ class GrblPcbPlugin(
             filepath = os.path.join(self._upload_dir, filename)
 
         if not os.path.exists(filepath):
-            return flask.jsonify(error=f"File not found: {filename}"), 404
+            return flask.jsonify(error=gettext("File not found: %(value)s") % {"value": filename}), 404
 
         try:
             self._parse_and_add_layer(filepath, layer_type)
@@ -991,14 +991,14 @@ class GrblPcbPlugin(
 
         project_id = data.get("project_id")
         if not project_id:
-            return flask.jsonify(error="No project_id provided"), 400
+            return flask.jsonify(error=gettext("No project_id provided")), 400
 
         project_dir = os.path.realpath(os.path.join(self._upload_dir, project_id))
         if not project_dir.startswith(os.path.realpath(self._upload_dir) + os.sep):
-            return flask.jsonify(error="Invalid project ID"), 400
+            return flask.jsonify(error=gettext("Invalid project ID")), 400
         project_json = os.path.join(project_dir, "project.json")
         if not os.path.isfile(project_json):
-            return flask.jsonify(error=f"Project not found: {project_id}"), 404
+            return flask.jsonify(error=gettext("Project not found: %(value)s") % {"value": project_id}), 404
 
         try:
             self._project = PCBProject.load(project_dir)
@@ -1061,7 +1061,7 @@ class GrblPcbPlugin(
 
         project_id = data.get("project_id")
         if not project_id:
-            return flask.jsonify(error="No project_id provided"), 400
+            return flask.jsonify(error=gettext("No project_id provided")), 400
 
         # If deleting the currently loaded project, clear it
         if self._project and self._project.id == project_id:
@@ -1073,7 +1073,7 @@ class GrblPcbPlugin(
 
         deleted = delete_project(self._upload_dir, project_id)
         if not deleted:
-            return flask.jsonify(error=f"Project not found: {project_id}"), 404
+            return flask.jsonify(error=gettext("Project not found: %(value)s") % {"value": project_id}), 404
 
         # Return updated project list
         projects = list_projects(self._upload_dir)
@@ -1223,7 +1223,7 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project loaded"), 400
+            return flask.jsonify(error=gettext("No project loaded")), 400
 
         angle = float(data.get("angle", 90))
         if angle == 0:
@@ -1320,13 +1320,13 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         # Determine which layer(s) to process
         layer_type = LayerType(data.get("layer_type", "top_copper"))
         geometries = self._geometries.get(layer_type)
         if not geometries:
-            return flask.jsonify(error=f"No geometry for {layer_type.value}"), 400
+            return flask.jsonify(error=gettext("No geometry for %(value)s") % {"value": layer_type.value}), 400
 
         settings = self._get_toolpath_settings(data)
 
@@ -1382,7 +1382,7 @@ class GrblPcbPlugin(
         from shapely.geometry import MultiPolygon, Polygon
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         ox = self._project.board_min_x
         oy = self._project.board_min_y
@@ -1429,10 +1429,10 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project loaded"), 400
+            return flask.jsonify(error=gettext("No project loaded")), 400
         if not self._project.drills:
             return flask.jsonify(
-                error="Drill file contains no holes (0 tools, 0 holes)"
+                error=gettext("Drill file contains no holes (0 tools, 0 holes)")
             ), 400
 
         settings = self._get_toolpath_settings(data)
@@ -1483,7 +1483,7 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         outline_geom = self._geometries.get(LayerType.OUTLINE)
         if not outline_geom:
@@ -1507,7 +1507,7 @@ class GrblPcbPlugin(
                 )
             else:
                 return flask.jsonify(
-                    error="No outline layer and no board dimensions"
+                    error=gettext("No outline layer and no board dimensions")
                 ), 400
         else:
             outline_geom = merge_geometries(outline_geom)
@@ -1561,13 +1561,13 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         layer_type_str = data.get("layer_type", "top_mask")
         try:
             layer_type = LayerType(layer_type_str)
         except ValueError:
-            return flask.jsonify(error=f"Invalid layer type: {layer_type_str}"), 400
+            return flask.jsonify(error=gettext("Invalid layer type: %(value)s") % {"value": layer_type_str}), 400
 
         mask_geom = self._geometries.get(layer_type)
         if mask_geom:
@@ -1576,7 +1576,7 @@ class GrblPcbPlugin(
             mask_merged = None  # expose entire board (no openings)
 
         if self._project.board_width <= 0 or self._project.board_height <= 0:
-            return flask.jsonify(error="No board dimensions available"), 400
+            return flask.jsonify(error=gettext("No board dimensions available")), 400
 
         board_bounds = (
             self._project.board_min_x,
@@ -1597,7 +1597,7 @@ class GrblPcbPlugin(
 
         if not gcode:
             return flask.jsonify(
-                error="Generated empty G-code — nothing to expose"
+                error=gettext("Generated empty G-code: nothing to expose")
             ), 400
 
         op = MillingOperation(
@@ -1641,7 +1641,7 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         grid_x = data.get("grid_x", self._settings.get_int(["autolevel_grid_x"]))
         grid_y = data.get("grid_y", self._settings.get_int(["autolevel_grid_y"]))
@@ -1674,17 +1674,17 @@ class GrblPcbPlugin(
         import flask
 
         if self._height_map is None:
-            return flask.jsonify(error="No height map configured"), 400
+            return flask.jsonify(error=gettext("No height map configured")), 400
 
         connector = self._get_grbl_connector()
         if not connector:
-            return flask.jsonify(error="Not connected to GRBL"), 400
+            return flask.jsonify(error=gettext("Not connected to GRBL")), 400
 
         if self._is_probe_active():
-            return flask.jsonify(error="Probing already in progress"), 409
+            return flask.jsonify(error=gettext("Probing already in progress")), 409
 
         if self._is_streaming_active(connector):
-            return flask.jsonify(error="Cannot start probing while streaming is active"), 409
+            return flask.jsonify(error=gettext("Cannot start probing while streaming is active")), 409
 
         # The new heights replace the old ones: leveled G-code from the
         # previous measurement must not be sent any more
@@ -1701,7 +1701,7 @@ class GrblPcbPlugin(
         )
         self._probe_thread.start()
 
-        return flask.jsonify(result="ok", message="Probing started")
+        return flask.jsonify(result="ok", message=gettext("Probing started"))
 
     def _autolevel_probe_loop(self, connector):
         """Background thread for sequential probing."""
@@ -1931,13 +1931,9 @@ class GrblPcbPlugin(
                 }
                 if z_drift is not None:
                     msg["z_drift"] = round(z_drift, 4)
-                    if abs(z_drift) > 0.05:
-                        msg["z_drift_warning"] = (
-                            f"Z-axis drift of {abs(z_drift):.3f}mm detected after "
-                            f"probing {total} points. This means the Z motor lost steps. "
-                            f"Please re-zero Z before milling! Consider lowering Z "
-                            f"acceleration ($122) or Z max rate ($112)."
-                        )
+                    # The frontend words the warning (translated)
+                    msg["z_drift_exceeded"] = abs(z_drift) > 0.05
+                    msg["probed_points"] = total
                 self._plugin_manager.send_plugin_message(
                     "grblpcb", msg,
                 )
@@ -1974,15 +1970,15 @@ class GrblPcbPlugin(
         import flask
 
         if self._height_map is None or not self._height_map.completed:
-            return flask.jsonify(error="Height map not complete"), 400
+            return flask.jsonify(error=gettext("Height map not complete")), 400
 
         op_index = data.get("operation_index", 0)
         if self._project is None or op_index >= len(self._project.operations):
-            return flask.jsonify(error="Invalid operation index"), 400
+            return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
         if not op.gcode:
-            return flask.jsonify(error="No G-code to correct"), 400
+            return flask.jsonify(error=gettext("No G-code to correct")), 400
 
         max_segment = data.get(
             "max_segment",
@@ -2009,16 +2005,16 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         op_index = data.get("operation_index", 0)
         if op_index >= len(self._project.operations):
-            return flask.jsonify(error="Invalid operation index"), 400
+            return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
         source = op.gcode  # Always mirror raw gcode, not leveled (to avoid double-correction)
         if not source:
-            return flask.jsonify(error="No G-code to mirror"), 400
+            return flask.jsonify(error=gettext("No G-code to mirror")), 400
 
         flip_axis = data.get("flip_axis", self._project.flip_axis)
         if flip_axis == "X":
@@ -2074,11 +2070,11 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         holes = data.get("holes", [])
         if len(holes) < 2:
-            return flask.jsonify(error="Need at least 2 alignment holes"), 400
+            return flask.jsonify(error=gettext("Need at least 2 alignment holes")), 400
 
         self._project.alignment_holes = [
             {
@@ -2113,20 +2109,20 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         if len(self._project.alignment_holes) < 2:
-            return flask.jsonify(error="No alignment holes set"), 400
+            return flask.jsonify(error=gettext("No alignment holes set")), 400
 
         connector = self._get_grbl_connector()
         if not connector:
-            return flask.jsonify(error="Not connected to GRBL"), 400
+            return flask.jsonify(error=gettext("Not connected to GRBL")), 400
 
         if self._is_probe_active():
-            return flask.jsonify(error="Probing already in progress"), 409
+            return flask.jsonify(error=gettext("Probing already in progress")), 409
 
         if self._is_streaming_active(connector):
-            return flask.jsonify(error="Cannot start probing while streaming is active"), 409
+            return flask.jsonify(error=gettext("Cannot start probing while streaming is active")), 409
 
         # Start probing in background thread
         self._probe_stop.clear()
@@ -2137,7 +2133,7 @@ class GrblPcbPlugin(
         )
         self._probe_thread.start()
 
-        return flask.jsonify(result="ok", message="Alignment probing started")
+        return flask.jsonify(result="ok", message=gettext("Alignment probing started"))
 
     def _alignment_probe_loop(self, connector):
         """Background thread: probe each alignment hole to find its XY center.
@@ -2349,13 +2345,13 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         holes = self._project.alignment_holes
         probed = [h for h in holes if h.get("probed")]
         if len(probed) < 2:
             return flask.jsonify(
-                error=f"Need at least 2 probed holes, have {len(probed)}"
+                error=gettext("Need at least 2 probed holes, have %(value)s") % {"value": len(probed)}
             ), 400
 
         expected = [(h["expected_x"], h["expected_y"]) for h in probed]
@@ -2364,7 +2360,7 @@ class GrblPcbPlugin(
         try:
             transform = compute_alignment_transform(expected, measured)
         except (ValueError, ArithmeticError) as e:
-            return flask.jsonify(error=f"Transform computation failed: {e}"), 400
+            return flask.jsonify(error=gettext("Transform computation failed: %(value)s") % {"value": e}), 400
 
         self._project.alignment_transform = transform.to_dict()
         self._save_project()
@@ -2384,20 +2380,20 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         if self._project.alignment_transform is None:
-            return flask.jsonify(error="No alignment transform computed"), 400
+            return flask.jsonify(error=gettext("No alignment transform computed")), 400
 
         op_index = data.get("operation_index", 0)
         if op_index >= len(self._project.operations):
-            return flask.jsonify(error="Invalid operation index"), 400
+            return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
         # Apply to the best available G-code (leveled > original)
         source = op.gcode_leveled if op.gcode_leveled else op.gcode
         if not source:
-            return flask.jsonify(error="No G-code to transform"), 400
+            return flask.jsonify(error=gettext("No G-code to transform")), 400
 
         transform = AlignmentTransform.from_dict(self._project.alignment_transform)
         aligned = apply_alignment_transform(source, transform)
@@ -2415,8 +2411,9 @@ class GrblPcbPlugin(
         return flask.jsonify(
             result="ok",
             operation=op.to_dict(),
-            message=f"Alignment applied: {transform.theta_deg:.3f}° rotation, "
-                    f"({transform.tx:.4f}, {transform.ty:.4f})mm offset",
+            message=gettext("Alignment applied: %(angle).3f° rotation, (%(tx).4f, %(ty).4f) mm offset") % {
+                "angle": transform.theta_deg, "tx": transform.tx, "ty": transform.ty,
+            },
         )
 
     def _handle_clear_alignment(self, data):
@@ -2424,7 +2421,7 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         for hole in self._project.alignment_holes:
             hole["measured_x"] = None
@@ -2440,17 +2437,17 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         op_index = data.get("operation_index", 0)
         if op_index >= len(self._project.operations):
-            return flask.jsonify(error="Invalid operation index"), 400
+            return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
         # Prefer leveled G-code if available
         gcode = op.gcode_leveled if op.gcode_leveled else op.gcode
         if not gcode:
-            return flask.jsonify(error="No G-code"), 400
+            return flask.jsonify(error=gettext("No G-code")), 400
 
         return flask.jsonify(
             result="ok",
@@ -2463,11 +2460,11 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         op_index = data.get("operation_index", 0)
         if op_index < 0 or op_index >= len(self._project.operations):
-            return flask.jsonify(error="Invalid operation index"), 400
+            return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         removed = self._project.operations.pop(op_index)
         self._save_project()
@@ -2483,12 +2480,12 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         new_order = data.get("new_order", [])
         ops = self._project.operations
         if sorted(new_order) != list(range(len(ops))):
-            return flask.jsonify(error="Invalid order - must be permutation of indices"), 400
+            return flask.jsonify(error=gettext("Invalid order - must be permutation of indices")), 400
 
         self._project.operations = [ops[i] for i in new_order]
         self._save_project()
@@ -2503,24 +2500,24 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            return flask.jsonify(error="No project"), 400
+            return flask.jsonify(error=gettext("No project")), 400
 
         connector = self._get_grbl_connector()
         if not connector:
-            return flask.jsonify(error="Not connected to GRBL"), 400
+            return flask.jsonify(error=gettext("Not connected to GRBL")), 400
 
         if self._is_probe_active():
-            return flask.jsonify(error="Cannot start streaming while probing is active"), 409
+            return flask.jsonify(error=gettext("Cannot start streaming while probing is active")), 409
 
         op_index = data.get("operation_index", 0)
         if op_index < 0 or op_index >= len(self._project.operations):
-            return flask.jsonify(error="Invalid operation index"), 400
+            return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
         # Prefer leveled G-code if available
         gcode = op.gcode_leveled if op.gcode_leveled else op.gcode
         if not gcode:
-            return flask.jsonify(error="No G-code to execute"), 400
+            return flask.jsonify(error=gettext("No G-code to execute")), 400
 
         # Pre-flight checks; the frontend shows the warnings by code and
         # resends with force=True once the user confirms
@@ -2539,11 +2536,11 @@ class GrblPcbPlugin(
 
         success = connector.stream_gcode(gcode, operation_name=op.name)
         if not success:
-            return flask.jsonify(error="Failed to start streaming"), 400
+            return flask.jsonify(error=gettext("Failed to start streaming")), 400
 
         return flask.jsonify(
             result="ok",
-            message=f"Streaming started: {op.name}",
+            message=op.name,
             total_lines=gcode.count("\n") + 1,
         )
 
@@ -2553,10 +2550,10 @@ class GrblPcbPlugin(
 
         connector = self._get_grbl_connector()
         if not connector:
-            return flask.jsonify(error="Not connected to GRBL"), 400
+            return flask.jsonify(error=gettext("Not connected to GRBL")), 400
 
         connector.stop_streaming()
-        return flask.jsonify(result="ok", message="Execution stopped")
+        return flask.jsonify(result="ok", message=gettext("Execution stopped"))
 
     def _handle_confirm_tool_change(self, data):
         """Confirm tool change during execution."""
@@ -2564,10 +2561,10 @@ class GrblPcbPlugin(
 
         connector = self._get_grbl_connector()
         if not connector:
-            return flask.jsonify(error="Not connected to GRBL"), 400
+            return flask.jsonify(error=gettext("Not connected to GRBL")), 400
 
         connector.confirm_tool_change()
-        return flask.jsonify(result="ok", message="Tool change confirmed")
+        return flask.jsonify(result="ok", message=gettext("Tool change confirmed"))
 
     def _handle_send_override(self, data):
         """Send a real-time override command to GRBL."""
@@ -2575,7 +2572,7 @@ class GrblPcbPlugin(
 
         connector = self._get_grbl_connector()
         if not connector:
-            return flask.jsonify(error="Not connected to GRBL"), 400
+            return flask.jsonify(error=gettext("Not connected to GRBL")), 400
 
         override_type = data.get("override_type", "")
         action = data.get("action", "")
@@ -2584,13 +2581,13 @@ class GrblPcbPlugin(
         valid_actions = {"reset", "plus10", "minus10", "plus1", "minus1", "100", "50", "25"}
 
         if override_type not in valid_types:
-            return flask.jsonify(error=f"Invalid override type: {override_type}"), 400
+            return flask.jsonify(error=gettext("Invalid override type: %(value)s") % {"value": override_type}), 400
         if action not in valid_actions:
-            return flask.jsonify(error=f"Invalid action: {action}"), 400
+            return flask.jsonify(error=gettext("Invalid action: %(value)s") % {"value": action}), 400
 
         success = connector.send_override(override_type, action)
         if not success:
-            return flask.jsonify(error="Failed to send override"), 400
+            return flask.jsonify(error=gettext("Failed to send override")), 400
 
         return flask.jsonify(result="ok")
 
@@ -2656,6 +2653,7 @@ class GrblPcbPlugin(
                 toolpaths.append({
                     "name": op.name,
                     "operation_type": op.operation_type,
+                    "layer_type": op.layer_type,
                     "points": points,
                 })
 
