@@ -10,6 +10,7 @@ import logging
 import queue
 import threading
 import time
+from gettext import gettext
 from typing import Any
 
 from octoprint.events import Events, eventManager
@@ -128,6 +129,7 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                 status_callback=self._on_grbl_status,
                 response_callback=self._on_grbl_response,
                 error_callback=self._on_grbl_error,
+                alarm_callback=self._on_grbl_alarm,
             )
             self._comm.connect()
             
@@ -217,7 +219,11 @@ class ConnectedGrblPrinter(ConnectedPrinter):
     
     def _on_grbl_status(self, status: dict):
         """Handle GRBL status update."""
+        was_alarm = self._grbl_state == "Alarm"
         self._grbl_state = status.get("state", "Unknown")
+        if was_alarm != (self._grbl_state == "Alarm"):
+            # Refresh OctoPrint's state text (see get_state_string)
+            self._listener.on_printer_state_changed(self.state)
         
         if "mpos" in status:
             self._machine_position = status["mpos"]
@@ -271,6 +277,22 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         """Handle GRBL error."""
         self._logger.error(f"GRBL error {error_code}: {error_msg}")
         self._listener.on_printer_logs(f"<<< error:{error_code} ({error_msg})")
+
+    def _on_grbl_alarm(self, alarm_code: int, alarm_msg: str):
+        """Handle GRBL alarm: log it and tell the user what to do."""
+        self._listener.on_printer_logs(f"<<< ALARM:{alarm_code} ({alarm_msg})")
+        if self._plugin_manager:
+            self._plugin_manager.send_plugin_message(
+                "grblpcb", {"type": "alarm", "code": alarm_code, "message": alarm_msg}
+            )
+
+    def get_state_string(self, state: ConnectedPrinterState | None = None):
+        """While GRBL is in alarm, say so instead of "Operational"."""
+        if state is None:
+            state = self.state
+        if state == ConnectedPrinterState.OPERATIONAL and self._grbl_state == "Alarm":
+            return gettext("Alarm (GRBL)")
+        return super().get_state_string(state)
     
     # -------------------------------------------------------------------------
     # Command Interface

@@ -1436,6 +1436,14 @@ $(function() {
                 // Update workspace
                 self._syncWorkspaceData();
             }
+            else if (data.type === "alarm") {
+                new PNotify({
+                    title: _.sprintf(gettext("GRBL alarm %d"), data.code),
+                    text: data.message + "\n\n" + gettext("The machine position may be lost. Home the machine or unlock it, then check the work zero before continuing."),
+                    type: "error",
+                    hide: false
+                });
+            }
             else if (data.type === "autolevel_complete") {
                 self.autolevelProgress(100);
                 var statusMsg = gettext("Probing complete! Height map ready.");

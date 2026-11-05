@@ -134,6 +134,7 @@ class GrblComm:
         status_callback: Optional[Callable[[dict], None]] = None,
         response_callback: Optional[Callable[[str], None]] = None,
         error_callback: Optional[Callable[[int, str], None]] = None,
+        alarm_callback: Optional[Callable[[int, str], None]] = None,
     ):
         self._port = port
         self._baudrate = baudrate
@@ -142,6 +143,7 @@ class GrblComm:
         self._status_callback = status_callback
         self._response_callback = response_callback
         self._error_callback = error_callback
+        self._alarm_callback = alarm_callback
         
         self._lock = threading.Lock()
         self._logger = logging.getLogger(__name__)
@@ -378,8 +380,8 @@ class GrblComm:
             self._logger.error(f"GRBL ALARM {alarm_code}: {alarm_msg}")
             if self._stream_mode:
                 self._response_queue.put(("alarm", alarm_code, alarm_msg))
-            if self._error_callback:
-                self._error_callback(alarm_code, f"ALARM: {alarm_msg}")
+            if self._alarm_callback:
+                self._alarm_callback(alarm_code, alarm_msg)
             return
         
         # Check for 'ok' response
