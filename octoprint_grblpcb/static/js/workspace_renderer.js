@@ -124,6 +124,11 @@
         this.canvas.addEventListener("wheel", this._onWheel, {passive: false});
         this.canvas.addEventListener("contextmenu", this._onContextMenu);
         window.addEventListener("resize", this._onResize);
+        // The canvas also changes size when the control panel is toggled
+        if (typeof ResizeObserver === "function" && this.canvas.parentElement) {
+            this._resizeObserver = new ResizeObserver(this._onResize);
+            this._resizeObserver.observe(this.canvas.parentElement);
+        }
     };
 
     WorkspaceRenderer.prototype.destroy = function() {
@@ -134,6 +139,7 @@
         this.canvas.removeEventListener("wheel", this._onWheel);
         this.canvas.removeEventListener("contextmenu", this._onContextMenu);
         window.removeEventListener("resize", this._onResize);
+        if (this._resizeObserver) this._resizeObserver.disconnect();
         if (this._animFrame) cancelAnimationFrame(this._animFrame);
     };
 
@@ -1192,7 +1198,7 @@
         if (this.probePoints.length === 0) return;
 
         var lx = w - 30;
-        var ly = 50;
+        var ly = 64;  // below the view toolbar
         var lh = 150;
         var lw = 15;
 

@@ -71,3 +71,30 @@ def _untranslatable_text_literals(text):
 def test_text_bindings_have_no_fixed_words(template):
     # Words in text bindings bypass gettext; build them in the view model
     assert _untranslatable_text_literals(template.read_text()) == []
+
+
+# Fixed words between tags bypass gettext as well. Allowed: units and
+# machine/G-code tokens that are the same in every language.
+_ALLOWED_TOKENS = {"mm", "RPM", "mm/min", "mm/m", "mm/s", "2D", "3D", "X", "Y", "Z", "F", "S",
+                   "X+", "X-", "Y+", "Y-", "Z+", "Z-", "0X", "0Y", "0Z", "RST", "B", "H", "°", "µm"}
+
+
+def _fixed_text_nodes(text):
+    text = re.sub(r"\{%\s*trans\b.*?\{%\s*endtrans\s*%\}", " ", text, flags=re.S)
+    text = re.sub(r"\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}", " ", text, flags=re.S)
+    text = re.sub(r"<!--.*?-->", " ", text, flags=re.S)
+    # Replace whole tags (attributes may contain '>') so only text nodes remain
+    text = re.sub(r"<(?:[^>\"']|\"[^\"]*\"|'[^']*')*>", "<>", text)
+    text = re.sub(r"&[a-z]+;", " ", text)
+    found = []
+    for node in re.findall(r">([^<>]+)<", text):
+        for token in node.split():
+            token = token.strip("().,:;×")
+            if re.search(r"[A-Za-z]{2,}", token) and token not in _ALLOWED_TOKENS:
+                found.append(token)
+    return found
+
+
+@pytest.mark.parametrize("template", TEMPLATES, ids=lambda p: p.name)
+def test_no_fixed_words_between_tags(template):
+    assert _fixed_text_nodes(template.read_text()) == []

@@ -264,6 +264,7 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                     "feed": self._feed_rate,
                     "spindle": self._spindle_speed,
                     "wcs": self._current_wcs,
+                    "z_zeroed": self._z_zeroed,
                 }
             if "overrides" in status:
                 msg["overrides"] = status["overrides"]

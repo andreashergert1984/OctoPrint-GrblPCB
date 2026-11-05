@@ -53,6 +53,7 @@ def _connector():
     c._work_offset = {"x": 0.0, "y": 0.0, "z": 0.0}
     c._feed_rate = c._spindle_speed = 0
     c._current_wcs = "G54"
+    c._z_zeroed = False
     return c
 
 

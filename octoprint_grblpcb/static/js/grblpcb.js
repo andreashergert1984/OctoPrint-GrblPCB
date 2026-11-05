@@ -130,6 +130,14 @@ $(function() {
         self.autolevelMargin = ko.observable(1.0);
         self.autolevelProgress = ko.observable(0);
         self.autolevelStatus = ko.observable("");
+        self.autolevelRunning = ko.observable(false);
+        self.probeButtonLabel = ko.pureComputed(function() {
+            var points = self.heightmapPoints();
+            var probed = points.filter(function(p) { return p.probed; }).length;
+            if (probed === 0) return gettext("Probe");
+            if (probed === points.length) return gettext("Probe again");
+            return gettext("Continue probing");
+        });
         self.heightmapPoints = ko.observableArray([]);
         self.hasHeightmap = ko.observable(false);
 
@@ -206,7 +214,7 @@ $(function() {
         self.spindleOverride = ko.observable(100);
 
         // Active tab
-        self.activeSubTab = ko.observable("cnc");
+        self.activeSubTab = ko.observable("pcb");
 
         // Workspace viewer
         self.workspaceViewMode = ko.observable("2d");
@@ -223,20 +231,10 @@ $(function() {
         self._renderer = null;
         self._rendererInitPending = false;
 
-        // UI help mode: compact, mini, detailed
-        self.uiHelpMode = ko.observable("detailed");
-        self.showQuickGuide = ko.observable(true);
-        self.quickGuideToggleText = ko.pureComputed(function() {
-            return self.showQuickGuide() ? gettext("Hide") : gettext("Show");
-        });
-        self.showQuickGuideDetails = ko.observable(true);
-        self.showExperiencedUsersDetails = ko.observable(true);
-        self.quickGuideToggleLabel = ko.pureComputed(function() {
-            return self.showQuickGuideDetails() ? gettext("Hide") : gettext("Show");
-        });
-        self.experiencedUsersToggleLabel = ko.pureComputed(function() {
-            return self.showExperiencedUsersDetails() ? gettext("Hide") : gettext("Show");
-        });
+        // UI help mode: compact (workflow steps only) or detailed (plus tips)
+        self.uiHelpMode = ko.observable("compact");
+        self.showViewOptions = ko.observable(false);
+        self.zZeroed = ko.observable(false);
 
         // Per-layer visibility tracking (gerber layers)
         self._gerberLayerVisibility = {};
@@ -246,13 +244,83 @@ $(function() {
         // =====================================================================
 
         self.navbarStateText = ko.pureComputed(function() {
-            return self.isConnected() ? self.grblState() : gettext("disconnected");
+            return self.isConnected() ? self.grblStateLabel() : gettext("disconnected");
         });
 
         self.onEventDisconnected = function() {
             self.isConnected(false);
+            self.zZeroed(false);
             self.isGrblConnector(false);
             self.grblState("Unknown");
+        };
+
+        // GRBL states in the user's language
+        self.grblStateLabel = ko.pureComputed(function() {
+            var state = self.grblState() || "";
+            var base = state.split(":")[0];
+            switch (base) {
+                case "Idle": return gettext("Ready");
+                case "Run": return gettext("Running");
+                case "Hold": return gettext("Paused (feed hold)");
+                case "Jog": return gettext("Jogging");
+                case "Home": return gettext("Homing");
+                case "Alarm": return gettext("Alarm");
+                case "Door": return gettext("Door open");
+                case "Check": return gettext("Check mode");
+                case "Sleep": return gettext("Sleeping");
+                default: return state;
+            }
+        });
+
+        // Workflow: board, machine, autolevel (optional), milling.
+        // Each step says whether it is done; the first open one is "next".
+        self.workflowSteps = ko.pureComputed(function() {
+            var hasBoard = self.hasProject() && self.projectLayers().length > 0;
+            var hasToolpaths = self.projectOperations().some(function(op) { return op.has_gcode; });
+            var machineReady = self.isConnected() && self.zZeroed();
+            var steps = [
+                {key: "board", tab: "pcb", label: gettext("Board"), done: hasBoard && hasToolpaths, optional: false,
+                 hint: gettext("Import Gerber and drill files, then generate the toolpaths.")},
+                {key: "machine", tab: "cnc", label: gettext("Machine"), done: machineReady, optional: false,
+                 hint: gettext("Connect, home, move to the board corner, zero X/Y, probe and zero Z.")},
+                {key: "autolevel", tab: "autolevel", label: gettext("Autolevel"), done: self.hasHeightmap(), optional: true,
+                 hint: gettext("Optional: probe the board surface and apply the height map to the toolpaths.")},
+                {key: "milling", tab: "operations", label: gettext("Milling"), done: false, optional: false,
+                 hint: gettext("Send the operations to the machine one after another.")}
+            ];
+            var next = null;
+            for (var i = 0; i < steps.length; i++) {
+                if (!steps[i].done && !steps[i].optional && next === null) next = i;
+            }
+            steps.forEach(function(step, i) { step.current = (i === next); });
+            return steps;
+        });
+
+        self.nextStepText = ko.pureComputed(function() {
+            if (!self.hasProject() || self.projectLayers().length === 0) {
+                return gettext("Create a project in the Board tab and import the Gerber and drill files.");
+            }
+            if (!self.projectOperations().some(function(op) { return op.has_gcode; })) {
+                return gettext("Generate the toolpaths in the Board tab (isolation, drilling, outline).");
+            }
+            if (!self.isConnected()) {
+                return gettext("Connect the machine on the left: connection type 'GRBL CNC Connection'.");
+            }
+            if (!self.zZeroed()) {
+                return gettext("Machine tab: home, move to the board corner, zero X/Y, then probe and zero Z.");
+            }
+            if (self.executionActive()) {
+                return "";
+            }
+            return gettext("Milling tab: send the operations in order. Autolevel before is optional.");
+        });
+
+        self.alignmentHoleText = function(hole, index) {
+            if (!hole.probed) {
+                return _.sprintf(gettext("Hole %(n)d: not probed yet"), {n: index + 1});
+            }
+            var dev = Math.sqrt(Math.pow(hole.measured_x - hole.expected_x, 2) + Math.pow(hole.measured_y - hole.expected_y, 2));
+            return _.sprintf(gettext("Hole %(n)d: off by %(dev)s mm"), {n: index + 1, dev: dev.toFixed(3)});
         };
 
         self.stateClass = ko.computed(function() {
@@ -352,6 +420,15 @@ $(function() {
             return layers.some(function(l) { return l.layer_type === "outline"; });
         });
 
+        self._hasLayer = function(type) {
+            return self.projectLayers().some(function(l) { return l.layer_type === type; });
+        };
+        self.hasTopCopperLayer = ko.pureComputed(function() { return self._hasLayer("top_copper"); });
+        self.hasBottomCopperLayer = ko.pureComputed(function() { return self._hasLayer("bottom_copper"); });
+        self.hasTopMaskLayer = ko.pureComputed(function() { return self._hasLayer("top_mask"); });
+        self.hasBottomMaskLayer = ko.pureComputed(function() { return self._hasLayer("bottom_mask"); });
+        self.maskButtonTitle = gettext("Expose solder mask using UV LED raster scan");
+
         self.hasMaskLayer = ko.computed(function() {
             var layers = self.projectLayers();
             return layers.some(function(l) {
@@ -375,13 +452,6 @@ $(function() {
             return self.uiHelpMode() === "detailed";
         });
 
-        self.showDetailedHelp = ko.pureComputed(function() {
-            return self.uiHelpMode() === "detailed";
-        });
-
-        self.showMiniGuide = ko.pureComputed(function() {
-            return self.uiHelpMode() === "mini";
-        });
 
         // Helper for gerber layer checkbox binding
         self.wsLayerVisible = function(layerType) {
@@ -871,12 +941,14 @@ $(function() {
         };
 
         self.startAutolevel = function() {
+            self.autolevelRunning(true);
             self.autolevelProgress(0);
             self.autolevelStatus(gettext("Probing started..."));
             self._sendCommand("start_autolevel");
         };
 
         self.stopAutolevel = function() {
+            self.autolevelRunning(false);
             self._sendCommand("stop_autolevel");
             self.autolevelStatus(gettext("Probing stopped"));
         };
@@ -1369,10 +1441,8 @@ $(function() {
             var s = self.settings.settings.plugins.grblpcb;
             if (s.ui_help_mode) {
                 self.uiHelpMode(s.ui_help_mode());
+                s.ui_help_mode.subscribe(self.uiHelpMode);
             }
-            self.showQuickGuide(true);
-            self.showQuickGuideDetails(true);
-            self.showExperiencedUsersDetails(true);
             self.jogFeed(s.default_jog_feed());
             self.spindleSpeedTarget(s.default_spindle_speed());
             self.autolevelGridX(s.autolevel_grid_x());
@@ -1470,6 +1540,7 @@ $(function() {
                 if (data.feed !== undefined) self.feedRate(data.feed);
                 if (data.spindle !== undefined) self.spindleSpeed(data.spindle);
                 if (data.wcs) self.currentWCS(data.wcs);
+                if (data.z_zeroed !== undefined) self.zZeroed(!!data.z_zeroed);
                 if (data.overrides) {
                     self.feedOverride(data.overrides.feed || 100);
                     self.rapidOverride(data.overrides.rapid || 100);
@@ -1477,6 +1548,8 @@ $(function() {
                 }
             }
             else if (data.type === "autolevel_progress") {
+                // also after a page reload during probing
+                self.autolevelRunning(true);
                 self.autolevelProgress(data.percent);
                 self.autolevelStatus(
                     _.sprintf(gettext("Probing point %d/%d (%d%%) Z=%s"), data.index + 1, data.total, data.percent, data.point.z.toFixed(4))
@@ -1499,6 +1572,7 @@ $(function() {
                 });
             }
             else if (data.type === "autolevel_failed") {
+                self.autolevelRunning(false);
                 var reasons = {
                     no_contact: gettext("The probe did not touch the board within the probe depth."),
                     grbl_error: gettext("GRBL rejected the probe command."),
@@ -1518,6 +1592,7 @@ $(function() {
                 });
             }
             else if (data.type === "autolevel_complete") {
+                self.autolevelRunning(false);
                 self.autolevelProgress(100);
                 var statusMsg = gettext("Probing complete! Height map ready.");
                 if (data.z_drift_exceeded) {
