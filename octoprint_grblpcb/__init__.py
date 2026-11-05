@@ -291,7 +291,7 @@ class GrblPcbPlugin(
             # UI settings
             show_machine_position=True,
             show_work_position=True,
-            ui_help_mode="detailed",
+            ui_help_mode="compact",
         )
 
     def on_settings_save(self, data):
@@ -1706,10 +1706,14 @@ class GrblPcbPlugin(
         if self._is_streaming_active(connector):
             return flask.jsonify(error=gettext("Cannot start probing while streaming is active")), 409
 
+        # Continue an interrupted run on the same clamping; otherwise measure
+        # every point again (a complete map or a moved zero means a new board)
+        if not self._height_map.can_resume(connector._work_offset):
+            self._height_map.reset_measurements()
+            self._height_map.work_offset = dict(connector._work_offset)
+            self._height_map.probed_at = time.time()
         # The new heights replace the old ones: leveled G-code from the
         # previous measurement must not be sent any more
-        self._height_map.work_offset = dict(connector._work_offset)
-        self._height_map.probed_at = time.time()
         self._discard_leveled_gcode()
         self._save_project()
 

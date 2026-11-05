@@ -406,3 +406,68 @@ def _map_probed_at(t):
 def test_height_map_side_check(probed_at, mirrored, alignment_at, expected):
     result = height_map_side_check(_map_probed_at(probed_at), mirrored, alignment_at)
     assert (result or {}).get("code") == expected
+
+
+# =========================================================================
+# Starting again: resume vs. measure anew
+# =========================================================================
+
+class _StartConnector:
+    def __init__(self, work_offset):
+        self._work_offset = work_offset
+
+    def is_streaming(self):
+        return False
+
+
+def _start(plugin, connector):
+    from flask import Flask
+    from flask_babel import Babel
+
+    app = Flask(__name__)
+    Babel(app)
+    plugin._get_grbl_connector = lambda: connector
+    plugin._autolevel_probe_loop = lambda c: None  # only the start decision is tested
+    with app.app_context():
+        plugin._handle_start_autolevel({})
+    plugin._probe_thread.join()
+
+
+def _start_plugin(probed):
+    from octoprint_grblpcb.pcb_project import PCBProject
+
+    plugin = _plugin()
+    plugin._save_project = lambda: None
+    plugin._project = PCBProject()
+    hm = HeightMap()
+    hm.generate_grid(0, 0, 10, 10, grid_x=2, grid_y=2, margin=0)
+    for i in probed:
+        hm.set_probe_result(i, -0.3)
+    hm.work_offset = {"x": 10.0, "y": 10.0, "z": -1.0}
+    hm.probed_at = 100.0
+    plugin._height_map = hm
+    return plugin
+
+
+def test_complete_map_is_measured_again():
+    plugin = _start_plugin(probed=[0, 1, 2, 3])
+    _start(plugin, _StartConnector({"x": 10.0, "y": 10.0, "z": -1.0}))
+    hm = plugin._height_map
+    assert not any(p.probed for p in hm.points)
+    assert hm.probed_at > 100.0
+
+
+def test_interrupted_run_on_same_zero_resumes():
+    plugin = _start_plugin(probed=[0, 1])
+    _start(plugin, _StartConnector({"x": 10.0, "y": 10.0, "z": -0.5}))
+    hm = plugin._height_map
+    assert [p.probed for p in hm.points] == [True, True, False, False]
+    assert hm.probed_at == 100.0
+
+
+def test_interrupted_run_with_moved_zero_starts_over():
+    plugin = _start_plugin(probed=[0, 1])
+    _start(plugin, _StartConnector({"x": 25.0, "y": 10.0, "z": -1.0}))
+    hm = plugin._height_map
+    assert not any(p.probed for p in hm.points)
+    assert hm.work_offset["x"] == 25.0

@@ -128,6 +128,23 @@ class HeightMap:
         """Check if all points have been probed."""
         return all(p.probed for p in self.points)
 
+    def can_resume(self, current_offset: dict) -> bool:
+        """
+        True if an interrupted measurement can be continued: some points are
+        still open and the XY work zero is the one it was started with.
+        """
+        if self.is_complete() or not any(p.probed for p in self.points):
+            return False
+        return height_map_origin_check(self, current_offset) is None
+
+    def reset_measurements(self):
+        """Forget all measured heights; the grid stays."""
+        for p in self.points:
+            p.z = 0.0
+            p.probed = False
+        self.completed = False
+        self._interpolator = None
+
     def next_unprobed_index(self) -> int:
         """Get index of next unprobed point, or -1 if all done."""
         for i, p in enumerate(self.points):
