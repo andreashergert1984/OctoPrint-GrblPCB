@@ -15,6 +15,7 @@ from octoprint_grblpcb.autolevel import (
     _rebuild_gcode_line,
     _subdivide_segment,
     apply_autolevel,
+    height_map_side_check,
 )
 
 
@@ -375,3 +376,33 @@ def test_probe_loop_stops_without_recording_failed_point(failure, reason):
     assert not any(p.probed for p in points[2:])
     failed = [m for m in plugin._plugin_manager.messages if m["type"] == "autolevel_failed"]
     assert failed == [{"type": "autolevel_failed", "index": 1, "total": 4, "reason": reason}]
+
+
+# =========================================================================
+# Height map side: front vs back after flipping
+# =========================================================================
+
+
+
+
+def _map_probed_at(t):
+    hm = HeightMap()
+    hm.probed_at = t
+    return hm
+
+
+@pytest.mark.parametrize(
+    "probed_at, mirrored, alignment_at, expected",
+    [
+        (200.0, True, 100.0, None),                      # back side, measured after flip
+        (50.0, True, 100.0, "heightmap_from_front"),     # back side, old front map
+        (50.0, True, None, "heightmap_side_unknown"),    # back side, flip never recorded
+        (None, True, 100.0, "heightmap_side_unknown"),   # map from before this check
+        (50.0, False, 100.0, None),                      # front side, measured before flip
+        (200.0, False, 100.0, "heightmap_from_back"),    # front side, back map
+        (200.0, False, None, None),                      # single-sided job
+    ],
+)
+def test_height_map_side_check(probed_at, mirrored, alignment_at, expected):
+    result = height_map_side_check(_map_probed_at(probed_at), mirrored, alignment_at)
+    assert (result or {}).get("code") == expected

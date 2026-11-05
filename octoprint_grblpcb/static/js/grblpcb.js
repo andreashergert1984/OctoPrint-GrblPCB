@@ -1282,6 +1282,12 @@ $(function() {
                     return gettext("Z-zero has not been set since connecting. Probe Z and zero it at the board surface before milling (Probe Z, then Zero Z).");
                 case "heightmap_origin_moved":
                     return _.sprintf(gettext("The work zero has moved by X %s mm, Y %s mm since the height map was probed. The leveled G-code would correct the wrong spots. Probe the board again."), warning.dx, warning.dy);
+                case "heightmap_from_front":
+                    return gettext("This back-side operation would use a height map measured before the board was flipped (before the alignment holes were probed). Probe the back side again.");
+                case "heightmap_from_back":
+                    return gettext("This front-side operation would use a height map measured after the board was flipped. Probe the front side again.");
+                case "heightmap_side_unknown":
+                    return gettext("For this back-side operation it is unknown whether the height map was measured after flipping the board. Probe the alignment holes after flipping, then probe the height map.");
                 case "heightmap_origin_unknown":
                     return gettext("It is unknown where the work zero was when the height map was probed. Probe the board again so the leveled G-code matches the clamped board.");
                 default:

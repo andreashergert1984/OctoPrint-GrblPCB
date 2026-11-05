@@ -60,6 +60,7 @@ class HeightMap:
     # Work offset (WCO, machine coordinates of the work zero) while probing.
     # The heights only apply to the board as it was clamped then.
     work_offset: Optional[dict] = None
+    probed_at: Optional[float] = None  # time.time() when probing started
 
     # Interpolator (not serialized)
     _interpolator: Optional[RegularGridInterpolator] = field(
@@ -204,6 +205,7 @@ class HeightMap:
             "points": [p.to_dict() for p in self.points],
             "completed": self.completed,
             "work_offset": self.work_offset,
+            "probed_at": self.probed_at,
         }
 
     @classmethod
@@ -217,6 +219,7 @@ class HeightMap:
             grid_y=data["grid_y"],
             completed=data.get("completed", False),
             work_offset=data.get("work_offset"),
+            probed_at=data.get("probed_at"),
         )
         hm.points = [ProbePoint.from_dict(p) for p in data.get("points", [])]
         if hm.completed:
@@ -242,6 +245,29 @@ def height_map_origin_check(height_map: HeightMap, current_offset: dict) -> Opti
     dy = current_offset.get("y", 0.0) - height_map.work_offset.get("y", 0.0)
     if abs(dx) > ORIGIN_TOLERANCE_MM or abs(dy) > ORIGIN_TOLERANCE_MM:
         return {"code": "heightmap_origin_moved", "dx": round(dx, 3), "dy": round(dy, 3)}
+    return None
+
+
+def height_map_side_check(
+    height_map: HeightMap, mirrored: bool, alignment_probed_at: Optional[float]
+) -> Optional[dict]:
+    """
+    Check that the height map was measured on the side being milled.
+
+    Probing the alignment holes marks the flip: it happens after the board
+    was turned over. A back-side (mirrored) operation needs a height map
+    measured after that, a front-side operation one measured before.
+
+    Returns None if it fits, otherwise a warning dict with a ``code``.
+    """
+    probed_at = height_map.probed_at
+    if mirrored:
+        if alignment_probed_at is None or probed_at is None:
+            return {"code": "heightmap_side_unknown"}
+        if probed_at < alignment_probed_at:
+            return {"code": "heightmap_from_front"}
+    elif alignment_probed_at is not None and probed_at is not None and probed_at > alignment_probed_at:
+        return {"code": "heightmap_from_back"}
     return None
 
 

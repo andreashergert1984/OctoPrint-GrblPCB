@@ -63,8 +63,6 @@ class GrblSimulator:
         # inside a hole stop at its wall
         self._holes = list(holes)
         self._probe_radius = probe_diameter / 2.0
-        self.overrides = {"feed": 100, "rapid": 100, "spindle": 100}
-        self._overrides_changed = False
         self._reset_state()
         threading.Thread(target=self._motion_loop, daemon=True).start()
 
@@ -78,6 +76,9 @@ class GrblSimulator:
             self.offsets = {w: {a: 0.0 for a in AXES} for w in WCS_CODES}
         self.wcs = "G54"
         self._reports = 0
+        # A soft reset restores the overrides to 100 %
+        self.overrides = {"feed": 100, "rapid": 100, "spindle": 100}
+        self._overrides_changed = True
         self.motion = "G0"
         self.absolute = True
         self.inches = False

@@ -241,7 +241,7 @@ class TestPCBProject:
             "id", "name", "layers", "drills", "operations", "state",
             "board_side", "board_width", "board_height", "board_min_x",
             "board_min_y", "flip_axis", "alignment_holes",
-            "alignment_transform", "rotation", "has_height_map", "height_map",
+            "alignment_transform", "alignment_probed_at", "rotation", "has_height_map", "height_map",
         }
         assert set(d.keys()) == expected_keys
 

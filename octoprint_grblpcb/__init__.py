@@ -48,7 +48,12 @@ from .toolpath import (
     compute_alignment_transform,
     apply_alignment_transform,
 )
-from .autolevel import HeightMap, apply_autolevel, height_map_origin_check
+from .autolevel import (
+    HeightMap,
+    apply_autolevel,
+    height_map_origin_check,
+    height_map_side_check,
+)
 
 
 class GrblPcbPlugin(
@@ -1688,6 +1693,7 @@ class GrblPcbPlugin(
         # The new heights replace the old ones: leveled G-code from the
         # previous measurement must not be sent any more
         self._height_map.work_offset = dict(connector._work_offset)
+        self._height_map.probed_at = time.time()
         self._discard_leveled_gcode()
         self._save_project()
 
@@ -2331,12 +2337,14 @@ class GrblPcbPlugin(
             except Exception as e:
                 self._logger.debug(f"Error resetting stream mode: {e}")
 
+        # All holes measured: the board is flipped from here on
+        all_probed = all(h["probed"] for h in holes)
+        if all_probed:
+            self._project.alignment_probed_at = time.time()
+
         # Save results
         with self._project_lock:
             self._save_project()
-
-        # Check if all holes probed
-        all_probed = all(h["probed"] for h in holes)
 
         if self._plugin_manager:
             self._plugin_manager.send_plugin_message(
@@ -2481,6 +2489,7 @@ class GrblPcbPlugin(
             hole["measured_y"] = None
             hole["probed"] = False
         self._project.alignment_transform = None
+        self._project.alignment_probed_at = None
         self._discard_aligned_gcode()
         self._save_project()
 
@@ -2583,6 +2592,11 @@ class GrblPcbPlugin(
                 origin = height_map_origin_check(self._height_map, connector._work_offset)
                 if origin:
                     warnings.append(origin)
+                side = height_map_side_check(
+                    self._height_map, op.mirrored, self._project.alignment_probed_at
+                )
+                if side:
+                    warnings.append(side)
             if warnings:
                 return flask.jsonify(result="warnings", warnings=warnings)
 

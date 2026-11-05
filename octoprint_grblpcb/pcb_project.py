@@ -230,6 +230,8 @@ class PCBProject:
     flip_axis: str = "X"  # mirror axis for double-sided
     alignment_holes: list = field(default_factory=list)  # [{expected_x, expected_y, diameter, measured_x, measured_y, probed}]
     alignment_transform: Optional[dict] = None  # computed rigid-body transform
+    # When the alignment holes were probed: the board was flipped before
+    alignment_probed_at: Optional[float] = None
 
     # Accumulated rotation (degrees CCW) applied to gerber data
     rotation: float = 0.0
@@ -295,6 +297,7 @@ class PCBProject:
             "flip_axis": self.flip_axis,
             "alignment_holes": self.alignment_holes,
             "alignment_transform": self.alignment_transform,
+            "alignment_probed_at": self.alignment_probed_at,
             "rotation": self.rotation,
             "has_height_map": self.height_map is not None,
             "height_map": self.height_map,
@@ -344,6 +347,7 @@ class PCBProject:
             flip_axis=data.get("flip_axis", "X"),
             alignment_holes=data.get("alignment_holes", []),
             alignment_transform=data.get("alignment_transform"),
+            alignment_probed_at=data.get("alignment_probed_at"),
             rotation=data.get("rotation", 0.0),
             height_map=data.get("height_map"),
         )
