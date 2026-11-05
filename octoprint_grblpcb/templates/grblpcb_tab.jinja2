@@ -20,10 +20,10 @@
     <!-- Alarm Warning (always visible, overlaid) -->
     <div class="grblpcb-alarm-warning" data-bind="visible: isAlarm">
         <strong>⚠️ {{ _("ALARM STATE") }}</strong>
-        <button class="btn btn-warning btn-small" data-bind="click: unlock">
+        <button class="btn btn-warning btn-small" data-bind="click: unlock, enable: manualAllowed">
             <i class="fas fa-unlock"></i> {{ _("Unlock ($X)") }}
         </button>
-        <button class="btn btn-primary btn-small" data-bind="click: homeAll">
+        <button class="btn btn-primary btn-small" data-bind="click: homeAll, enable: manualAllowed">
             <i class="fas fa-home"></i> {{ _("Home All") }}
         </button>
     </div>
@@ -129,7 +129,7 @@
                             <button class="btn btn-small" data-bind="click: jogYPlus, enable: canJog">Y+</button>
                             <div></div>
                             <button class="btn btn-small" data-bind="click: jogXMinus, enable: canJog">X-</button>
-                            <button class="btn btn-small btn-default" data-bind="click: gotoZero, enable: isIdle" title="{{ _('Go to 0,0') }}">⊙</button>
+                            <button class="btn btn-small btn-default" data-bind="click: gotoZero, enable: manualIdle" title="{{ _('Go to 0,0') }}">⊙</button>
                             <button class="btn btn-small" data-bind="click: jogXPlus, enable: canJog">X+</button>
                             <div></div>
                             <button class="btn btn-small" data-bind="click: jogYMinus, enable: canJog">Y-</button>
@@ -162,10 +162,10 @@
                 <div class="grblpcb-compact-section">
                     <h4><i class="fas fa-cog"></i> {{ _("Machine") }}</h4>
                     <div class="grblpcb-btn-wrap">
-                        <button class="btn btn-small btn-primary" data-bind="click: homeAll, enable: isIdle">
+                        <button class="btn btn-small btn-primary" data-bind="click: homeAll, enable: manualIdle">
                             <i class="fas fa-home"></i> {{ _("Home") }}
                         </button>
-                        <button class="btn btn-small btn-warning" data-bind="click: unlock">
+                        <button class="btn btn-small btn-warning" data-bind="click: unlock, enable: manualAllowed">
                             <i class="fas fa-unlock"></i> {{ _("Unlock") }}
                         </button>
                         <button class="btn btn-small grblpcb-estop" data-bind="click: softReset">
@@ -207,14 +207,14 @@
                     <h4><i class="fas fa-crosshairs"></i> {{ _("Work Coords") }}</h4>
                     <div class="grblpcb-btn-wrap" title="{{ _('Selected work coordinate system, e.g. G54-G59. This tells GRBL where your zero point lives in the machine coordinate system.') }}">
                         <!-- ko foreach: wcsOptions -->
-                        <button class="btn btn-mini" data-bind="text: $data, click: function() { $parent.setWCS($data); }, css: { active: $parent.currentWCS() === $data }" title="{{ _('Current work coordinate system:') }} {{ _('G54-G59') }}"></button>
+                        <button class="btn btn-mini" data-bind="text: $data, click: function() { $parent.setWCS($data); }, enable: $parent.manualAllowed, css: { active: $parent.currentWCS() === $data }" title="{{ _('Current work coordinate system:') }} {{ _('G54-G59') }}"></button>
                         <!-- /ko -->
                     </div>
                     <div class="grblpcb-btn-wrap grblpcb-mt-4">
-                        <button class="btn btn-mini" data-bind="click: zeroX, enable: isIdle" title="{{ _('Set current X position as 0 in the active work coordinate system.') }}">0X</button>
-                        <button class="btn btn-mini" data-bind="click: zeroY, enable: isIdle" title="{{ _('Set current Y position as 0 in the active work coordinate system.') }}">0Y</button>
-                        <button class="btn btn-mini" data-bind="click: zeroZ, enable: isIdle" title="{{ _('Set current Z position as 0 in the active work coordinate system.') }}">0Z</button>
-                        <button class="btn btn-mini btn-primary" data-bind="click: zeroAll, enable: isIdle" title="{{ _('Set X, Y and Z to zero in the current work coordinate system.') }}">{{ _("0 All") }}</button>
+                        <button class="btn btn-mini" data-bind="click: zeroX, enable: manualIdle" title="{{ _('Set current X position as 0 in the active work coordinate system.') }}">0X</button>
+                        <button class="btn btn-mini" data-bind="click: zeroY, enable: manualIdle" title="{{ _('Set current Y position as 0 in the active work coordinate system.') }}">0Y</button>
+                        <button class="btn btn-mini" data-bind="click: zeroZ, enable: manualIdle" title="{{ _('Set current Z position as 0 in the active work coordinate system.') }}">0Z</button>
+                        <button class="btn btn-mini btn-primary" data-bind="click: zeroAll, enable: manualIdle" title="{{ _('Set X, Y and Z to zero in the current work coordinate system.') }}">{{ _("0 All") }}</button>
                     </div>
                     <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
                         {{ _("Tip: zero only after the tool is above the board. Keep the same origin for both sides of a double-sided board.") }}
@@ -231,9 +231,9 @@
                 <div class="grblpcb-compact-section">
                     <h4><i class="fas fa-search-plus"></i> {{ _("Probe") }}</h4>
                     <div class="grblpcb-btn-wrap">
-                        <button class="btn btn-small btn-info" data-bind="click: probeZ, enable: isIdle">Z</button>
-                        <button class="btn btn-small" data-bind="click: probeX, enable: isIdle">X</button>
-                        <button class="btn btn-small" data-bind="click: probeY, enable: isIdle">Y</button>
+                        <button class="btn btn-small btn-info" data-bind="click: probeZ, enable: manualIdle">Z</button>
+                        <button class="btn btn-small" data-bind="click: probeX, enable: manualIdle">X</button>
+                        <button class="btn btn-small" data-bind="click: probeY, enable: manualIdle">Y</button>
                     </div>
                     <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
                         {{ _("Tip: probe only on a clean conductive surface and watch the first probe carefully for unexpected contact.") }}
@@ -247,10 +247,10 @@
                 <div class="grblpcb-compact-section">
                     <h4><i class="fas fa-sync-alt"></i> {{ _("Spindle") }}</h4>
                     <div class="grblpcb-btn-wrap">
-                        <button class="btn btn-small btn-success" data-bind="click: spindleOn, enable: isIdle">{{ _("On") }}</button>
+                        <button class="btn btn-small btn-success" data-bind="click: spindleOn, enable: manualIdle">{{ _("On") }}</button>
                         <button class="btn btn-small btn-danger" data-bind="click: spindleOff">{{ _("Off") }}</button>
                         <input type="number" class="input-mini grblpcb-w-55" data-bind="value: spindleSpeedTarget">
-                        <button class="btn btn-mini" data-bind="click: setSpindleSpeed, enable: isIdle">{{ _("Set") }}</button>
+                        <button class="btn btn-mini" data-bind="click: setSpindleSpeed, enable: manualIdle">{{ _("Set") }}</button>
                     </div>
                     <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
                         {{ _("Tip: start conservative on a new tool or board material, then increase after a successful test cut.") }}

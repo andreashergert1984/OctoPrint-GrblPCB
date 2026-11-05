@@ -142,3 +142,24 @@ def test_manual_commands_during_pause_do_not_overflow_grbl():
         assert received[-1] == "G1 X3.5 F6000"
     finally:
         cleanup()
+
+
+def test_alarm_during_pause_requires_new_confirmation(setup):
+    connector, received = setup
+    assert connector.stream_gcode("G21\nG90\nM0\nG1 X1 F600\n", operation_name="test")
+    assert _wait_status(connector, "pause")
+    assert connector.accepts_manual_commands()
+
+    # Probe upwards: no contact, ALARM:5; the user confirms anyway
+    connector.commands("G91", "G38.2 Z1 F100", "G90")
+    time.sleep(0.5)
+    connector.confirm_tool_change()
+    assert _wait_status(connector, "confirm_again")
+    assert "G1 X1 F600" not in received
+
+    connector.commands("$X")
+    time.sleep(0.5)
+    connector.confirm_tool_change()
+    assert _wait_status(connector, "completed")
+    assert received[-1] == "G1 X1 F600"
+    assert not connector.accepts_manual_commands() or not connector.is_streaming()

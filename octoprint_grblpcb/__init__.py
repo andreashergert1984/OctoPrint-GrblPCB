@@ -455,8 +455,24 @@ class GrblPcbPlugin(
         "send_to_cnc",
     })
 
+    # Commands that send G-code lines; real-time commands (hold, resume,
+    # overrides, stop) are always fine
+    _MANUAL_GCODE_COMMANDS = frozenset({
+        "probe", "home", "unlock", "set_wcs", "zero_axis", "goto_zero",
+        "set_spindle", "spindle_on", "spindle_off", "jog",
+    })
+
     def on_api_command(self, command, data):
         import flask
+
+        if command in self._MANUAL_GCODE_COMMANDS:
+            # Mixed into a running job they would move the machine and
+            # break the character counting of the stream
+            connector = self._get_grbl_connector()
+            if connector is not None and not connector.accepts_manual_commands():
+                return flask.jsonify(error=gettext(
+                    "Not possible while a job is running. Wait for a tool change or pause, or stop the job."
+                )), 409
 
         if command in self._CNC_COMMANDS:
             handler = getattr(self, f"_handle_{command}", None)

@@ -31,6 +31,11 @@ class _ConnectorStub:
     def is_streaming(self):
         return self._streaming
 
+    def accepts_manual_commands(self):
+        return not self._streaming or self.paused
+
+    paused = False
+
     def request_status(self):
         self.status_requests += 1
 
@@ -305,3 +310,34 @@ class TestLeveledGcodeSafety:
         with self.app.app_context():
             body = self.plugin._handle_send_to_cnc({"operation_index": 0, "force": True}).get_json()
         assert body["result"] == "ok"
+
+
+class TestManualCommandsDuringJob:
+    def setup_method(self):
+        self.app = Flask(__name__)
+        Babel(self.app)
+        self.plugin = GrblPcbPlugin()
+
+    def _jog(self, connector):
+        self.plugin._get_grbl_connector = lambda: connector
+        self.plugin._handle_jog = lambda data: "jogged"
+        with self.app.app_context():
+            return self.plugin.on_api_command("jog", {"axis": "X", "distance": 1})
+
+    def test_rejected_while_job_runs(self):
+        response, status = self._jog(_ConnectorStub(streaming=True))
+        assert status == 409
+
+    def test_allowed_while_job_paused(self):
+        connector = _ConnectorStub(streaming=True)
+        connector.paused = True
+        assert self._jog(connector) == "jogged"
+
+    def test_allowed_without_job(self):
+        assert self._jog(_ConnectorStub(streaming=False)) == "jogged"
+
+    def test_realtime_commands_stay_allowed(self):
+        self.plugin._get_grbl_connector = lambda: _ConnectorStub(streaming=True)
+        self.plugin._handle_hold = lambda data: "held"
+        with self.app.app_context():
+            assert self.plugin.on_api_command("hold", {}) == "held"

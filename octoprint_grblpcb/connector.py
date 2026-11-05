@@ -96,6 +96,7 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         self._stream_total_lines = 0
         self._stream_start_time = 0
         self._tool_change_event = threading.Event()
+        self._paused_for_intervention = threading.Event()
         
         self._logger = logging.getLogger(__name__)
     
@@ -582,37 +583,20 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                     break
                 
                 # Handle M6 tool change
+                # M6 tool change and M0 program pause: neither goes to GRBL
+                # (it rejects M6); the user works on the machine and confirms
+                pause_status = None
                 if re.match(r"M0?6\b", line, re.IGNORECASE):
-                    # Drain buffer before tool change
+                    pause_status = "tool_change"
+                elif re.match(r"M0\b", line, re.IGNORECASE):
+                    pause_status = "pause"
+                if pause_status:
                     self._drain_buffer(sent_lengths, buffer_fill)
                     buffer_fill = 0
                     sent_lengths = []
                     self._safe_pause_before_manual_intervention()
-
-                    self._send_stream_progress("tool_change", operation_name, line_num=i)
-                    self._tool_change_event.clear()
-                    # Wait for user confirmation
-                    while not self._tool_change_event.is_set() and not self._stream_stop.is_set():
-                        time.sleep(0.1)
-                    if self._stream_stop.is_set():
+                    if not self._pause_for_intervention(pause_status, operation_name, i):
                         break
-                    self._settle_after_pause()
-                    continue  # Skip sending M6 to GRBL (it doesn't understand it)
-
-                # Handle M0 program pause the same way
-                if re.match(r"M0\b", line, re.IGNORECASE):
-                    self._drain_buffer(sent_lengths, buffer_fill)
-                    buffer_fill = 0
-                    sent_lengths = []
-                    self._safe_pause_before_manual_intervention()
-
-                    self._send_stream_progress("pause", operation_name, line_num=i)
-                    self._tool_change_event.clear()
-                    while not self._tool_change_event.is_set() and not self._stream_stop.is_set():
-                        time.sleep(0.1)
-                    if self._stream_stop.is_set():
-                        break
-                    self._settle_after_pause()
                     continue
                 
                 cmd_len = len(line) + 1  # +1 for newline
@@ -672,7 +656,41 @@ class ConnectedGrblPrinter(ConnectedPrinter):
     
     SETTLE_QUIET = 0.5  # seconds without responses before streaming resumes
 
-    def _settle_after_pause(self):
+    def is_paused_for_intervention(self) -> bool:
+        """True while a job waits at M0/M6 for the user."""
+        return self._paused_for_intervention.is_set()
+
+    def accepts_manual_commands(self) -> bool:
+        """Manual G-code is allowed without a job or while it is paused."""
+        return not self.is_streaming() or self.is_paused_for_intervention()
+
+    def _pause_for_intervention(self, status: str, operation_name: str, line_num: int) -> bool:
+        """
+        Wait for the user's confirmation and for the machine to settle.
+
+        Returns False if the job was stopped. An alarm during the pause
+        voids a confirmation already given: after unlocking, the user has
+        to check the machine and confirm again.
+        """
+        self._paused_for_intervention.set()
+        try:
+            self._send_stream_progress(status, operation_name, line_num=line_num)
+            self._tool_change_event.clear()
+            while True:
+                while not self._tool_change_event.is_set() and not self._stream_stop.is_set():
+                    time.sleep(0.1)
+                if self._stream_stop.is_set():
+                    return False
+                if self._settle_after_pause():
+                    return True
+                if self._stream_stop.is_set():
+                    return False
+                self._tool_change_event.clear()
+                self._send_stream_progress("confirm_again", operation_name, line_num=line_num)
+        finally:
+            self._paused_for_intervention.clear()
+
+    def _settle_after_pause(self) -> bool:
         """
         Wait until manual commands sent during the pause are done.
 
@@ -680,10 +698,15 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         those with ok/[PRB] into the stream queue. Counting them as answers
         to streamed lines would overfill GRBL's 128-byte RX buffer. Discard
         them until GRBL is idle and nothing arrives for SETTLE_QUIET.
+
+        Returns True once settled, False if GRBL is in alarm (or the job
+        was stopped).
         """
         started = quiet_since = time.time()
         reported = False
         while not self._stream_stop.is_set():
+            if self._grbl_state == "Alarm":
+                return False
             try:
                 self._comm._response_queue.get(timeout=0.1)
                 quiet_since = time.time()
@@ -691,9 +714,9 @@ class ConnectedGrblPrinter(ConnectedPrinter):
             except queue.Empty:
                 pass
             if self._grbl_state == "Idle" and time.time() - quiet_since >= self.SETTLE_QUIET:
-                return
+                return True
             if not reported and time.time() - started > 2.0:
-                # e.g. GRBL went into alarm during the pause: say why we wait
+                # e.g. a probe move is still running: say why we wait
                 self._send_stream_progress("waiting_for_idle", "", line_num=self._stream_current_line)
                 reported = True
 

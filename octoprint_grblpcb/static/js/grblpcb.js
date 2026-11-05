@@ -188,6 +188,12 @@ $(function() {
 
         // Execution state
         self.executionActive = ko.observable(false);
+        // A job stopped at M0/M6 waiting for the user
+        self.executionPaused = ko.observable(false);
+        // Manual G-code (jog, zero, probe, ...) only without a job or in a pause
+        self.manualAllowed = ko.pureComputed(function() {
+            return !self.executionActive() || self.executionPaused();
+        });
         self.executionProgress = ko.observable(0);
         self.executionStatus = ko.observable("");
         self.executionCurrentLine = ko.observable(0);
@@ -270,7 +276,11 @@ $(function() {
 
         self.canJog = ko.computed(function() {
             var state = self.grblState();
-            return self.isGrblConnector() && (state === "Idle" || state === "Jog");
+            return self.isGrblConnector() && (state === "Idle" || state === "Jog") && self.manualAllowed();
+        });
+
+        self.manualIdle = ko.pureComputed(function() {
+            return self.isIdle() && self.manualAllowed();
         });
 
         self.hasProject = ko.computed(function() {
@@ -1562,6 +1572,8 @@ $(function() {
                 
                 var errorSuffix = (data.errors && data.errors > 0) ? _.sprintf(gettext(" (%d GRBL errors)"), data.errors) : "";
                 
+                self.executionPaused(["tool_change", "pause", "confirm_again", "waiting_for_idle"].indexOf(data.status) !== -1);
+
                 if (data.status === "completed") {
                     self.executionActive(false);
                     self.executionStatus(_.sprintf(gettext("Completed in %ss"), data.elapsed) + errorSuffix);
@@ -1573,6 +1585,8 @@ $(function() {
                     self.executionStatus(_.sprintf(gettext("⚠️ TOOL CHANGE required at line %d. After changing the tool, probe and zero Z, then click Confirm."), data.current_line + 1));
                 } else if (data.status === "pause") {
                     self.executionStatus(_.sprintf(gettext("⏸ Program pause at line %d. Click Confirm to continue."), data.current_line + 1));
+                } else if (data.status === "confirm_again") {
+                    self.executionStatus(gettext("GRBL went into alarm during the pause. Unlock it, check the position and the Z zero, then confirm again."));
                 } else if (data.status === "waiting_for_idle") {
                     self.executionStatus(gettext("Waiting until the machine is idle before continuing. If GRBL is in alarm, unlock it or stop the job."));
                 } else if (data.status === "progress") {
