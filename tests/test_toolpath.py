@@ -320,7 +320,7 @@ class TestGenerateDrill:
 
     def test_peck_drilling(self):
         drills = self._make_drills()
-        settings = ToolpathSettings(cut_depth=2.0, peck_depth=0.5)
+        settings = ToolpathSettings(cut_depth=2.0, peck_depth=0.5, breakthrough_depth=0.0)
         gcode = generate_drill_gcode(drills, settings)
         # Each hole should have 4 peck cycles (2.0 / 0.5 = 4)
         lines = gcode.splitlines()
@@ -361,6 +361,20 @@ class TestOptimizeDrillOrder:
 
 # =========================================================================
 # Outline G-code generation
+
+
+def test_drill_goes_through_with_breakthrough():
+    settings = ToolpathSettings(cut_depth=1.6, peck_depth=0.5, breakthrough_depth=0.2)
+    gcode = generate_drill_gcode(TestGenerateDrill()._make_drills(), settings)
+    assert _deepest_z(gcode) == pytest.approx(-1.8)
+
+
+def _deepest_z(gcode):
+    import re
+
+    return min(float(z) for z in re.findall(r"Z(-?\d+\.?\d*)", gcode))
+
+
 # =========================================================================
 
 
@@ -382,6 +396,13 @@ class TestGenerateOutline:
         mp = MultiPolygon([small, big])
         gcode = generate_outline_gcode(mp, ToolpathSettings(), board_thickness=1.6)
         assert gcode  # non-empty, uses big polygon
+
+    def test_outline_goes_through_and_keeps_tabs(self):
+        settings = ToolpathSettings(breakthrough_depth=0.2, tab_height=0.5, peck_depth=0.5)
+        gcode = generate_outline_gcode(self._make_outline(), settings, board_thickness=1.6)
+        assert _deepest_z(gcode) == pytest.approx(-1.8)
+        # Tabs stay 0.5 mm high, measured from the board bottom
+        assert "G1 Z-1.1000" in gcode
 
     def test_linestring_input(self):
         ls = LineString([(0, 0), (50, 0), (50, 30), (0, 30), (0, 0)])

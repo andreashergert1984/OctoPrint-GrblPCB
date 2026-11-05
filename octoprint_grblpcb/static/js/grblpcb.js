@@ -159,6 +159,7 @@ $(function() {
         self.genDrillFeed = ko.observable(100);
         self.genPeckDepth = ko.observable(0.5);
         self.genBoardThickness = ko.observable(1.6);
+        self.genBreakthrough = ko.observable(0.2);
         // -- Outline --
         self.genOutlineDiameter = ko.observable(2.0);
         self.genTabWidth = ko.observable(2.0);
@@ -708,7 +709,8 @@ $(function() {
                 spindle_speed: parseInt(self.genSpindleSpeed()),
                 safe_z: parseFloat(self.genSafeZ()),
                 travel_z: parseFloat(self.genTravelZ()),
-                board_thickness: parseFloat(self.genBoardThickness())
+                board_thickness: parseFloat(self.genBoardThickness()),
+                breakthrough_depth: parseFloat(self.genBreakthrough())
             })
                 .done(function(response) {
                     self.uploadMessage(
@@ -734,6 +736,7 @@ $(function() {
                 safe_z: parseFloat(self.genSafeZ()),
                 travel_z: parseFloat(self.genTravelZ()),
                 board_thickness: parseFloat(self.genBoardThickness()),
+                breakthrough_depth: parseFloat(self.genBreakthrough()),
                 tab_width: parseFloat(self.genTabWidth()),
                 tab_height: parseFloat(self.genTabHeight()),
                 num_tabs: parseInt(self.genNumTabs())
@@ -1355,6 +1358,7 @@ $(function() {
             self.genDrillFeed(s.drill_feed());
             self.genPeckDepth(s.peck_depth());
             self.genBoardThickness(s.board_thickness());
+            self.genBreakthrough(s.breakthrough_depth());
             self.genTabWidth(s.outline_tab_width());
             self.genTabHeight(s.outline_tab_height());
             self.genNumTabs(s.outline_num_tabs());

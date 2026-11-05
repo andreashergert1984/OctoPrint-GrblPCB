@@ -249,6 +249,7 @@ class GrblPcbPlugin(
             drill_feed=100,  # mm/min
             peck_depth=0.5,  # mm per peck
             board_thickness=1.6,  # mm
+            breakthrough_depth=0.2,  # mm below the board for drilling and outline
             
             # Outline
             outline_tab_width=2.0,  # mm
@@ -1281,6 +1282,7 @@ class GrblPcbPlugin(
             clear_gaps=self._settings.get_boolean(["isolation_clear_gaps"]),
             peck_depth=self._settings.get_float(["peck_depth"]),
             drill_feed=self._settings.get_float(["drill_feed"]),
+            breakthrough_depth=self._settings.get_float(["breakthrough_depth"]),
             tab_width=self._settings.get_float(["outline_tab_width"]),
             tab_height=self._settings.get_float(["outline_tab_height"]),
             num_tabs=self._settings.get_int(["outline_num_tabs"]),
@@ -1301,7 +1303,7 @@ class GrblPcbPlugin(
                 "tool_diameter", "tool_angle", "cut_depth", "depth_per_pass",
                 "feed_rate", "plunge_rate", "spindle_speed",
                 "passes", "pass_overlap", "max_width", "clear_gaps", "safe_z", "travel_z",
-                "peck_depth", "drill_feed",
+                "peck_depth", "drill_feed", "breakthrough_depth",
                 "tab_width", "tab_height", "num_tabs",
                 "spindle_dwell",
                 "wcs",
@@ -1434,7 +1436,10 @@ class GrblPcbPlugin(
             ), 400
 
         settings = self._get_toolpath_settings(data)
-        settings.cut_depth = self._settings.get_float(["board_thickness"])
+        settings.cut_depth = float(data.get(
+            "board_thickness",
+            self._settings.get_float(["board_thickness"]),
+        ))
 
         gcode = generate_drill_gcode(
             self._project.drills,

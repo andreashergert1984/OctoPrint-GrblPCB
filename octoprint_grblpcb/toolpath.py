@@ -61,6 +61,9 @@ class ToolpathSettings:
     peck_depth: float = 0.5  # mm per peck
     retract_height: float = 1.0  # mm above surface for peck retract
     drill_feed: float = 100.0  # mm/min
+    # Drilling and outline go this far below the board so no skin is left
+    # (board tolerance, uneven spoil board, drill tip cone)
+    breakthrough_depth: float = 0.2  # mm
 
     # Outline
     tab_width: float = 2.0  # mm
@@ -515,6 +518,10 @@ def generate_drill_gcode(
     lines = []
     lines.append("; === Drilling G-code ===")
     lines.append(f"; Drill feed: {settings.drill_feed} mm/min")
+    lines.append(
+        f"; Drill depth: {settings.cut_depth + settings.breakthrough_depth:.2f} mm "
+        f"(board {settings.cut_depth} mm + breakthrough {settings.breakthrough_depth} mm)"
+    )
     lines.append(f"; Spindle speed: {settings.spindle_speed} RPM")
     lines.append("")
 
@@ -550,8 +557,8 @@ def generate_drill_gcode(
             # Rapid to hole position
             lines.append(f"G0 X{hx:.4f} Y{hy:.4f}")
 
-            # Determine drill depth from board thickness (use cut_depth as total)
-            depth = settings.cut_depth
+            # cut_depth holds the board thickness for drilling
+            depth = settings.cut_depth + settings.breakthrough_depth
             if depth <= settings.peck_depth or settings.peck_depth <= 0:
                 # Simple drill cycle
                 lines.append(settings.z_move(settings.retract_height))
@@ -629,7 +636,9 @@ def generate_outline_gcode(
 
     lines = []
     lines.append("; === Outline Cutting G-code ===")
+    total_depth = board_thickness + settings.breakthrough_depth
     lines.append(f"; Board thickness: {board_thickness} mm")
+    lines.append(f"; Breakthrough: {settings.breakthrough_depth} mm (total depth {total_depth:.2f} mm)")
     lines.append(f"; Tool diameter: {settings.tool_diameter} mm")
     lines.append(f"; Tab width: {settings.tab_width} mm")
     lines.append(f"; Tabs: {settings.num_tabs}")
@@ -682,11 +691,11 @@ def generate_outline_gcode(
     )
 
     # Multi-pass depth cutting
-    num_depth_passes = max(1, math.ceil(board_thickness / settings.peck_depth))
+    num_depth_passes = max(1, math.ceil(total_depth / settings.peck_depth))
 
     for depth_pass in range(num_depth_passes):
         current_depth = min(
-            (depth_pass + 1) * settings.peck_depth, board_thickness
+            (depth_pass + 1) * settings.peck_depth, total_depth
         )
         lines.append(f"; Depth pass {depth_pass + 1}: Z{-current_depth:.3f}")
 
