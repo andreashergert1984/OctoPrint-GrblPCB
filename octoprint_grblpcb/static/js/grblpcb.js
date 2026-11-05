@@ -1508,7 +1508,7 @@ $(function() {
             else if (data.type === "alarm") {
                 new PNotify({
                     title: _.sprintf(gettext("GRBL alarm %d"), data.code),
-                    text: data.message + "\n\n" + gettext("The machine position may be lost. Home the machine or unlock it, then check the work zero before continuing."),
+                    text: (GrblPcbLabels.alarm(data.code) || data.message) + "\n\n" + gettext("The machine position may be lost. Home the machine or unlock it, then check the work zero before continuing."),
                     type: "error",
                     hide: false
                 });

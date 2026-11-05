@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: OctoPrint-GrblPCB 0.1.0\n"
 "Report-Msgid-Bugs-To: i18n@octoprint.org\n"
-"POT-Creation-Date: 2026-11-05 22:03+0100\n"
+"POT-Creation-Date: 2026-11-05 22:06+0100\n"
 "PO-Revision-Date: 2025-07-19 18:00+0100\n"
 "Last-Translator: Andreas Hergert <andreas@hergert.info>\n"
 "Language: de\n"
@@ -770,6 +770,46 @@ msgstr "Maskenbelichtung"
 #: octoprint_grblpcb/static/js/labels.js:43
 msgid "(mirrored)"
 msgstr "(gespiegelt)"
+
+#: octoprint_grblpcb/static/js/labels.js:51
+msgid "Hard limit triggered. Position is likely lost."
+msgstr "Endschalter ausgelöst. Die Position ist wahrscheinlich verloren."
+
+#: octoprint_grblpcb/static/js/labels.js:52
+msgid "Motion target exceeds machine travel."
+msgstr "Das Bewegungsziel liegt außerhalb des Verfahrbereichs."
+
+#: octoprint_grblpcb/static/js/labels.js:53
+msgid "Reset while in motion. Position is likely lost."
+msgstr "Reset während der Bewegung. Die Position ist wahrscheinlich verloren."
+
+#: octoprint_grblpcb/static/js/labels.js:54
+msgid "Probe fail: the probe was already triggered before probing."
+msgstr "Antasten fehlgeschlagen: Der Taster war schon vor dem Antasten ausgelöst."
+
+#: octoprint_grblpcb/static/js/labels.js:55
+msgid "Probe fail: no contact within the programmed travel."
+msgstr "Antasten fehlgeschlagen: kein Kontakt innerhalb des programmierten Wegs."
+
+#: octoprint_grblpcb/static/js/labels.js:56
+msgid "Homing fail: reset during the homing cycle."
+msgstr "Referenzfahrt fehlgeschlagen: Reset während der Referenzfahrt."
+
+#: octoprint_grblpcb/static/js/labels.js:57
+msgid "Homing fail: safety door opened during homing."
+msgstr "Referenzfahrt fehlgeschlagen: Schutztür während der Referenzfahrt geöffnet."
+
+#: octoprint_grblpcb/static/js/labels.js:58
+msgid "Homing fail: pull-off did not clear the limit switch."
+msgstr "Referenzfahrt fehlgeschlagen: Beim Freifahren wurde der Endschalter nicht frei."
+
+#: octoprint_grblpcb/static/js/labels.js:59
+msgid "Homing fail: limit switch not found within search distance."
+msgstr "Referenzfahrt fehlgeschlagen: Endschalter innerhalb des Suchwegs nicht gefunden."
+
+#: octoprint_grblpcb/static/js/labels.js:60
+msgid "Homing fail: second limit switch of a dual axis did not trigger."
+msgstr "Referenzfahrt fehlgeschlagen: Der zweite Endschalter einer Doppelachse hat nicht ausgelöst."
 
 #: octoprint_grblpcb/static/js/workspace_renderer.js:636
 #, python-format

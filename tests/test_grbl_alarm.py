@@ -73,3 +73,10 @@ def test_state_text_shows_alarm_and_refreshes_on_change():
     c._on_grbl_status({"state": "Idle", "mpos": {"x": 0.0, "y": 0.0, "z": 0.0}})
     assert c.get_state_string() == "Operational"
     assert len(c._listener.states) == 2
+
+
+def test_probe_alarm_codes_follow_grbl_1_1():
+    from octoprint_grblpcb.grbl_comm import GRBL_ALARMS
+
+    assert "initial state" in GRBL_ALARMS[4]
+    assert "did not contact" in GRBL_ALARMS[5]

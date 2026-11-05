@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: OctoPrint-GrblPCB 0.1.0\n"
 "Report-Msgid-Bugs-To: i18n@octoprint.org\n"
-"POT-Creation-Date: 2026-11-05 22:03+0100\n"
+"POT-Creation-Date: 2026-11-05 22:06+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -784,6 +784,46 @@ msgstr ""
 
 #: octoprint_grblpcb/static/js/labels.js:43
 msgid "(mirrored)"
+msgstr ""
+
+#: octoprint_grblpcb/static/js/labels.js:51
+msgid "Hard limit triggered. Position is likely lost."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/labels.js:52
+msgid "Motion target exceeds machine travel."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/labels.js:53
+msgid "Reset while in motion. Position is likely lost."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/labels.js:54
+msgid "Probe fail: the probe was already triggered before probing."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/labels.js:55
+msgid "Probe fail: no contact within the programmed travel."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/labels.js:56
+msgid "Homing fail: reset during the homing cycle."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/labels.js:57
+msgid "Homing fail: safety door opened during homing."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/labels.js:58
+msgid "Homing fail: pull-off did not clear the limit switch."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/labels.js:59
+msgid "Homing fail: limit switch not found within search distance."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/labels.js:60
+msgid "Homing fail: second limit switch of a dual axis did not trigger."
 msgstr ""
 
 #: octoprint_grblpcb/static/js/workspace_renderer.js:636

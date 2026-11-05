@@ -45,7 +45,25 @@
         return label;
     }
 
+    // GRBL 1.1 alarm codes
+    function alarm(code) {
+        switch (code) {
+            case 1: return gettext("Hard limit triggered. Position is likely lost.");
+            case 2: return gettext("Motion target exceeds machine travel.");
+            case 3: return gettext("Reset while in motion. Position is likely lost.");
+            case 4: return gettext("Probe fail: the probe was already triggered before probing.");
+            case 5: return gettext("Probe fail: no contact within the programmed travel.");
+            case 6: return gettext("Homing fail: reset during the homing cycle.");
+            case 7: return gettext("Homing fail: safety door opened during homing.");
+            case 8: return gettext("Homing fail: pull-off did not clear the limit switch.");
+            case 9: return gettext("Homing fail: limit switch not found within search distance.");
+            case 10: return gettext("Homing fail: second limit switch of a dual axis did not trigger.");
+            default: return "";
+        }
+    }
+
     global.GrblPcbLabels = {
+        alarm: alarm,
         layer: layer,
         operationType: operationType,
         operation: operation
