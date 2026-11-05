@@ -75,7 +75,9 @@ class GrblSimulator:
 
     def _reset_state(self):
         self.state = "Alarm" if self._homing else "Idle"
-        self.mpos = {a: 0.0 for a in AXES}
+        if not hasattr(self, "mpos"):
+            # GRBL keeps the machine position over a soft reset
+            self.mpos = {a: 0.0 for a in AXES}
         if not hasattr(self, "offsets"):
             # Work offsets live in EEPROM and survive a soft reset
             self.offsets = {w: {a: 0.0 for a in AXES} for w in WCS_CODES}
@@ -129,11 +131,8 @@ class GrblSimulator:
             elif byte == 0x18:  # Ctrl-X
                 # Reset during motion loses steps: GRBL raises ALARM:3
                 in_motion = self.state in ("Run", "Jog", "Home") or self.state.startswith("Hold")
-                position = dict(self.mpos)
                 self._reset_state()
                 if in_motion:
-                    self.mpos = position
-                    self._planned_end = dict(position)
                     self.state = "Alarm"
                     self.send("ALARM:3")
                 self.send("")

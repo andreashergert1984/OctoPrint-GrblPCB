@@ -158,3 +158,10 @@ def test_overrides_reported():
     s.realtime(0x90)
     s.realtime(ord("?"))
     assert "Ov:100,50,90" in _lines(s)[0]
+
+
+def test_soft_reset_keeps_machine_position(sim):
+    sim.line("G0 X10 Y5")
+    _idle(sim)
+    sim.realtime(0x18)
+    assert sim.mpos == {"x": 10.0, "y": 5.0, "z": 0.0}
