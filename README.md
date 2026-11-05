@@ -146,6 +146,11 @@ Connection → Additional serial ports** (`plugins.serial_connector.additionalPo
 the GRBL connection then lists it. `--homing` starts in `Alarm` like a machine
 with `$22=1`, `--time-scale` sets how fast moves run (default 5 % of real time).
 
+At the default time scale the simulated machine finishes moves faster than the
+plugin can stream them, so its planner runs empty and the status shows `Idle`
+between moves, as real GRBL does when it starves. Use `--time-scale 1` to see the
+status a real machine would report during a job.
+
 ## Plugin Structure
 
 ```
