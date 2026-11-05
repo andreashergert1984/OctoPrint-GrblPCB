@@ -151,6 +151,18 @@ plugin can stream them, so its planner runs empty and the status shows `Idle`
 between moves, as real GRBL does when it starves. Use `--time-scale 1` to see the
 status a real machine would report during a job.
 
+### In a Container
+
+`docker/` builds OctoPrint from source with the plugin installed editable and the
+simulator enabled:
+
+```bash
+docker compose -f docker/docker-compose.yml up --build
+```
+
+Open http://localhost:5000, choose **GRBL CNC Connection** and the port
+`/tmp/ttyGRBL`. Status and open points: [docs/development-plan.md](docs/development-plan.md).
+
 ## Development Checks
 
 There is no CI pipeline; run the checks locally in the OctoPrint venv before pushing:
@@ -196,6 +208,8 @@ OctoPrint-GrblPCB/
 │   └── translations/          # Bundled i18n files
 ├── tests/                     # Automated test suite (pytest)
 ├── tools/grbl_simulator.py    # GRBL 1.1 simulator for testing without hardware
+├── docker/                    # Development container (OctoPrint from source + simulator)
+├── docs/development-plan.md   # Status and open points
 ├── babel.cfg                  # i18n string extraction config
 ├── CHANGELOG.md
 ├── pyproject.toml

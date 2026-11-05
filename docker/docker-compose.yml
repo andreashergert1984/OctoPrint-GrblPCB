@@ -1,0 +1,27 @@
+# Development setup: OctoPrint with OctoPrint-GrblPCB.
+#
+#   docker compose -f docker/docker-compose.yml up --build
+#
+# Open http://localhost:5000. GRBL_SIMULATOR=1 starts the simulator; select
+# "GRBL CNC Connection" and the port /tmp/ttyGRBL. For a real machine set
+# GRBL_SIMULATOR=0 and pass the device through (see "devices" below).
+
+services:
+  octoprint:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        OCTOPRINT_REF: dev
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      GRBL_SIMULATOR: "1"
+    volumes:
+      - ..:/plugin
+      - octoprint_data:/data
+    # devices:
+    #   - /dev/ttyUSB0:/dev/ttyUSB0
+
+volumes:
+  octoprint_data:
