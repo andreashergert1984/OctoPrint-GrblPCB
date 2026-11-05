@@ -1101,54 +1101,23 @@ $(function() {
         // =================================================================
 
         self.setAlignmentHolesFromDrills = function() {
-            // Let user pick alignment holes from the drill list.
-            // Use the 2 holes that are farthest apart (corner-to-corner).
-            var drills = self.projectDrills();
-            var allHoles = [];
-            for (var d = 0; d < drills.length; d++) {
-                var drill = drills[d];
-                for (var h = 0; h < drill.holes.length; h++) {
-                    allHoles.push({
-                        x: drill.holes[h][0],
-                        y: drill.holes[h][1],
-                        diameter: drill.diameter
-                    });
-                }
-            }
-            if (allHoles.length < 2) {
-                self.alignmentStatus(gettext("Need at least 2 drill holes"));
-                return;
-            }
-
-            // Find the 2 holes with maximum distance (best alignment baseline)
-            var bestDist = 0, bestI = 0, bestJ = 1;
-            for (var i = 0; i < allHoles.length; i++) {
-                for (var j = i + 1; j < allHoles.length; j++) {
-                    var dx = allHoles[i].x - allHoles[j].x;
-                    var dy = allHoles[i].y - allHoles[j].y;
-                    var dist = dx * dx + dy * dy;
-                    if (dist > bestDist) {
-                        bestDist = dist;
-                        bestI = i;
-                        bestJ = j;
-                    }
-                }
-            }
-
-            var selected = [
-                {expected_x: allHoles[bestI].x, expected_y: allHoles[bestI].y, diameter: allHoles[bestI].diameter},
-                {expected_x: allHoles[bestJ].x, expected_y: allHoles[bestJ].y, diameter: allHoles[bestJ].diameter}
-            ];
-
-            OctoPrint.simpleApiCommand("grblpcb", "set_alignment_holes", {
-                holes: selected
-            }).done(function(response) {
-                self.alignmentHoles(response.alignment_holes);
-                self.alignmentTransform(null);
-                self.alignmentStatus(
-                    _.sprintf(gettext("Set %d alignment holes (dist=%smm)"), selected.length, Math.sqrt(bestDist).toFixed(1))
-                );
-            });
+            // The backend picks the two farthest holes and gives their
+            // positions on the flipped board (back-side work coordinates)
+            OctoPrint.simpleApiCommand("grblpcb", "auto_alignment_holes", {})
+                .done(function(response) {
+                    var holes = response.alignment_holes;
+                    self.alignmentHoles(holes);
+                    self.alignmentTransform(null);
+                    var dx = holes[0].expected_x - holes[1].expected_x;
+                    var dy = holes[0].expected_y - holes[1].expected_y;
+                    self.alignmentStatus(
+                        _.sprintf(gettext("Set %d alignment holes (dist=%smm)"), holes.length, Math.sqrt(dx * dx + dy * dy).toFixed(1))
+                    );
+                    self._refreshProject();
+                })
+                .fail(function(xhr) {
+                    self.alignmentStatus(gettext("Error: ") + (xhr.responseJSON?.error || gettext("failed")));
+                });
         };
 
         self.setAlignmentHoleManual = function(holes) {
@@ -1207,7 +1176,7 @@ $(function() {
             var ops = self.projectOperations();
             var applied = 0;
             for (var i = 0; i < ops.length; i++) {
-                if (ops[i].name && ops[i].name.indexOf("(mirrored)") !== -1 && ops[i].has_gcode) {
+                if (ops[i].mirrored && ops[i].has_gcode) {
                     self.applyAlignment(i);
                     applied++;
                 }

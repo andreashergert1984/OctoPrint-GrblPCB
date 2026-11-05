@@ -110,3 +110,51 @@ def test_reset_during_motion_raises_alarm(sim):
     assert sim.state == "Alarm"
     sim.line("G0 X1")
     assert _lines(sim) == ["error:9"]
+
+
+def _sim_with_hole():
+    out = []
+    s = grbl_simulator.GrblSimulator(
+        lambda data: out.append(data.decode()), time_scale=0.0, holes=[(10.0, 20.0, 3.0)], probe_diameter=1.0
+    )
+    s.out = out
+    return s
+
+
+def test_wall_probe_inside_hole():
+    s = _sim_with_hole()
+    s.line("G0 X10.2 Y20")
+    _idle(s)
+    s.line("G1 Z-1.5 F100")  # below the surface (-1.0)
+    _idle(s)
+    s.out.clear()
+    s.line("G38.3 X12 F50")
+    lines = _lines(s)
+    # hole radius 1.5 minus probe radius 0.5: wall at x = 11.0
+    assert lines[0] == "[PRB:11.000,20.000,-1.500:1]"
+    s.line("G38.3 X8 F50")
+    assert _lines(s)[0] == "[PRB:9.000,20.000,-1.500:1]"
+
+
+def test_wall_probe_without_wall_g38_3_no_alarm():
+    s = _sim_with_hole()
+    s.line("G0 X30 Y30")
+    _idle(s)
+    s.line("G1 Z-1.5 F100")
+    _idle(s)
+    s.out.clear()
+    s.line("G38.3 X35 F50")
+    lines = _lines(s)
+    assert lines[0].endswith(":0]") and "ALARM:5" not in lines
+    assert s.state != "Alarm"
+
+
+def test_overrides_reported():
+    s = _sim_with_hole()
+    for byte in (0x91, 0x91, 0x93, 0x96, 0x9B):
+        s.realtime(byte)
+    s.realtime(ord("?"))
+    assert "Ov:121,50,90" in _lines(s)[0]
+    s.realtime(0x90)
+    s.realtime(ord("?"))
+    assert "Ov:100,50,90" in _lines(s)[0]

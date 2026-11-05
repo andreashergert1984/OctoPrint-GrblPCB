@@ -1026,6 +1026,41 @@ def mirror_coordinates_y(
 # =============================================================================
 
 
+def back_side_alignment_holes(
+    holes: list[tuple[float, float, float]],
+    board_min: tuple[float, float],
+    board_size: tuple[float, float],
+    flip_axis: str = "X",
+) -> list[dict]:
+    """
+    Pick the two holes farthest apart and give their positions on the back side.
+
+    ``holes`` are (x, y, diameter) in drill-file coordinates. The drill
+    G-code puts them at (x - min_x, y - min_y); after flipping the board
+    (``flip_axis`` "X" mirrors X, "Y" mirrors Y, as mirror_gcode does) they
+    are expected at the mirrored work coordinates returned here.
+    """
+    if len(holes) < 2:
+        raise ValueError("need at least 2 holes")
+    best = (0.0, 0, 1)
+    for i in range(len(holes)):
+        for j in range(i + 1, len(holes)):
+            dist = (holes[i][0] - holes[j][0]) ** 2 + (holes[i][1] - holes[j][1]) ** 2
+            if dist > best[0]:
+                best = (dist, i, j)
+    width, height = board_size
+    result = []
+    for k in best[1:]:
+        x, y, diameter = holes[k]
+        hx, hy = x - board_min[0], y - board_min[1]
+        if flip_axis == "X":
+            hx = width - hx
+        else:
+            hy = height - hy
+        result.append({"expected_x": round(hx, 4), "expected_y": round(hy, 4), "diameter": diameter})
+    return result
+
+
 @dataclass
 class AlignmentTransform:
     """Rigid-body 2D transform: rotation + translation.

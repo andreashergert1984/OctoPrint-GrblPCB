@@ -44,6 +44,7 @@ from .toolpath import (
     mirror_coordinates_x,
     mirror_coordinates_y,
     AlignmentTransform,
+    back_side_alignment_holes,
     compute_alignment_transform,
     apply_alignment_transform,
 )
@@ -390,6 +391,7 @@ class GrblPcbPlugin(
             set_board_side=["side"],
             mirror_gcode=["operation_index"],
             set_alignment_holes=["holes"],
+            auto_alignment_holes=[],
             probe_alignment=[],
             stop_alignment_probe=[],
             compute_alignment=[],
@@ -440,7 +442,8 @@ class GrblPcbPlugin(
         "setup_autolevel", "start_autolevel", "stop_autolevel",
         "get_heightmap", "apply_autolevel",
         "set_board_side", "mirror_gcode",
-        "set_alignment_holes", "probe_alignment", "stop_alignment_probe",
+        "set_alignment_holes", "auto_alignment_holes",
+        "probe_alignment", "stop_alignment_probe",
         "compute_alignment", "apply_alignment", "clear_alignment",
         "get_operations", "download_gcode", "delete_operation",
         "reorder_operations", "get_toolpath_preview",
@@ -1986,7 +1989,7 @@ class GrblPcbPlugin(
             return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
-        if not op.gcode:
+        if not op.gcode_to_level:
             return flask.jsonify(error=gettext("No G-code to correct")), 400
 
         max_segment = data.get(
@@ -1994,7 +1997,7 @@ class GrblPcbPlugin(
             self._settings.get_float(["autolevel_max_segment"]),
         )
 
-        leveled = apply_autolevel(op.gcode, self._height_map, max_segment)
+        leveled = apply_autolevel(op.gcode_to_level, self._height_map, max_segment)
         op.gcode_leveled = leveled
         self._project.state = ProjectState.LEVELED
         self._save_project()
@@ -2043,6 +2046,7 @@ class GrblPcbPlugin(
             feed_rate=op.feed_rate,
             spindle_speed=op.spindle_speed,
             passes=op.passes,
+            mirrored=True,
         )
 
         # Replace existing mirrored version if found, otherwise insert after source
@@ -2097,6 +2101,7 @@ class GrblPcbPlugin(
             for h in holes
         ]
         self._project.alignment_transform = None
+        self._discard_aligned_gcode()
         self._save_project()
 
         self._logger.info(
@@ -2108,6 +2113,40 @@ class GrblPcbPlugin(
             result="ok",
             alignment_holes=self._project.alignment_holes,
         )
+
+    def _handle_auto_alignment_holes(self, data):
+        """Pick the two farthest drill holes as alignment references.
+
+        Their expected positions are given in work coordinates of the back
+        side, i.e. as the mirrored drill G-code places them.
+        """
+        import flask
+
+        if self._project is None:
+            return flask.jsonify(error=gettext("No project")), 400
+        holes = [
+            (x, y, drill.diameter)
+            for drill in self._project.drills
+            for x, y in drill.holes
+        ]
+        if len(holes) < 2:
+            return flask.jsonify(error=gettext("Need at least 2 alignment holes")), 400
+        selected = back_side_alignment_holes(
+            holes,
+            (self._project.board_min_x, self._project.board_min_y),
+            (self._project.board_width, self._project.board_height),
+            self._project.flip_axis,
+        )
+        return self._handle_set_alignment_holes({"holes": selected})
+
+    def _discard_aligned_gcode(self):
+        """Drop aligned G-code (and leveled G-code built on it)."""
+        if self._project is None:
+            return
+        for op in self._project.operations:
+            if op.gcode_aligned:
+                op.gcode_aligned = ""
+                op.gcode_leveled = ""
 
     def _handle_probe_alignment(self, data):
         """Start XY edge-find probing of alignment holes.
@@ -2310,10 +2349,15 @@ class GrblPcbPlugin(
             )
 
     def _probe_axis(self, comm, connector, axis: str, target: float, feed: float):
-        """Probe a single axis direction, return the contact coordinate or None."""
+        """
+        Probe a single axis direction, return the contact coordinate in work
+        coordinates or None.
+
+        G38.3: finding no wall must not raise an alarm and lock the machine.
+        """
         connector.commands(
             "G21", "G90",
-            f"G38.2 {axis}{target:.4f} F{feed}",
+            f"G38.3 {axis}{target:.4f} F{feed}",
         )
         # Wait for G21, G90 ok
         self._wait_for_ok(comm, timeout=2.0)
@@ -2331,8 +2375,8 @@ class GrblPcbPlugin(
             if resp[0] == "probe":
                 probe_data = resp[1]
                 if probe_data["success"]:
-                    # Extract the relevant axis coordinate
-                    result_val = probe_data.get(axis.lower(), None)
+                    # PRB reports machine coordinates
+                    result_val = probe_data[axis.lower()] - connector._work_offset.get(axis.lower(), 0.0)
                 else:
                     self._logger.warning(f"Probe {axis} contact failed")
                     return None
@@ -2372,16 +2416,18 @@ class GrblPcbPlugin(
             return flask.jsonify(error=gettext("Transform computation failed: %(value)s") % {"value": e}), 400
 
         self._project.alignment_transform = transform.to_dict()
+        self._discard_aligned_gcode()
         self._save_project()
 
         return flask.jsonify(
             result="ok",
             transform=transform.to_dict(),
-            message=(
-                f"Alignment: rotation {transform.theta_deg:.3f}°, "
-                f"offset ({transform.tx:.4f}, {transform.ty:.4f})mm, "
-                f"RMS error {transform.rms_error:.4f}mm"
-            ),
+            message=gettext(
+                "Alignment: rotation %(angle).3f°, offset (%(tx).4f, %(ty).4f) mm, RMS error %(rms).4f mm"
+            ) % {
+                "angle": transform.theta_deg, "tx": transform.tx,
+                "ty": transform.ty, "rms": transform.rms_error,
+            },
         )
 
     def _handle_apply_alignment(self, data):
@@ -2399,16 +2445,14 @@ class GrblPcbPlugin(
             return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
-        # Apply to the best available G-code (leveled > original)
-        source = op.gcode_leveled if op.gcode_leveled else op.gcode
-        if not source:
+        # Always from the raw G-code, so applying twice does not stack
+        if not op.gcode:
             return flask.jsonify(error=gettext("No G-code to transform")), 400
 
         transform = AlignmentTransform.from_dict(self._project.alignment_transform)
-        aligned = apply_alignment_transform(source, transform)
-
-        # Store in gcode_leveled (alignment is the last transform before execution)
-        op.gcode_leveled = aligned
+        op.gcode_aligned = apply_alignment_transform(op.gcode, transform)
+        # Leveled G-code was built on the old XY positions
+        op.gcode_leveled = ""
         self._save_project()
 
         self._logger.info(
@@ -2437,6 +2481,7 @@ class GrblPcbPlugin(
             hole["measured_y"] = None
             hole["probed"] = False
         self._project.alignment_transform = None
+        self._discard_aligned_gcode()
         self._save_project()
 
         return flask.jsonify(result="ok")
@@ -2453,8 +2498,7 @@ class GrblPcbPlugin(
             return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
-        # Prefer leveled G-code if available
-        gcode = op.gcode_leveled if op.gcode_leveled else op.gcode
+        gcode = op.gcode_to_send
         if not gcode:
             return flask.jsonify(error=gettext("No G-code")), 400
 
@@ -2523,8 +2567,7 @@ class GrblPcbPlugin(
             return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
-        # Prefer leveled G-code if available
-        gcode = op.gcode_leveled if op.gcode_leveled else op.gcode
+        gcode = op.gcode_to_send
         if not gcode:
             return flask.jsonify(error=gettext("No G-code to execute")), 400
 
@@ -2609,8 +2652,7 @@ class GrblPcbPlugin(
 
         toolpaths = []
         for op in self._project.operations:
-            # Prefer leveled G-code for preview
-            gcode = op.gcode_leveled if op.gcode_leveled else op.gcode
+            gcode = op.gcode_to_send
             if not gcode:
                 continue
 

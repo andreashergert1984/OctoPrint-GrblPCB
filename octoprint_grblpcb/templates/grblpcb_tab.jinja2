@@ -739,6 +739,8 @@
                                 </div>
                                 <div>
                                     <span class="label grblpcb-text-xs" data-bind="visible: !has_gcode">{{ _("No G-code") }}</span>
+                                    <span class="label label-info grblpcb-text-xs" data-bind="visible: has_aligned_gcode"
+                                          title="{{ _('The double-sided alignment is applied to this operation.') }}">{{ _("Aligned") }}</span>
                                     <span class="label label-success grblpcb-text-xs" data-bind="visible: has_leveled_gcode"
                                           title="{{ _('The leveled G-code is sent: the height map is applied.') }}">{{ _("Leveled") }}</span>
                                     <span class="label grblpcb-text-xs" data-bind="visible: has_gcode && !has_leveled_gcode"

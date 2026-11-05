@@ -39,7 +39,7 @@
         if (op.operation_type === "isolation" || op.operation_type === "mask_expose") {
             label += " (" + layer(op.layer_type) + ")";
         }
-        if (/\(mirrored\)/i.test(op.name || "")) {
+        if (op.mirrored) {
             label += " " + gettext("(mirrored)");
         }
         return label;

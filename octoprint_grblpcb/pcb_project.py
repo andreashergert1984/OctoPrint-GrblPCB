@@ -135,7 +135,11 @@ class MillingOperation:
     operation_type: str  # "isolation", "drill", "outline"
     layer_type: str
     gcode: str = ""
+    # Derived versions, each built from the one before:
+    # gcode -> gcode_aligned (double-sided alignment) -> gcode_leveled
+    gcode_aligned: str = ""
     gcode_leveled: str = ""  # G-code with autolevel correction
+    mirrored: bool = False  # bottom-side copy made by mirror_gcode
     tool_diameter: float = 0.1  # mm
     tool_angle: float = 60.0  # degrees (for V-bits)
     cut_depth: float = -0.1  # mm
@@ -145,6 +149,16 @@ class MillingOperation:
     pass_overlap: float = 0.0  # mm extra offset per pass
     estimated_time: float = 0.0  # seconds
     completed: bool = False
+
+    @property
+    def gcode_to_send(self) -> str:
+        """The most processed version: leveled, else aligned, else raw."""
+        return self.gcode_leveled or self.gcode_aligned or self.gcode
+
+    @property
+    def gcode_to_level(self) -> str:
+        """Autolevel works on the aligned version if there is one."""
+        return self.gcode_aligned or self.gcode
 
     def to_dict(self, include_gcode: bool = False) -> dict:
         d = {
@@ -161,11 +175,14 @@ class MillingOperation:
             "estimated_time": self.estimated_time,
             "completed": self.completed,
             "has_gcode": bool(self.gcode),
+            "has_aligned_gcode": bool(self.gcode_aligned),
             "has_leveled_gcode": bool(self.gcode_leveled),
+            "mirrored": self.mirrored,
             "gcode_lines": self.gcode.count("\n") + 1 if self.gcode else 0,
         }
         if include_gcode:
             d["gcode"] = self.gcode
+            d["gcode_aligned"] = self.gcode_aligned
             d["gcode_leveled"] = self.gcode_leveled
         return d
 
@@ -176,7 +193,10 @@ class MillingOperation:
             operation_type=data["operation_type"],
             layer_type=data["layer_type"],
             gcode=data.get("gcode", ""),
+            gcode_aligned=data.get("gcode_aligned", ""),
             gcode_leveled=data.get("gcode_leveled", ""),
+            # Older projects only marked mirrored copies by name
+            mirrored=data.get("mirrored", "(mirrored)" in data.get("name", "")),
             tool_diameter=data.get("tool_diameter", 0.1),
             tool_angle=data.get("tool_angle", 60.0),
             cut_depth=data.get("cut_depth", -0.1),

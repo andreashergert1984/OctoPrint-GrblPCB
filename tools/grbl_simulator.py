@@ -51,13 +51,20 @@ SETTINGS = {
 class GrblSimulator:
     """State machine of a simulated GRBL 1.1 controller."""
 
-    def __init__(self, write, homing=False, time_scale=0.05, surface_z=-1.0):
+    def __init__(self, write, homing=False, time_scale=0.05, surface_z=-1.0,
+                 holes=(), probe_diameter=1.0):
         self._write = write
         self._lock = threading.RLock()
         self._planner = queue.Queue(maxsize=PLANNER_BLOCKS)
         self._time_scale = time_scale
         self._homing = homing
         self._surface_z = surface_z
+        # Drilled holes in machine coordinates: (x, y, diameter); X/Y probes
+        # inside a hole stop at its wall
+        self._holes = list(holes)
+        self._probe_radius = probe_diameter / 2.0
+        self.overrides = {"feed": 100, "rapid": 100, "spindle": 100}
+        self._overrides_changed = False
         self._reset_state()
         threading.Thread(target=self._motion_loop, daemon=True).start()
 
@@ -127,11 +134,15 @@ class GrblSimulator:
                 self.send(VERSION_BANNER)
                 if self.state == "Alarm":
                     self.send("[MSG:'$H'|'$X' to unlock]")
-            elif byte == 0x85 or 0x90 <= byte <= 0xA1:
-                if byte == 0x85 and self.state == "Jog":
+            elif byte == 0x85:
+                if self.state == "Jog":
                     self._drain_planner()
                     self._planned_end = dict(self.mpos)
                     self.state = "Idle"
+            elif 0x90 <= byte <= 0x9D:
+                self._override(byte)
+            elif 0x9E <= byte <= 0xA1:
+                pass  # toggles (spindle stop, flood, mist) not simulated
             else:
                 return False
             return True
@@ -305,10 +316,27 @@ class GrblSimulator:
             else:
                 self.offsets[wcs][a] = v
 
+    def _override(self, byte):
+        """Real-time override bytes as in GRBL 1.1 (feed/spindle 10-200 %)."""
+        o = self.overrides
+        steps = {
+            0x90: ("feed", None), 0x91: ("feed", 10), 0x92: ("feed", -10),
+            0x93: ("feed", 1), 0x94: ("feed", -1),
+            0x99: ("spindle", None), 0x9A: ("spindle", 10), 0x9B: ("spindle", -10),
+            0x9C: ("spindle", 1), 0x9D: ("spindle", -1),
+        }
+        if byte in steps:
+            key, delta = steps[byte]
+            o[key] = 100 if delta is None else max(10, min(200, o[key] + delta))
+        else:
+            o["rapid"] = {0x95: 100, 0x96: 50, 0x97: 25}[byte]
+        self._overrides_changed = True
+
     def _probe(self, target, fail_ok):
         self._planner.join()
         if "z" not in target:
-            raise GrblError(37)
+            self._probe_wall(target, fail_ok)
+            return
         if self.absolute:
             z_target = target["z"] + self.offsets[self.wcs]["z"]
         else:
@@ -323,6 +351,40 @@ class GrblSimulator:
             self._planned_end = dict(self.mpos)
             self.probe = (self.mpos["x"], self.mpos["y"], self.mpos["z"], 1 if hit else 0)
             self.state = "Idle"
+            self.send(f"[PRB:{self.mpos['x']:.3f},{self.mpos['y']:.3f},{self.mpos['z']:.3f}:{1 if hit else 0}]")
+            if not hit and not fail_ok:
+                self.state = "Alarm"
+                self.send("ALARM:5")
+
+    def _probe_wall(self, target, fail_ok):
+        """X or Y probe: contact where the probe tip meets a hole wall."""
+        axes = [a for a in ("x", "y") if a in target]
+        if len(axes) != 1:
+            raise GrblError(37)
+        axis = axes[0]
+        other = "y" if axis == "x" else "x"
+        start = self.mpos[axis]
+        off = self.offsets[self.wcs][axis]
+        end = target[axis] + off if self.absolute else start + target[axis]
+        contact = None
+        below_surface = self.mpos["z"] < self.surface_at(self.mpos["x"], self.mpos["y"])
+        for hx, hy, diameter in self._holes:
+            centre = {"x": hx, "y": hy}
+            r = diameter / 2.0 - self._probe_radius
+            across = self.mpos[other] - centre[other]
+            if not below_surface or r <= 0 or abs(across) >= r:
+                continue
+            half = math.sqrt(r * r - across * across)
+            if abs(start - centre[axis]) > half + 1e-6:
+                continue  # not inside this hole (touching the wall counts)
+            wall = centre[axis] + (half if end > start else -half)
+            if min(start, end) <= wall <= max(start, end):
+                contact = wall
+        with self._lock:
+            self.mpos[axis] = contact if contact is not None else end
+            self._planned_end = dict(self.mpos)
+            hit = contact is not None
+            self.probe = (self.mpos["x"], self.mpos["y"], self.mpos["z"], 1 if hit else 0)
             self.send(f"[PRB:{self.mpos['x']:.3f},{self.mpos['y']:.3f},{self.mpos['z']:.3f}:{1 if hit else 0}]")
             if not hit and not fail_ok:
                 self.state = "Alarm"
@@ -371,8 +433,10 @@ class GrblSimulator:
         if self._reports % 10 == 0:
             o = self.offsets[self.wcs]
             fields.append(f"WCO:{o['x']:.3f},{o['y']:.3f},{o['z']:.3f}")
-        elif self._reports % 10 == 1:
-            fields.append("Ov:100,100,100")
+        if self._reports % 10 == 1 or self._overrides_changed:
+            o = self.overrides
+            fields.append(f"Ov:{o['feed']},{o['rapid']},{o['spindle']}")
+            self._overrides_changed = False
         self._reports += 1
         return "<" + "|".join(fields) + ">"
 
@@ -449,8 +513,14 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="log received lines and replies (not status reports)")
     parser.add_argument("--surface-z", type=float, default=-1.0,
                         help="copper surface height in machine coordinates (default -1.0)")
+    parser.add_argument("--hole", action="append", default=[], metavar="X,Y,D",
+                        help="drilled hole in machine coordinates for X/Y probing; repeatable")
+    parser.add_argument("--probe-diameter", type=float, default=1.0,
+                        help="diameter of the probe tip used for X/Y probing (default 1.0)")
     args = parser.parse_args()
-    serve(args.link, verbose=args.verbose, homing=args.homing, time_scale=args.time_scale, surface_z=args.surface_z)
+    holes = [tuple(float(v) for v in h.split(",")) for h in args.hole]
+    serve(args.link, verbose=args.verbose, homing=args.homing, time_scale=args.time_scale,
+          surface_z=args.surface_z, holes=holes, probe_diameter=args.probe_diameter)
 
 
 if __name__ == "__main__":
