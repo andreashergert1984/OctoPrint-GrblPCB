@@ -239,6 +239,16 @@ $(function() {
         // Computed properties
         // =====================================================================
 
+        self.navbarStateText = ko.pureComputed(function() {
+            return self.isConnected() ? self.grblState() : gettext("disconnected");
+        });
+
+        self.onEventDisconnected = function() {
+            self.isConnected(false);
+            self.isGrblConnector(false);
+            self.grblState("Unknown");
+        };
+
         self.stateClass = ko.computed(function() {
             switch(self.grblState()) {
                 case "Idle": return "text-success";
@@ -1567,7 +1577,7 @@ $(function() {
     OCTOPRINT_VIEWMODELS.push({
         construct: GrblPcbViewModel,
         dependencies: ["settingsViewModel", "loginStateViewModel", "printerStateViewModel", "connectionViewModel"],
-        elements: ["#tab_plugin_grblpcb"]
+        elements: ["#tab_plugin_grblpcb", "#navbar_plugin_grblpcb"]
     });
 
 });
