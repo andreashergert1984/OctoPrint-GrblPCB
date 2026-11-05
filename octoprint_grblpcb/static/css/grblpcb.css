@@ -621,7 +621,8 @@
 /* Navbar indicator                                                          */
 /* ========================================================================= */
 
-#navbar_plugin_grblpcb {
+#navbar_plugin_grblpcb .grblpcb-navbar {
+    display: inline-block;
     padding: 10px 15px;
 }
 
