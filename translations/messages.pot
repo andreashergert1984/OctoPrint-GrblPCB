@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: OctoPrint-GrblPCB 0.1.0\n"
 "Report-Msgid-Bugs-To: i18n@octoprint.org\n"
-"POT-Creation-Date: 2026-11-05 21:44+0100\n"
+"POT-Creation-Date: 2026-11-05 21:48+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -31,9 +31,9 @@ msgid "Unknown command"
 msgstr ""
 
 #: octoprint_grblpcb/__init__.py:482 octoprint_grblpcb/__init__.py:642
-#: octoprint_grblpcb/__init__.py:1681 octoprint_grblpcb/__init__.py:2119
-#: octoprint_grblpcb/__init__.py:2507 octoprint_grblpcb/__init__.py:2553
-#: octoprint_grblpcb/__init__.py:2564 octoprint_grblpcb/__init__.py:2575
+#: octoprint_grblpcb/__init__.py:1681 octoprint_grblpcb/__init__.py:2132
+#: octoprint_grblpcb/__init__.py:2520 octoprint_grblpcb/__init__.py:2566
+#: octoprint_grblpcb/__init__.py:2577 octoprint_grblpcb/__init__.py:2588
 msgid "Not connected to GRBL"
 msgstr ""
 
@@ -140,12 +140,12 @@ msgstr ""
 #: octoprint_grblpcb/__init__.py:783 octoprint_grblpcb/__init__.py:810
 #: octoprint_grblpcb/__init__.py:1323 octoprint_grblpcb/__init__.py:1385
 #: octoprint_grblpcb/__init__.py:1486 octoprint_grblpcb/__init__.py:1564
-#: octoprint_grblpcb/__init__.py:1644 octoprint_grblpcb/__init__.py:2008
-#: octoprint_grblpcb/__init__.py:2073 octoprint_grblpcb/__init__.py:2112
-#: octoprint_grblpcb/__init__.py:2348 octoprint_grblpcb/__init__.py:2383
-#: octoprint_grblpcb/__init__.py:2424 octoprint_grblpcb/__init__.py:2440
-#: octoprint_grblpcb/__init__.py:2463 octoprint_grblpcb/__init__.py:2483
-#: octoprint_grblpcb/__init__.py:2503
+#: octoprint_grblpcb/__init__.py:1644 octoprint_grblpcb/__init__.py:2021
+#: octoprint_grblpcb/__init__.py:2086 octoprint_grblpcb/__init__.py:2125
+#: octoprint_grblpcb/__init__.py:2361 octoprint_grblpcb/__init__.py:2396
+#: octoprint_grblpcb/__init__.py:2437 octoprint_grblpcb/__init__.py:2453
+#: octoprint_grblpcb/__init__.py:2476 octoprint_grblpcb/__init__.py:2496
+#: octoprint_grblpcb/__init__.py:2516
 msgid "No project"
 msgstr ""
 
@@ -201,11 +201,11 @@ msgstr ""
 msgid "No height map configured"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:1684 octoprint_grblpcb/__init__.py:2122
+#: octoprint_grblpcb/__init__.py:1684 octoprint_grblpcb/__init__.py:2135
 msgid "Probing already in progress"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:1687 octoprint_grblpcb/__init__.py:2125
+#: octoprint_grblpcb/__init__.py:1687 octoprint_grblpcb/__init__.py:2138
 msgid "Cannot start probing while streaming is active"
 msgstr ""
 
@@ -213,99 +213,99 @@ msgstr ""
 msgid "Probing started"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:1973
+#: octoprint_grblpcb/__init__.py:1986
 msgid "Height map not complete"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:1977 octoprint_grblpcb/__init__.py:2012
-#: octoprint_grblpcb/__init__.py:2390 octoprint_grblpcb/__init__.py:2444
-#: octoprint_grblpcb/__init__.py:2467 octoprint_grblpcb/__init__.py:2514
+#: octoprint_grblpcb/__init__.py:1990 octoprint_grblpcb/__init__.py:2025
+#: octoprint_grblpcb/__init__.py:2403 octoprint_grblpcb/__init__.py:2457
+#: octoprint_grblpcb/__init__.py:2480 octoprint_grblpcb/__init__.py:2527
 msgid "Invalid operation index"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:1981
+#: octoprint_grblpcb/__init__.py:1994
 msgid "No G-code to correct"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2017
+#: octoprint_grblpcb/__init__.py:2030
 msgid "No G-code to mirror"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2077
+#: octoprint_grblpcb/__init__.py:2090
 msgid "Need at least 2 alignment holes"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2115
+#: octoprint_grblpcb/__init__.py:2128
 msgid "No alignment holes set"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2136
+#: octoprint_grblpcb/__init__.py:2149
 msgid "Alignment probing started"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2354
+#: octoprint_grblpcb/__init__.py:2367
 #, python-format
 msgid "Need at least 2 probed holes, have %(value)s"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2363
+#: octoprint_grblpcb/__init__.py:2376
 #, python-format
 msgid "Transform computation failed: %(value)s"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2386
+#: octoprint_grblpcb/__init__.py:2399
 msgid "No alignment transform computed"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2396
+#: octoprint_grblpcb/__init__.py:2409
 msgid "No G-code to transform"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2414
+#: octoprint_grblpcb/__init__.py:2427
 #, python-format
 msgid "Alignment applied: %(angle).3f° rotation, (%(tx).4f, %(ty).4f) mm offset"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2450
+#: octoprint_grblpcb/__init__.py:2463
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:741
 msgid "No G-code"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2488
+#: octoprint_grblpcb/__init__.py:2501
 msgid "Invalid order - must be permutation of indices"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2510
+#: octoprint_grblpcb/__init__.py:2523
 msgid "Cannot start streaming while probing is active"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2520
+#: octoprint_grblpcb/__init__.py:2533
 msgid "No G-code to execute"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2539
+#: octoprint_grblpcb/__init__.py:2552
 msgid "Failed to start streaming"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2556
+#: octoprint_grblpcb/__init__.py:2569
 msgid "Execution stopped"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2567
+#: octoprint_grblpcb/__init__.py:2580
 msgid "Tool change confirmed"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2584
+#: octoprint_grblpcb/__init__.py:2597
 #, python-format
 msgid "Invalid override type: %(value)s"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2586
+#: octoprint_grblpcb/__init__.py:2599
 #, python-format
 msgid "Invalid action: %(value)s"
 msgstr ""
 
-#: octoprint_grblpcb/__init__.py:2590
+#: octoprint_grblpcb/__init__.py:2603
 msgid "Failed to send override"
 msgstr ""
 
@@ -616,10 +616,37 @@ msgid ""
 msgstr ""
 
 #: octoprint_grblpcb/static/js/grblpcb.js:1499
-msgid "Probing complete! Height map ready."
+msgid "The probe did not touch the board within the probe depth."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1500
+msgid "GRBL rejected the probe command."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1501
+msgid "GRBL raised an alarm."
 msgstr ""
 
 #: octoprint_grblpcb/static/js/grblpcb.js:1502
+msgid "No probe result within 30 seconds."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1505
+#, python-format
+msgid ""
+"Probing stopped at point %(point)d of %(total)d. No height was recorded "
+"for this point."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1510
+msgid "Autolevel aborted"
+msgstr ""
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1518
+msgid "Probing complete! Height map ready."
+msgstr ""
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1521
 #, python-format
 msgid ""
 "Z-axis drift of %(drift)s mm detected after probing %(points)d points. "
@@ -627,64 +654,64 @@ msgid ""
 " Z acceleration ($122) or Z max rate ($112)."
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1507
+#: octoprint_grblpcb/static/js/grblpcb.js:1526
 msgid "Z-axis drift detected"
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1513
+#: octoprint_grblpcb/static/js/grblpcb.js:1532
 #, python-format
 msgid "(Z drift: %(drift)d µm)"
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1524
+#: octoprint_grblpcb/static/js/grblpcb.js:1543
 #, python-format
 msgid "Probing hole %d/%d (%d%%)"
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1538
+#: octoprint_grblpcb/static/js/grblpcb.js:1557
 msgid "All holes probed! Click 'Compute Transform' to calculate alignment."
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1542
+#: octoprint_grblpcb/static/js/grblpcb.js:1561
 msgid "Probing finished (not all holes probed)"
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1550
+#: octoprint_grblpcb/static/js/grblpcb.js:1569
 #, python-format
 msgid " (%d GRBL errors)"
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1554
+#: octoprint_grblpcb/static/js/grblpcb.js:1573
 #, python-format
 msgid "Completed in %ss"
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1558
+#: octoprint_grblpcb/static/js/grblpcb.js:1577
 #, python-format
 msgid "Stopped at line %d"
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1560
+#: octoprint_grblpcb/static/js/grblpcb.js:1579
 #, python-format
 msgid "⚠️ TOOL CHANGE required at line %d. Click Confirm when ready."
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1562
+#: octoprint_grblpcb/static/js/grblpcb.js:1581
 #, python-format
 msgid "⏸ Program pause at line %d. Click Confirm to continue."
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1564
+#: octoprint_grblpcb/static/js/grblpcb.js:1583
 #, python-format
 msgid "ETA: %ds"
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1566
+#: octoprint_grblpcb/static/js/grblpcb.js:1585
 #, python-format
 msgid "Line %d/%d (%d%%)"
 msgstr ""
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1570
+#: octoprint_grblpcb/static/js/grblpcb.js:1589
 #, python-format
 msgid "Streaming started: %s"
 msgstr ""

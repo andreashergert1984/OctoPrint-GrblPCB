@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: OctoPrint-GrblPCB 0.1.0\n"
 "Report-Msgid-Bugs-To: i18n@octoprint.org\n"
-"POT-Creation-Date: 2026-11-05 21:44+0100\n"
+"POT-Creation-Date: 2026-11-05 21:48+0100\n"
 "PO-Revision-Date: 2025-07-19 18:00+0100\n"
 "Last-Translator: Andreas Hergert <andreas@hergert.info>\n"
 "Language: de\n"
@@ -32,9 +32,9 @@ msgid "Unknown command"
 msgstr "Unbekannter Befehl"
 
 #: octoprint_grblpcb/__init__.py:482 octoprint_grblpcb/__init__.py:642
-#: octoprint_grblpcb/__init__.py:1681 octoprint_grblpcb/__init__.py:2119
-#: octoprint_grblpcb/__init__.py:2507 octoprint_grblpcb/__init__.py:2553
-#: octoprint_grblpcb/__init__.py:2564 octoprint_grblpcb/__init__.py:2575
+#: octoprint_grblpcb/__init__.py:1681 octoprint_grblpcb/__init__.py:2132
+#: octoprint_grblpcb/__init__.py:2520 octoprint_grblpcb/__init__.py:2566
+#: octoprint_grblpcb/__init__.py:2577 octoprint_grblpcb/__init__.py:2588
 msgid "Not connected to GRBL"
 msgstr "Nicht mit GRBL verbunden"
 
@@ -101,12 +101,8 @@ msgid "This check verifies controller state and workflow safety."
 msgstr "Dieser Check prüft den Zustand der Steuerung und die Ablaufsicherheit."
 
 #: octoprint_grblpcb/__init__.py:678
-msgid ""
-"Step loss, backlash, and absolute accuracy require external measurement "
-"such as a dial indicator, gauge block, or probe pad."
-msgstr ""
-"Schrittverlust, Umkehrspiel und absolute Genauigkeit lassen sich nur mit "
-"externer Messung prüfen, etwa mit Messuhr, Endmaß oder Antastplatte."
+msgid "Step loss, backlash, and absolute accuracy require external measurement such as a dial indicator, gauge block, or probe pad."
+msgstr "Schrittverlust, Umkehrspiel und absolute Genauigkeit lassen sich nur mit externer Messung prüfen, etwa mit Messuhr, Endmaß oder Antastplatte."
 
 #: octoprint_grblpcb/__init__.py:698
 msgid "Speed must be a number"
@@ -143,12 +139,12 @@ msgstr "Vorschub außerhalb des Bereichs (1 bis 10000): %(value)s"
 #: octoprint_grblpcb/__init__.py:783 octoprint_grblpcb/__init__.py:810
 #: octoprint_grblpcb/__init__.py:1323 octoprint_grblpcb/__init__.py:1385
 #: octoprint_grblpcb/__init__.py:1486 octoprint_grblpcb/__init__.py:1564
-#: octoprint_grblpcb/__init__.py:1644 octoprint_grblpcb/__init__.py:2008
-#: octoprint_grblpcb/__init__.py:2073 octoprint_grblpcb/__init__.py:2112
-#: octoprint_grblpcb/__init__.py:2348 octoprint_grblpcb/__init__.py:2383
-#: octoprint_grblpcb/__init__.py:2424 octoprint_grblpcb/__init__.py:2440
-#: octoprint_grblpcb/__init__.py:2463 octoprint_grblpcb/__init__.py:2483
-#: octoprint_grblpcb/__init__.py:2503
+#: octoprint_grblpcb/__init__.py:1644 octoprint_grblpcb/__init__.py:2021
+#: octoprint_grblpcb/__init__.py:2086 octoprint_grblpcb/__init__.py:2125
+#: octoprint_grblpcb/__init__.py:2361 octoprint_grblpcb/__init__.py:2396
+#: octoprint_grblpcb/__init__.py:2437 octoprint_grblpcb/__init__.py:2453
+#: octoprint_grblpcb/__init__.py:2476 octoprint_grblpcb/__init__.py:2496
+#: octoprint_grblpcb/__init__.py:2516
 msgid "No project"
 msgstr "Kein Projekt"
 
@@ -204,11 +200,11 @@ msgstr "Leerer G-Code erzeugt: nichts zu belichten"
 msgid "No height map configured"
 msgstr "Keine Höhenkarte eingerichtet"
 
-#: octoprint_grblpcb/__init__.py:1684 octoprint_grblpcb/__init__.py:2122
+#: octoprint_grblpcb/__init__.py:1684 octoprint_grblpcb/__init__.py:2135
 msgid "Probing already in progress"
 msgstr "Die Abtastung läuft bereits"
 
-#: octoprint_grblpcb/__init__.py:1687 octoprint_grblpcb/__init__.py:2125
+#: octoprint_grblpcb/__init__.py:1687 octoprint_grblpcb/__init__.py:2138
 msgid "Cannot start probing while streaming is active"
 msgstr "Abtasten ist nicht möglich, solange ein Auftrag läuft"
 
@@ -216,101 +212,99 @@ msgstr "Abtasten ist nicht möglich, solange ein Auftrag läuft"
 msgid "Probing started"
 msgstr "Abtastung gestartet"
 
-#: octoprint_grblpcb/__init__.py:1973
+#: octoprint_grblpcb/__init__.py:1986
 msgid "Height map not complete"
 msgstr "Höhenkarte nicht vollständig"
 
-#: octoprint_grblpcb/__init__.py:1977 octoprint_grblpcb/__init__.py:2012
-#: octoprint_grblpcb/__init__.py:2390 octoprint_grblpcb/__init__.py:2444
-#: octoprint_grblpcb/__init__.py:2467 octoprint_grblpcb/__init__.py:2514
+#: octoprint_grblpcb/__init__.py:1990 octoprint_grblpcb/__init__.py:2025
+#: octoprint_grblpcb/__init__.py:2403 octoprint_grblpcb/__init__.py:2457
+#: octoprint_grblpcb/__init__.py:2480 octoprint_grblpcb/__init__.py:2527
 msgid "Invalid operation index"
 msgstr "Ungültige Operation"
 
-#: octoprint_grblpcb/__init__.py:1981
+#: octoprint_grblpcb/__init__.py:1994
 msgid "No G-code to correct"
 msgstr "Kein G-Code zum Korrigieren"
 
-#: octoprint_grblpcb/__init__.py:2017
+#: octoprint_grblpcb/__init__.py:2030
 msgid "No G-code to mirror"
 msgstr "Kein G-Code zum Spiegeln"
 
-#: octoprint_grblpcb/__init__.py:2077
+#: octoprint_grblpcb/__init__.py:2090
 msgid "Need at least 2 alignment holes"
 msgstr "Mindestens 2 Ausrichtungslöcher erforderlich"
 
-#: octoprint_grblpcb/__init__.py:2115
+#: octoprint_grblpcb/__init__.py:2128
 msgid "No alignment holes set"
 msgstr "Keine Ausrichtungslöcher festgelegt"
 
-#: octoprint_grblpcb/__init__.py:2136
+#: octoprint_grblpcb/__init__.py:2149
 msgid "Alignment probing started"
 msgstr "Ausrichtungsabtastung gestartet"
 
-#: octoprint_grblpcb/__init__.py:2354
+#: octoprint_grblpcb/__init__.py:2367
 #, python-format
 msgid "Need at least 2 probed holes, have %(value)s"
 msgstr "Mindestens 2 abgetastete Löcher erforderlich, vorhanden: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:2363
+#: octoprint_grblpcb/__init__.py:2376
 #, python-format
 msgid "Transform computation failed: %(value)s"
 msgstr "Berechnung der Ausrichtung fehlgeschlagen: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:2386
+#: octoprint_grblpcb/__init__.py:2399
 msgid "No alignment transform computed"
 msgstr "Keine Ausrichtung berechnet"
 
-#: octoprint_grblpcb/__init__.py:2396
+#: octoprint_grblpcb/__init__.py:2409
 msgid "No G-code to transform"
 msgstr "Kein G-Code zum Umrechnen"
 
-#: octoprint_grblpcb/__init__.py:2414
+#: octoprint_grblpcb/__init__.py:2427
 #, python-format
 msgid "Alignment applied: %(angle).3f° rotation, (%(tx).4f, %(ty).4f) mm offset"
-msgstr ""
-"Ausrichtung angewendet: %(angle).3f° Drehung, Versatz (%(tx).4f, "
-"%(ty).4f) mm"
+msgstr "Ausrichtung angewendet: %(angle).3f° Drehung, Versatz (%(tx).4f, %(ty).4f) mm"
 
-#: octoprint_grblpcb/__init__.py:2450
+#: octoprint_grblpcb/__init__.py:2463
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:741
 msgid "No G-code"
 msgstr "Kein G-Code"
 
-#: octoprint_grblpcb/__init__.py:2488
+#: octoprint_grblpcb/__init__.py:2501
 msgid "Invalid order - must be permutation of indices"
 msgstr "Ungültige Reihenfolge: Jede Operation muss genau einmal vorkommen"
 
-#: octoprint_grblpcb/__init__.py:2510
+#: octoprint_grblpcb/__init__.py:2523
 msgid "Cannot start streaming while probing is active"
 msgstr "Senden ist nicht möglich, solange eine Abtastung läuft"
 
-#: octoprint_grblpcb/__init__.py:2520
+#: octoprint_grblpcb/__init__.py:2533
 msgid "No G-code to execute"
 msgstr "Kein G-Code zum Ausführen"
 
-#: octoprint_grblpcb/__init__.py:2539
+#: octoprint_grblpcb/__init__.py:2552
 msgid "Failed to start streaming"
 msgstr "Senden konnte nicht gestartet werden"
 
-#: octoprint_grblpcb/__init__.py:2556
+#: octoprint_grblpcb/__init__.py:2569
 msgid "Execution stopped"
 msgstr "Ausführung gestoppt"
 
-#: octoprint_grblpcb/__init__.py:2567
+#: octoprint_grblpcb/__init__.py:2580
 msgid "Tool change confirmed"
 msgstr "Werkzeugwechsel bestätigt"
 
-#: octoprint_grblpcb/__init__.py:2584
+#: octoprint_grblpcb/__init__.py:2597
 #, python-format
 msgid "Invalid override type: %(value)s"
 msgstr "Ungültige Übersteuerung: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:2586
+#: octoprint_grblpcb/__init__.py:2599
 #, python-format
 msgid "Invalid action: %(value)s"
 msgstr "Ungültige Aktion: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:2590
+#: octoprint_grblpcb/__init__.py:2603
 msgid "Failed to send override"
 msgstr "Übersteuerung konnte nicht gesendet werden"
 
@@ -577,32 +571,17 @@ msgid "Streaming: %s"
 msgstr "Sende: %s"
 
 #: octoprint_grblpcb/static/js/grblpcb.js:1294
-msgid ""
-"Z-zero has not been set since connecting. Probe Z and zero it at the "
-"board surface before milling (Probe Z, then Zero Z)."
-msgstr ""
-"Seit dem Verbinden wurde kein Z-Nullpunkt gesetzt. Vor dem Fräsen Z auf "
-"der Platinenoberfläche antasten und nullen (Z antasten, dann Z nullen)."
+msgid "Z-zero has not been set since connecting. Probe Z and zero it at the board surface before milling (Probe Z, then Zero Z)."
+msgstr "Seit dem Verbinden wurde kein Z-Nullpunkt gesetzt. Vor dem Fräsen Z auf der Platinenoberfläche antasten und nullen (Z antasten, dann Z nullen)."
 
 #: octoprint_grblpcb/static/js/grblpcb.js:1296
 #, python-format
-msgid ""
-"The work zero has moved by X %s mm, Y %s mm since the height map was "
-"probed. The leveled G-code would correct the wrong spots. Probe the board"
-" again."
-msgstr ""
-"Der Werkstücknullpunkt hat sich seit der Höhenmessung um X %s mm, Y %s mm"
-" verschoben. Der höhenkorrigierte G-Code würde an den falschen Stellen "
-"korrigieren. Bitte die Platine neu abtasten."
+msgid "The work zero has moved by X %s mm, Y %s mm since the height map was probed. The leveled G-code would correct the wrong spots. Probe the board again."
+msgstr "Der Werkstücknullpunkt hat sich seit der Höhenmessung um X %s mm, Y %s mm verschoben. Der höhenkorrigierte G-Code würde an den falschen Stellen korrigieren. Bitte die Platine neu abtasten."
 
 #: octoprint_grblpcb/static/js/grblpcb.js:1298
-msgid ""
-"It is unknown where the work zero was when the height map was probed. "
-"Probe the board again so the leveled G-code matches the clamped board."
-msgstr ""
-"Es ist nicht bekannt, wo der Werkstücknullpunkt bei der Höhenmessung lag."
-" Bitte die Platine neu abtasten, damit der höhenkorrigierte G-Code zur "
-"aufgespannten Platine passt."
+msgid "It is unknown where the work zero was when the height map was probed. Probe the board again so the leveled G-code matches the clamped board."
+msgstr "Es ist nicht bekannt, wo der Werkstücknullpunkt bei der Höhenmessung lag. Bitte die Platine neu abtasten, damit der höhenkorrigierte G-Code zur aufgespannten Platine passt."
 
 #: octoprint_grblpcb/static/js/grblpcb.js:1308
 msgid "Stopped"
@@ -623,90 +602,101 @@ msgid "GRBL alarm %d"
 msgstr "GRBL-Alarm %d"
 
 #: octoprint_grblpcb/static/js/grblpcb.js:1492
-msgid ""
-"The machine position may be lost. Home the machine or unlock it, then "
-"check the work zero before continuing."
-msgstr ""
-"Die Maschinenposition ist möglicherweise verloren. Referenzfahrt "
-"ausführen oder entsperren und vor dem Weiterarbeiten den "
-"Werkstücknullpunkt prüfen."
+msgid "The machine position may be lost. Home the machine or unlock it, then check the work zero before continuing."
+msgstr "Die Maschinenposition ist möglicherweise verloren. Referenzfahrt ausführen oder entsperren und vor dem Weiterarbeiten den Werkstücknullpunkt prüfen."
 
 #: octoprint_grblpcb/static/js/grblpcb.js:1499
+msgid "The probe did not touch the board within the probe depth."
+msgstr "Der Taster hat die Platine innerhalb der Antasttiefe nicht berührt."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1500
+msgid "GRBL rejected the probe command."
+msgstr "GRBL hat den Antastbefehl abgelehnt."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1501
+msgid "GRBL raised an alarm."
+msgstr "GRBL hat einen Alarm ausgelöst."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1502
+msgid "No probe result within 30 seconds."
+msgstr "Innerhalb von 30 Sekunden kam kein Antastergebnis."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1505
+#, python-format
+msgid "Probing stopped at point %(point)d of %(total)d. No height was recorded for this point."
+msgstr "Abtasten bei Punkt %(point)d von %(total)d abgebrochen. Für diesen Punkt wurde keine Höhe gespeichert."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1510
+msgid "Autolevel aborted"
+msgstr "Autolevel abgebrochen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1518
 msgid "Probing complete! Height map ready."
 msgstr "Abtastung abgeschlossen! Höhenkarte bereit."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1502
+#: octoprint_grblpcb/static/js/grblpcb.js:1521
 #, python-format
-msgid ""
-"Z-axis drift of %(drift)s mm detected after probing %(points)d points. "
-"The Z motor lost steps. Zero Z again before milling and consider lowering"
-" Z acceleration ($122) or Z max rate ($112)."
-msgstr ""
-"Nach dem Abtasten von %(points)d Punkten wurde eine Z-Abweichung von "
-"%(drift)s mm festgestellt. Der Z-Motor hat Schritte verloren. Vor dem "
-"Fräsen Z neu nullen und die Z-Beschleunigung ($122) oder die maximale "
-"Z-Geschwindigkeit ($112) senken."
+msgid "Z-axis drift of %(drift)s mm detected after probing %(points)d points. The Z motor lost steps. Zero Z again before milling and consider lowering Z acceleration ($122) or Z max rate ($112)."
+msgstr "Nach dem Abtasten von %(points)d Punkten wurde eine Z-Abweichung von %(drift)s mm festgestellt. Der Z-Motor hat Schritte verloren. Vor dem Fräsen Z neu nullen und die Z-Beschleunigung ($122) oder die maximale Z-Geschwindigkeit ($112) senken."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1507
+#: octoprint_grblpcb/static/js/grblpcb.js:1526
 msgid "Z-axis drift detected"
 msgstr "Z-Abweichung festgestellt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1513
+#: octoprint_grblpcb/static/js/grblpcb.js:1532
 #, python-format
 msgid "(Z drift: %(drift)d µm)"
 msgstr "(Z-Abweichung: %(drift)d µm)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1524
+#: octoprint_grblpcb/static/js/grblpcb.js:1543
 #, python-format
 msgid "Probing hole %d/%d (%d%%)"
 msgstr "Loch %d/%d wird abgetastet (%d%%)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1538
+#: octoprint_grblpcb/static/js/grblpcb.js:1557
 msgid "All holes probed! Click 'Compute Transform' to calculate alignment."
-msgstr ""
-"Alle Löcher abgetastet! „Transformation berechnen“ klicken, um die "
-"Ausrichtung zu berechnen."
+msgstr "Alle Löcher abgetastet! „Transformation berechnen“ klicken, um die Ausrichtung zu berechnen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1542
+#: octoprint_grblpcb/static/js/grblpcb.js:1561
 msgid "Probing finished (not all holes probed)"
 msgstr "Abtastung beendet (nicht alle Löcher abgetastet)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1550
+#: octoprint_grblpcb/static/js/grblpcb.js:1569
 #, python-format
 msgid " (%d GRBL errors)"
 msgstr " (%d GRBL-Fehler)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1554
+#: octoprint_grblpcb/static/js/grblpcb.js:1573
 #, python-format
 msgid "Completed in %ss"
 msgstr "Abgeschlossen in %ss"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1558
+#: octoprint_grblpcb/static/js/grblpcb.js:1577
 #, python-format
 msgid "Stopped at line %d"
 msgstr "Gestoppt bei Zeile %d"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1560
+#: octoprint_grblpcb/static/js/grblpcb.js:1579
 #, python-format
 msgid "⚠️ TOOL CHANGE required at line %d. Click Confirm when ready."
 msgstr "⚠️ WERKZEUGWECHSEL bei Zeile %d. Wenn bereit, auf „Bestätigen“ klicken."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1562
+#: octoprint_grblpcb/static/js/grblpcb.js:1581
 #, python-format
 msgid "⏸ Program pause at line %d. Click Confirm to continue."
 msgstr "⏸ Programmpause bei Zeile %d. Zum Fortfahren auf „Bestätigen“ klicken."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1564
+#: octoprint_grblpcb/static/js/grblpcb.js:1583
 #, python-format
 msgid "ETA: %ds"
 msgstr "Restzeit: %ds"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1566
+#: octoprint_grblpcb/static/js/grblpcb.js:1585
 #, python-format
 msgid "Line %d/%d (%d%%)"
 msgstr "Zeile %d/%d (%d%%)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1570
+#: octoprint_grblpcb/static/js/grblpcb.js:1589
 #, python-format
 msgid "Streaming started: %s"
 msgstr "Übertragung gestartet: %s"
@@ -800,15 +790,12 @@ msgstr "Fräsbahnen: %d/%d"
 msgid ""
 "\n"
 "        No serial port found. Is your CNC connected?\n"
-"        Try %(refresh)srefreshing%(endrefresh)s or check %(link)sGRBL "
-"documentation%(endlink)s.\n"
+"        Try %(refresh)srefreshing%(endrefresh)s or check %(link)sGRBL documentation%(endlink)s.\n"
 "    "
 msgstr ""
 "\n"
-"        Kein serieller Port gefunden. Ist Ihre CNC-Maschine "
-"angeschlossen?\n"
-"        Versuchen Sie %(refresh)szu aktualisieren%(endrefresh)s oder "
-"lesen Sie die %(link)sGRBL-Dokumentation%(endlink)s.\n"
+"        Kein serieller Port gefunden. Ist Ihre CNC-Maschine angeschlossen?\n"
+"        Versuchen Sie %(refresh)szu aktualisieren%(endrefresh)s oder lesen Sie die %(link)sGRBL-Dokumentation%(endlink)s.\n"
 "    "
 
 #: octoprint_grblpcb/templates/grblpcb_connection_option.jinja2:9
@@ -836,24 +823,12 @@ msgid "Quick guide"
 msgstr "Kurzanleitung"
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:6
-msgid ""
-"Use conservative defaults first. Keep safe Z high enough for clamps, set "
-"probe depth below your board height, and test new tool/material "
-"combinations on scrap before a real PCB job."
-msgstr ""
-"Zuerst mit vorsichtigen Werten arbeiten. Sicheres Z hoch genug über den "
-"Spannmitteln halten, die Antasttiefe unter die Platinenhöhe legen und "
-"neue Kombinationen aus Werkzeug und Material auf einem Reststück testen, "
-"bevor eine echte Platine gefräst wird."
+msgid "Use conservative defaults first. Keep safe Z high enough for clamps, set probe depth below your board height, and test new tool/material combinations on scrap before a real PCB job."
+msgstr "Zuerst mit vorsichtigen Werten arbeiten. Sicheres Z hoch genug über den Spannmitteln halten, die Antasttiefe unter die Platinenhöhe legen und neue Kombinationen aus Werkzeug und Material auf einem Reststück testen, bevor eine echte Platine gefräst wird."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:7
-msgid ""
-"Beginner: change one parameter at a time. Advanced: tune feed, spindle, "
-"and probe settings together after a successful test cut."
-msgstr ""
-"Einsteiger: immer nur einen Wert ändern. Fortgeschrittene: Vorschub, "
-"Spindel und Antasten nach einem erfolgreichen Testschnitt gemeinsam "
-"abstimmen."
+msgid "Beginner: change one parameter at a time. Advanced: tune feed, spindle, and probe settings together after a successful test cut."
+msgstr "Einsteiger: immer nur einen Wert ändern. Fortgeschrittene: Vorschub, Spindel und Antasten nach einem erfolgreichen Testschnitt gemeinsam abstimmen."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:11
 msgid "UI Help Mode"
@@ -877,12 +852,8 @@ msgid "Detailed Help"
 msgstr "Ausführliche Hilfe"
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:20
-msgid ""
-"Compact hides most hints, Mini Guide shows a small collapsible guide, and"
-" Detailed Help shows all guidance blocks."
-msgstr ""
-"Kompakt blendet die meisten Hinweise aus, Kurzhilfe zeigt eine kleine "
-"aufklappbare Anleitung, Ausführliche Hilfe zeigt alle Hinweisblöcke."
+msgid "Compact hides most hints, Mini Guide shows a small collapsible guide, and Detailed Help shows all guidance blocks."
+msgstr "Kompakt blendet die meisten Hinweise aus, Kurzhilfe zeigt eine kleine aufklappbare Anleitung, Ausführliche Hilfe zeigt alle Hinweisblöcke."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:27
 msgid "General Settings"
@@ -897,20 +868,12 @@ msgid "Default feed rate for milling operations"
 msgstr "Standard-Vorschubgeschwindigkeit für Fräsoperationen"
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:37
-msgid ""
-"Start lower for a new tool or board material, then increase after a "
-"successful test cut."
-msgstr ""
-"Bei neuem Werkzeug oder Platinenmaterial niedriger anfangen und nach "
-"einem erfolgreichen Testschnitt erhöhen."
+msgid "Start lower for a new tool or board material, then increase after a successful test cut."
+msgstr "Bei neuem Werkzeug oder Platinenmaterial niedriger anfangen und nach einem erfolgreichen Testschnitt erhöhen."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:38
-msgid ""
-"If you are unsure, keep this conservative and tune the speed in the "
-"toolpath preview first."
-msgstr ""
-"Im Zweifel vorsichtig bleiben und die Geschwindigkeit zuerst in der "
-"Fräsbahnvorschau abstimmen."
+msgid "If you are unsure, keep this conservative and tune the speed in the toolpath preview first."
+msgstr "Im Zweifel vorsichtig bleiben und die Geschwindigkeit zuerst in der Fräsbahnvorschau abstimmen."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:43
 msgid "Default Jog Feed"
@@ -925,12 +888,8 @@ msgid "Use a slower jog speed when the machine is close to the board or clamps."
 msgstr "Langsamer tippen, wenn die Maschine nahe an Platine oder Spannmitteln ist."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:51
-msgid ""
-"Experienced users may raise this for long travel moves, but only after "
-"confirming direction and clearance."
-msgstr ""
-"Für lange Verfahrwege kann der Wert höher sein, aber erst, wenn Richtung "
-"und Freiraum geprüft sind."
+msgid "Experienced users may raise this for long travel moves, but only after confirming direction and clearance."
+msgstr "Für lange Verfahrwege kann der Wert höher sein, aber erst, wenn Richtung und Freiraum geprüft sind."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:56
 msgid "Safe Z Height"
@@ -941,18 +900,12 @@ msgid "Height for rapid XY moves"
 msgstr "Höhe für schnelle XY-Bewegungen"
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:63
-msgid ""
-"This should clear the tallest clamp, connector, and the tool itself "
-"during travel moves."
-msgstr ""
-"Diese Höhe muss beim Verfahren über dem höchsten Spannmittel, Stecker und"
-" dem Werkzeug selbst liegen."
+msgid "This should clear the tallest clamp, connector, and the tool itself during travel moves."
+msgstr "Diese Höhe muss beim Verfahren über dem höchsten Spannmittel, Stecker und dem Werkzeug selbst liegen."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:64
 msgid "A safe Z that is too low is one of the easiest ways to crash the machine."
-msgstr ""
-"Ein zu niedriges sicheres Z ist eine der häufigsten Ursachen für "
-"Kollisionen."
+msgstr "Ein zu niedriges sicheres Z ist eine der häufigsten Ursachen für Kollisionen."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:69
 msgid "Default WCS"
@@ -975,20 +928,12 @@ msgid "Maximum probe travel (negative for Z probing down)"
 msgstr "Maximaler Tastweg (negativ für Z-Abtastung nach unten)"
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:96
-msgid ""
-"Set this slightly deeper than the expected board height difference, but "
-"not so deep that it risks the bed."
-msgstr ""
-"Etwas tiefer als der erwartete Höhenunterschied der Platine einstellen, "
-"aber nicht so tief, dass das Bett gefährdet ist."
+msgid "Set this slightly deeper than the expected board height difference, but not so deep that it risks the bed."
+msgstr "Etwas tiefer als der erwartete Höhenunterschied der Platine einstellen, aber nicht so tief, dass das Bett gefährdet ist."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:97
-msgid ""
-"For precise work, keep a note of the actual board thickness and probe pad"
-" height you used."
-msgstr ""
-"Für genaues Arbeiten die tatsächliche Plattenstärke und die Höhe der "
-"Antastplatte notieren."
+msgid "For precise work, keep a note of the actual board thickness and probe pad height you used."
+msgstr "Für genaues Arbeiten die tatsächliche Plattenstärke und die Höhe der Antastplatte notieren."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:102
 msgid "Probe Feed Rate"
@@ -1024,18 +969,12 @@ msgid "Default Spindle Speed"
 msgstr "Standard-Spindeldrehzahl"
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:150
-msgid ""
-"Match this to the tool and copper thickness; test on scrap first if "
-"unsure."
-msgstr ""
-"An Werkzeug und Kupferstärke anpassen; im Zweifel zuerst auf einem "
-"Reststück testen."
+msgid "Match this to the tool and copper thickness; test on scrap first if unsure."
+msgstr "An Werkzeug und Kupferstärke anpassen; im Zweifel zuerst auf einem Reststück testen."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:151
 msgid "Too much speed can burn tools; too little can leave burrs or tear traces."
-msgstr ""
-"Zu hohe Drehzahl kann Werkzeuge verbrennen, zu niedrige hinterlässt Grate"
-" oder reißt Leiterbahnen."
+msgstr "Zu hohe Drehzahl kann Werkzeuge verbrennen, zu niedrige hinterlässt Grate oder reißt Leiterbahnen."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:156
 msgid "Minimum Spindle RPM"
@@ -1054,20 +993,12 @@ msgid "Delay after M3 to let spindle reach speed"
 msgstr "Verzögerung nach M3, damit die Spindel die Drehzahl erreicht"
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:183
-msgid ""
-"Increase this if the spindle takes longer to stabilize before cutting "
-"starts."
-msgstr ""
-"Erhöhen, wenn die Spindel länger braucht, bis sie vor dem Schnitt stabil "
-"läuft."
+msgid "Increase this if the spindle takes longer to stabilize before cutting starts."
+msgstr "Erhöhen, wenn die Spindel länger braucht, bis sie vor dem Schnitt stabil läuft."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:184
-msgid ""
-"Use a longer delay when the spindle needs time to settle at the selected "
-"RPM."
-msgstr ""
-"Eine längere Wartezeit wählen, wenn die Spindel Zeit braucht, um die "
-"eingestellte Drehzahl zu erreichen."
+msgid "Use a longer delay when the spindle needs time to settle at the selected RPM."
+msgstr "Eine längere Wartezeit wählen, wenn die Spindel Zeit braucht, um die eingestellte Drehzahl zu erreichen."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:191
 msgid "Safety Settings"
@@ -1139,12 +1070,8 @@ msgid "Toggle controls panel"
 msgstr "Steuerungspanel ein-/ausblenden"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:70
-msgid ""
-"Tip: home first, then check the zero and run a short machine check before"
-" the first job."
-msgstr ""
-"Tipp: zuerst Referenzfahrt, dann Nullpunkt prüfen und vor dem ersten "
-"Auftrag einen kurzen Maschinencheck ausführen."
+msgid "Tip: home first, then check the zero and run a short machine check before the first job."
+msgstr "Tipp: zuerst Referenzfahrt, dann Nullpunkt prüfen und vor dem ersten Auftrag einen kurzen Maschinencheck ausführen."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:76
 msgid "Quick Guide"
@@ -1171,32 +1098,20 @@ msgid "For Experienced Users"
 msgstr "Für Erfahrene"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:100
-msgid ""
-"Use the status bar to check state, feed, spindle, and position at a "
-"glance."
-msgstr ""
-"Die Statusleiste zeigt Zustand, Vorschub, Spindel und Position auf einen "
-"Blick."
+msgid "Use the status bar to check state, feed, spindle, and position at a glance."
+msgstr "Die Statusleiste zeigt Zustand, Vorschub, Spindel und Position auf einen Blick."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:101
 msgid "Run Probe or autolevel only after the setup is mechanically stable."
-msgstr ""
-"Antasten oder Autolevel erst starten, wenn der Aufbau mechanisch stabil "
-"ist."
+msgstr "Antasten oder Autolevel erst starten, wenn der Aufbau mechanisch stabil ist."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:102
 msgid "Preview routing and drilling separately before combining them."
-msgstr ""
-"Fräsen und Bohren erst getrennt in der Vorschau prüfen, bevor sie "
-"kombiniert werden."
+msgstr "Fräsen und Bohren erst getrennt in der Vorschau prüfen, bevor sie kombiniert werden."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:103
-msgid ""
-"Tune feed, spindle, and probe settings on scrap material before "
-"production runs."
-msgstr ""
-"Vorschub, Spindel und Antasten auf Restmaterial abstimmen, bevor echte "
-"Platinen gefräst werden."
+msgid "Tune feed, spindle, and probe settings on scrap material before production runs."
+msgstr "Vorschub, Spindel und Antasten auf Restmaterial abstimmen, bevor echte Platinen gefräst werden."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:112
 msgid "Home the machine first."
@@ -1223,20 +1138,12 @@ msgid "Feed:"
 msgstr "Vorschub:"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:154
-msgid ""
-"Tip: use 10 mm or 1 mm jogs when confirming direction and travel. Reserve"
-" 0.1 mm for fine adjustment."
-msgstr ""
-"Tipp: Richtung und Verfahrweg mit 10 mm oder 1 mm prüfen. 0,1 mm nur für "
-"die Feineinstellung."
+msgid "Tip: use 10 mm or 1 mm jogs when confirming direction and travel. Reserve 0.1 mm for fine adjustment."
+msgstr "Tipp: Richtung und Verfahrweg mit 10 mm oder 1 mm prüfen. 0,1 mm nur für die Feineinstellung."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:157
-msgid ""
-"If an axis moves in the wrong direction, stop and correct the machine "
-"configuration before continuing."
-msgstr ""
-"Fährt eine Achse in die falsche Richtung, anhalten und die "
-"Maschinenkonfiguration korrigieren, bevor es weitergeht."
+msgid "If an axis moves in the wrong direction, stop and correct the machine configuration before continuing."
+msgstr "Fährt eine Achse in die falsche Richtung, anhalten und die Maschinenkonfiguration korrigieren, bevor es weitergeht."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:163
 msgid "Machine"
@@ -1263,33 +1170,20 @@ msgid "Before milling:"
 msgstr "Vor dem Fräsen:"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:185
-msgid ""
-"Home → unlock if needed → set zero → run Check. If the controller is not "
-"Idle, do not start the job."
-msgstr ""
-"Referenzfahrt → bei Bedarf entsperren → Nullpunkt setzen → Check "
-"ausführen. Ist die Steuerung nicht im Leerlauf, den Auftrag nicht "
-"starten."
+msgid "Home → unlock if needed → set zero → run Check. If the controller is not Idle, do not start the job."
+msgstr "Referenzfahrt → bei Bedarf entsperren → Nullpunkt setzen → Check ausführen. Ist die Steuerung nicht im Leerlauf, den Auftrag nicht starten."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:188
-msgid ""
-"For repeatability, verify one axis at a time and compare the travel with "
-"a ruler or dial indicator."
-msgstr ""
-"Für die Wiederholgenauigkeit jede Achse einzeln prüfen und den Verfahrweg"
-" mit Lineal oder Messuhr vergleichen."
+msgid "For repeatability, verify one axis at a time and compare the travel with a ruler or dial indicator."
+msgstr "Für die Wiederholgenauigkeit jede Achse einzeln prüfen und den Verfahrweg mit Lineal oder Messuhr vergleichen."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:207
 msgid "Work Coords"
 msgstr "Werkstückkoordinaten"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:208
-msgid ""
-"Selected work coordinate system, e.g. G54-G59. This tells GRBL where your"
-" zero point lives in the machine coordinate system."
-msgstr ""
-"Gewähltes Werkstück-Koordinatensystem, z. B. G54 bis G59. Es legt fest, "
-"wo der Nullpunkt im Maschinenkoordinatensystem liegt."
+msgid "Selected work coordinate system, e.g. G54-G59. This tells GRBL where your zero point lives in the machine coordinate system."
+msgstr "Gewähltes Werkstück-Koordinatensystem, z. B. G54 bis G59. Es legt fest, wo der Nullpunkt im Maschinenkoordinatensystem liegt."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:210
 msgid "Current work coordinate system:"
@@ -1320,30 +1214,16 @@ msgid "0 All"
 msgstr "Alle nullen"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:220
-msgid ""
-"Tip: zero only after the tool is above the board. Keep the same origin "
-"for both sides of a double-sided board."
-msgstr ""
-"Tipp: erst nullen, wenn das Werkzeug über der Platine steht. Bei "
-"doppelseitigen Platinen für beide Seiten denselben Ursprung verwenden."
+msgid "Tip: zero only after the tool is above the board. Keep the same origin for both sides of a double-sided board."
+msgstr "Tipp: erst nullen, wenn das Werkzeug über der Platine steht. Bei doppelseitigen Platinen für beide Seiten denselben Ursprung verwenden."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:223
-msgid ""
-"Current work coordinate system: the active G54-G59 setup defines where "
-"your board origin is. G0/G1 positions are then relative to that origin, "
-"not to the machine home."
-msgstr ""
-"Aktuelles Werkstück-Koordinatensystem: Das aktive G54 bis G59 legt den "
-"Platinenursprung fest. G0/G1-Positionen beziehen sich auf diesen "
-"Ursprung, nicht auf den Maschinennullpunkt."
+msgid "Current work coordinate system: the active G54-G59 setup defines where your board origin is. G0/G1 positions are then relative to that origin, not to the machine home."
+msgstr "Aktuelles Werkstück-Koordinatensystem: Das aktive G54 bis G59 legt den Platinenursprung fest. G0/G1-Positionen beziehen sich auf diesen Ursprung, nicht auf den Maschinennullpunkt."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:226
-msgid ""
-"Advanced: if you re-zero after a tool change, document the reference "
-"point so later layers still line up."
-msgstr ""
-"Fortgeschritten: Wer nach einem Werkzeugwechsel neu nullt, sollte den "
-"Bezugspunkt festhalten, damit spätere Lagen passen."
+msgid "Advanced: if you re-zero after a tool change, document the reference point so later layers still line up."
+msgstr "Fortgeschritten: Wer nach einem Werkzeugwechsel neu nullt, sollte den Bezugspunkt festhalten, damit spätere Lagen passen."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:232
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:612
@@ -1351,20 +1231,12 @@ msgid "Probe"
 msgstr "Abtasten"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:239
-msgid ""
-"Tip: probe only on a clean conductive surface and watch the first probe "
-"carefully for unexpected contact."
-msgstr ""
-"Tipp: nur auf sauberer, leitender Oberfläche antasten und beim ersten "
-"Antasten auf unerwarteten Kontakt achten."
+msgid "Tip: probe only on a clean conductive surface and watch the first probe carefully for unexpected contact."
+msgstr "Tipp: nur auf sauberer, leitender Oberfläche antasten und beim ersten Antasten auf unerwarteten Kontakt achten."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:242
-msgid ""
-"For repeatability checks, probe the same point several times and compare "
-"the spread before trusting the result."
-msgstr ""
-"Zur Prüfung der Wiederholgenauigkeit denselben Punkt mehrmals antasten "
-"und die Streuung vergleichen, bevor dem Ergebnis vertraut wird."
+msgid "For repeatability checks, probe the same point several times and compare the spread before trusting the result."
+msgstr "Zur Prüfung der Wiederholgenauigkeit denselben Punkt mehrmals antasten und die Streuung vergleichen, bevor dem Ergebnis vertraut wird."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:248
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:449
@@ -1385,20 +1257,12 @@ msgid "Set"
 msgstr "Setzen"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:256
-msgid ""
-"Tip: start conservative on a new tool or board material, then increase "
-"after a successful test cut."
-msgstr ""
-"Tipp: bei neuem Werkzeug oder Platinenmaterial vorsichtig anfangen und "
-"nach einem erfolgreichen Testschnitt steigern."
+msgid "Tip: start conservative on a new tool or board material, then increase after a successful test cut."
+msgstr "Tipp: bei neuem Werkzeug oder Platinenmaterial vorsichtig anfangen und nach einem erfolgreichen Testschnitt steigern."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:259
-msgid ""
-"If spindle noise or burrs increase, reduce feed or speed before changing "
-"the toolpath itself."
-msgstr ""
-"Werden Spindelgeräusch oder Grate stärker, zuerst Vorschub oder Drehzahl "
-"senken, bevor die Fräsbahn geändert wird."
+msgid "If spindle noise or burrs increase, reduce feed or speed before changing the toolpath itself."
+msgstr "Werden Spindelgeräusch oder Grate stärker, zuerst Vorschub oder Drehzahl senken, bevor die Fräsbahn geändert wird."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:270
 msgid "Project"
@@ -1425,20 +1289,12 @@ msgid "No saved projects."
 msgstr "Keine gespeicherten Projekte."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:302
-msgid ""
-"Saved projects keep imported layers, generated toolpaths, and alignment "
-"settings together."
-msgstr ""
-"Gespeicherte Projekte halten importierte Lagen, erzeugte Fräsbahnen und "
-"Ausrichtung zusammen."
+msgid "Saved projects keep imported layers, generated toolpaths, and alignment settings together."
+msgstr "Gespeicherte Projekte halten importierte Lagen, erzeugte Fräsbahnen und Ausrichtung zusammen."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:305
-msgid ""
-"Tip: saved projects are ideal for repeat jobs because they preserve the "
-"layer combination and the last-used alignment choices."
-msgstr ""
-"Tipp: Gespeicherte Projekte eignen sich für Wiederholaufträge, weil sie "
-"die Lagen und die zuletzt genutzte Ausrichtung behalten."
+msgid "Tip: saved projects are ideal for repeat jobs because they preserve the layer combination and the last-used alignment choices."
+msgstr "Tipp: Gespeicherte Projekte eignen sich für Wiederholaufträge, weil sie die Lagen und die zuletzt genutzte Ausrichtung behalten."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:311
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:788
@@ -1478,12 +1334,8 @@ msgid "Rotate by custom angle"
 msgstr "Um benutzerdefinierten Winkel drehen"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:391
-msgid ""
-"Tip: keep the board orientation consistent. If you rotate here, all "
-"imported layers and drill positions rotate together."
-msgstr ""
-"Tipp: Die Ausrichtung der Platine einheitlich halten. Eine Drehung hier "
-"dreht alle importierten Lagen und Bohrpositionen gemeinsam."
+msgid "Tip: keep the board orientation consistent. If you rotate here, all imported layers and drill positions rotate together."
+msgstr "Tipp: Die Ausrichtung der Platine einheitlich halten. Eine Drehung hier dreht alle importierten Lagen und Bohrpositionen gemeinsam."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:398
 msgid "Generate G-code"
@@ -1539,12 +1391,8 @@ msgid "Extra lateral offset per pass"
 msgstr "Zusätzlicher seitlicher Versatz pro Durchgang"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:431
-msgid ""
-"Automatically add passes until all gaps between copper features are fully"
-" cleared"
-msgstr ""
-"Automatisch Durchgänge hinzufügen, bis alle Lücken zwischen Kupferflächen"
-" vollständig freigestellt sind"
+msgid "Automatically add passes until all gaps between copper features are fully cleared"
+msgstr "Automatisch Durchgänge hinzufügen, bis alle Lücken zwischen Kupferflächen vollständig freigestellt sind"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:432
 msgid "Clear all gaps"
@@ -1613,12 +1461,8 @@ msgid "Breakthrough"
 msgstr "Durchbruch"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:479
-msgid ""
-"Drilling and the outline cut go this far below the board so no skin is "
-"left."
-msgstr ""
-"Bohren und Umrissschnitt gehen so weit unter die Platine, damit keine "
-"Haut stehen bleibt."
+msgid "Drilling and the outline cut go this far below the board so no skin is left."
+msgstr "Bohren und Umrissschnitt gehen so weit unter die Platine, damit keine Haut stehen bleibt."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:494
 msgid "Tabs"
@@ -1682,59 +1526,32 @@ msgid "Mask Expose (Bottom)"
 msgstr "Maske belichten (Unterseite)"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:576
-msgid ""
-"Interpretation: G0 = rapid move, G1 = feed move, Z changes are tool "
-"height values, and the active WCS defines the board origin."
-msgstr ""
-"Bedeutung: G0 = Eilgang, G1 = Vorschubbewegung, Z-Werte sind "
-"Werkzeughöhen, und das aktive Werkstück-Koordinatensystem legt den "
-"Platinenursprung fest."
+msgid "Interpretation: G0 = rapid move, G1 = feed move, Z changes are tool height values, and the active WCS defines the board origin."
+msgstr "Bedeutung: G0 = Eilgang, G1 = Vorschubbewegung, Z-Werte sind Werkzeughöhen, und das aktive Werkstück-Koordinatensystem legt den Platinenursprung fest."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:577
-msgid ""
-"Tip: generate and preview one operation at a time first, then combine "
-"only when the alignment and tool settings look correct."
-msgstr ""
-"Tipp: zuerst jede Operation einzeln erzeugen und prüfen, erst "
-"kombinieren, wenn Ausrichtung und Werkzeugeinstellungen stimmen."
+msgid "Tip: generate and preview one operation at a time first, then combine only when the alignment and tool settings look correct."
+msgstr "Tipp: zuerst jede Operation einzeln erzeugen und prüfen, erst kombinieren, wenn Ausrichtung und Werkzeugeinstellungen stimmen."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:579
-msgid ""
-"G-code is just a toolpath program. The important pieces are the active "
-"WCS, feed values, spindle speed, and the cut depth per layer."
-msgstr ""
-"G-Code ist ein Fräsbahnprogramm. Wichtig sind das aktive Werkstück-"
-"Koordinatensystem, die Vorschübe, die Drehzahl und die Schnitttiefe je "
-"Lage."
+msgid "G-code is just a toolpath program. The important pieces are the active WCS, feed values, spindle speed, and the cut depth per layer."
+msgstr "G-Code ist ein Fräsbahnprogramm. Wichtig sind das aktive Werkstück-Koordinatensystem, die Vorschübe, die Drehzahl und die Schnitttiefe je Lage."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:580
-msgid ""
-"Advanced: compare the preview of routing and drilling separately before "
-"you run a combined job on the machine."
-msgstr ""
-"Fortgeschritten: Die Vorschau von Fräsen und Bohren getrennt vergleichen,"
-" bevor ein kombinierter Auftrag läuft."
+msgid "Advanced: compare the preview of routing and drilling separately before you run a combined job on the machine."
+msgstr "Fortgeschritten: Die Vorschau von Fräsen und Bohren getrennt vergleichen, bevor ein kombinierter Auftrag läuft."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:582
-msgid ""
-"Quick meaning: G0 = move quickly, G1 = cut/move at feed speed, G54-G59 = "
-"the chosen board origin, Z = vertical position."
-msgstr ""
-"Kurz erklärt: G0 = schnell verfahren, G1 = mit Vorschub schneiden oder "
-"fahren, G54 bis G59 = gewählter Platinenursprung, Z = Höhe."
+msgid "Quick meaning: G0 = move quickly, G1 = cut/move at feed speed, G54-G59 = the chosen board origin, Z = vertical position."
+msgstr "Kurz erklärt: G0 = schnell verfahren, G1 = mit Vorschub schneiden oder fahren, G54 bis G59 = gewählter Platinenursprung, Z = Höhe."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:583
 msgid "G-code quick guide:"
 msgstr "G-Code kurz erklärt:"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:583
-msgid ""
-"G0 is a fast travel move, G1 is a cutting or feed move, and the current "
-"WCS decides where the board coordinate system starts."
-msgstr ""
-"G0 ist ein schneller Verfahrweg, G1 eine Schnitt- oder Vorschubbewegung, "
-"und das aktuelle Werkstück-Koordinatensystem legt fest, wo die "
-"Platinenkoordinaten beginnen."
+msgid "G0 is a fast travel move, G1 is a cutting or feed move, and the current WCS decides where the board coordinate system starts."
+msgstr "G0 ist ein schneller Verfahrweg, G1 eine Schnitt- oder Vorschubbewegung, und das aktuelle Werkstück-Koordinatensystem legt fest, wo die Platinenkoordinaten beginnen."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:594
 msgid "Probe Grid"
@@ -1749,13 +1566,8 @@ msgid "Generate Grid"
 msgstr "Raster erzeugen"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:607
-msgid ""
-"For beginners: start with a smaller grid and larger margin. For "
-"experienced users: tighten the grid when you need more precise "
-"compensation."
-msgstr ""
-"Einsteiger: mit kleinem Raster und größerem Rand beginnen. Erfahrene: das"
-" Raster verfeinern, wenn eine genauere Korrektur nötig ist."
+msgid "For beginners: start with a smaller grid and larger margin. For experienced users: tighten the grid when you need more precise compensation."
+msgstr "Einsteiger: mit kleinem Raster und größerem Rand beginnen. Erfahrene: das Raster verfeinern, wenn eine genauere Korrektur nötig ist."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:615
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:685
@@ -1767,12 +1579,8 @@ msgid "Progress"
 msgstr "Fortschritt"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:628
-msgid ""
-"Autolevel can take a while. Do not move the machine manually while "
-"probing is active."
-msgstr ""
-"Autolevel kann eine Weile dauern. Die Maschine während des Abtastens "
-"nicht von Hand bewegen."
+msgid "Autolevel can take a while. Do not move the machine manually while probing is active."
+msgstr "Autolevel kann eine Weile dauern. Die Maschine während des Abtastens nicht von Hand bewegen."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:644
 msgid "Probe Data"
@@ -1847,12 +1655,8 @@ msgid "Double-Sided Alignment"
 msgstr "Doppelseitige Ausrichtung"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:809
-msgid ""
-"Automatically pick the 2 farthest-apart drill holes as alignment "
-"references"
-msgstr ""
-"Automatisch die 2 am weitesten voneinander entfernten Bohrlöcher als "
-"Ausrichtungsreferenzen wählen"
+msgid "Automatically pick the 2 farthest-apart drill holes as alignment references"
+msgstr "Automatisch die 2 am weitesten voneinander entfernten Bohrlöcher als Ausrichtungsreferenzen wählen"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:810
 msgid "Auto-Select Alignment Holes"
@@ -1937,13 +1741,9 @@ msgstr "Aktualisieren"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:930
 msgid "Create or load a project in the PCB Project tab to begin."
-msgstr ""
-"Erstellen oder laden Sie ein Projekt im Platinenprojekt-Tab, um zu "
-"beginnen."
+msgstr "Erstellen oder laden Sie ein Projekt im Platinenprojekt-Tab, um zu beginnen."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:931
 msgid "Scroll to zoom &middot; Drag to pan &middot; 3D: drag to rotate"
-msgstr ""
-"Scrollen zum Zoomen &middot; Ziehen zum Verschieben &middot; 3D: Ziehen "
-"zum Drehen"
+msgstr "Scrollen zum Zoomen &middot; Ziehen zum Verschieben &middot; 3D: Ziehen zum Drehen"
 

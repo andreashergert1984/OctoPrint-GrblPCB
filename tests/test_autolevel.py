@@ -256,3 +256,127 @@ class TestApplyAutolevel:
         result = apply_autolevel(gcode, hm)
         # Z=5 is above surface, should not get correction
         assert "Z5.0000" in result
+
+
+# =========================================================================
+# Probe result handling: never record substitute heights
+# =========================================================================
+
+import queue as _queue
+
+import pytest as _pytest
+
+from octoprint_grblpcb import GrblPcbPlugin
+
+
+class _Comm:
+    def __init__(self, *responses):
+        self._response_queue = _queue.Queue()
+        for r in responses:
+            self._response_queue.put(r)
+
+
+def _plugin():
+    plugin = GrblPcbPlugin()
+    plugin.PROBE_TIMEOUT = 0.2
+    return plugin
+
+
+def test_probe_result_in_work_coordinates():
+    comm = _Comm(("probe", {"x": 1.0, "y": 2.0, "z": -1.2, "success": True}), ("ok",))
+    assert _plugin()._await_probe_result(comm, {"z": -1.0}) == (_pytest.approx(-0.2), None)
+
+
+@_pytest.mark.parametrize(
+    "responses, reason",
+    [
+        ([("probe", {"x": 0.0, "y": 0.0, "z": -5.0, "success": False})], "no_contact"),
+        ([("error", 9, "locked")], "grbl_error"),
+        ([("alarm", 5, "Probe fail")], "alarm"),
+        ([], "timeout"),
+    ],
+)
+def test_probe_failures_give_no_height(responses, reason):
+    assert _plugin()._await_probe_result(_Comm(*responses), {"z": 0.0}) == (None, reason)
+
+
+def test_user_stop_is_not_a_failure():
+    plugin = _plugin()
+    plugin._probe_stop.set()
+    assert plugin._await_probe_result(_Comm(), {"z": 0.0}) == (None, None)
+
+
+class _ProbeComm:
+    def __init__(self):
+        self._response_queue = _queue.Queue()
+        self._stream_mode = False
+
+
+class _ProbeConnector:
+    """Answers moves with ok; probe i answers with probe_answers[i]."""
+
+    def __init__(self, probe_answers):
+        self._comm = _ProbeComm()
+        self._work_offset = {"x": 0.0, "y": 0.0, "z": 0.0}
+        self._work_position = {"x": 0.0, "y": 0.0, "z": 0.0}
+        self._probe_answers = list(probe_answers)
+
+    def commands(self, *commands, **kwargs):
+        for command in commands:
+            if command.startswith("G38.2"):
+                answer = self._probe_answers.pop(0) if self._probe_answers else []
+                for response in answer:
+                    self._comm._response_queue.put(response)
+            else:
+                self._comm._response_queue.put(("ok",))
+
+
+class _Settings:
+    def get_float(self, path):
+        return 1.0
+
+
+class _PluginManager:
+    def __init__(self):
+        self.messages = []
+
+    def send_plugin_message(self, plugin, data):
+        self.messages.append(data)
+
+
+def _contact(z):
+    return [("probe", {"x": 0.0, "y": 0.0, "z": z, "success": True}), ("ok",)]
+
+
+@_pytest.mark.parametrize(
+    "failure, reason",
+    [
+        ([("probe", {"x": 0.0, "y": 0.0, "z": -5.0, "success": False}), ("alarm", 5, "Probe fail")], "no_contact"),
+        ([("error", 9, "locked")], "grbl_error"),
+        ([("alarm", 5, "Probe fail")], "alarm"),
+        ([], "timeout"),
+    ],
+)
+def test_probe_loop_stops_without_recording_failed_point(failure, reason):
+    from octoprint_grblpcb.pcb_project import PCBProject
+
+    import logging
+
+    plugin = _plugin()
+    plugin._logger = logging.getLogger("test")
+    plugin._settings = _Settings()
+    plugin._plugin_manager = _PluginManager()
+    plugin._save_project = lambda: None
+    plugin._project = PCBProject()
+    plugin._height_map = HeightMap()
+    plugin._height_map.generate_grid(0, 0, 10, 10, grid_x=2, grid_y=2)
+
+    connector = _ProbeConnector([_contact(-0.1), failure, _contact(-0.2), _contact(-0.3)])
+    plugin._autolevel_probe_loop(connector)
+
+    points = plugin._height_map.points
+    assert points[0].probed and points[0].z == _pytest.approx(-0.1)
+    assert not points[1].probed
+    assert not any(p.probed for p in points[2:])
+    failed = [m for m in plugin._plugin_manager.messages if m["type"] == "autolevel_failed"]
+    assert failed == [{"type": "autolevel_failed", "index": 1, "total": 4, "reason": reason}]

@@ -1494,6 +1494,25 @@ $(function() {
                     hide: false
                 });
             }
+            else if (data.type === "autolevel_failed") {
+                var reasons = {
+                    no_contact: gettext("The probe did not touch the board within the probe depth."),
+                    grbl_error: gettext("GRBL rejected the probe command."),
+                    alarm: gettext("GRBL raised an alarm."),
+                    timeout: gettext("No probe result within 30 seconds.")
+                };
+                var failText = _.sprintf(
+                    gettext("Probing stopped at point %(point)d of %(total)d. No height was recorded for this point."),
+                    {point: data.index + 1, total: data.total}
+                ) + " " + (reasons[data.reason] || data.reason);
+                self.autolevelStatus("⚠ " + failText);
+                new PNotify({
+                    title: gettext("Autolevel aborted"),
+                    text: failText,
+                    type: "error",
+                    hide: false
+                });
+            }
             else if (data.type === "autolevel_complete") {
                 self.autolevelProgress(100);
                 var statusMsg = gettext("Probing complete! Height map ready.");

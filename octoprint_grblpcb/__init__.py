@@ -1703,6 +1703,40 @@ class GrblPcbPlugin(
 
         return flask.jsonify(result="ok", message=gettext("Probing started"))
 
+    PROBE_TIMEOUT = 30.0
+
+    def _await_probe_result(self, comm, work_offset):
+        """
+        Wait for the result of one G38.2 probe.
+
+        Returns (z, None) with z in work coordinates on contact,
+        (None, reason) on failure ("no_contact", "grbl_error", "alarm",
+        "timeout") and (None, None) if the user stopped probing.
+        """
+        z_val = None
+        deadline = time.time() + self.PROBE_TIMEOUT
+        while time.time() < deadline:
+            if self._probe_stop.is_set():
+                return None, None
+            try:
+                resp = comm._response_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            if resp[0] == "probe":
+                if not resp[1]["success"]:
+                    return None, "no_contact"
+                # PRB reports machine coordinates; convert to work
+                # coordinates so Z is about 0 at the board surface
+                z_val = resp[1]["z"] - work_offset.get("z", 0.0)
+            elif resp[0] == "ok":
+                if z_val is not None:
+                    return z_val, None
+            elif resp[0] == "error":
+                return None, "grbl_error"
+            elif resp[0] == "alarm":
+                return None, "alarm"
+        return None, "timeout"
+
     def _autolevel_probe_loop(self, connector):
         """Background thread for sequential probing."""
         probe_depth = self._settings.get_float(["probe_depth"])
@@ -1757,42 +1791,21 @@ class GrblPcbPlugin(
                 self._wait_for_ok(comm, timeout=2.0)
                 self._wait_for_ok(comm, timeout=2.0)
 
-                # Wait for the probe result - this can take time
-                z_val = None
-                probe_ok = False
-                deadline = time.time() + 30.0  # 30 second timeout for probe
-                while time.time() < deadline and not self._probe_stop.is_set():
-                    try:
-                        resp = comm._response_queue.get(timeout=1.0)
-                    except queue.Empty:
-                        continue
-                    
-                    if resp[0] == "probe":
-                        probe_data = resp[1]
-                        if probe_data["success"]:
-                            # PRB reports machine coordinates; convert to
-                            # work coordinates so Z≈0 at the board surface.
-                            wco_z = connector._work_offset.get("z", 0.0)
-                            z_val = probe_data["z"] - wco_z
-                        else:
-                            self._logger.warning(f"Probe failed at point {i}")
-                            z_val = 0.0
-                    elif resp[0] == "ok":
-                        probe_ok = True
-                        if z_val is not None:
-                            break
-                    elif resp[0] == "error":
-                        self._logger.error(f"Probe error at point {i}: {resp[1]} {resp[2]}")
-                        z_val = 0.0
-                        break
-                    elif resp[0] == "alarm":
-                        self._logger.error(f"Alarm during probing: {resp[2]}")
-                        self._probe_stop.set()
-                        break
-
+                z_val, failure = self._await_probe_result(comm, connector._work_offset)
+                if failure:
+                    # Never record a substitute height: the point stays
+                    # unprobed and the run stops so the user can fix the cause
+                    self._logger.error(f"Autolevel aborted at point {i}: {failure}")
+                    self._probe_stop.set()
+                    if self._plugin_manager:
+                        self._plugin_manager.send_plugin_message(
+                            "grblpcb",
+                            {"type": "autolevel_failed", "index": i, "total": total, "reason": failure},
+                        )
+                    break
                 if z_val is None:
-                    # Fallback: read from work position
-                    z_val = connector._work_position.get("z", 0.0)
+                    # Stopped by the user while waiting
+                    break
 
                 self._height_map.set_probe_result(i, z_val)
 
