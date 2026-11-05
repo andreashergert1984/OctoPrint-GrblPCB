@@ -311,6 +311,25 @@ $(function() {
             return self.uploadMessage().indexOf(gettext("Error")) === 0;
         });
 
+        self.gcodeLinesText = function(count) {
+            return _.sprintf(gettext("%(count)d lines"), {count: count});
+        };
+
+        self.heightmapPointsText = ko.pureComputed(function() {
+            return _.sprintf(gettext("(%(count)d points)"), {count: self.heightmapPoints().length});
+        });
+
+        self.alignmentTransformText = ko.pureComputed(function() {
+            var t = self.alignmentTransform();
+            if (!t) return "";
+            return _.sprintf(gettext("θ=%(angle)s°  offset=(%(tx)s, %(ty)s) mm  RMS=%(rms)s mm"), {
+                angle: t.theta_deg.toFixed(3),
+                tx: t.tx.toFixed(3),
+                ty: t.ty.toFixed(3),
+                rms: t.rms_error.toFixed(4)
+            });
+        });
+
         self.projectSummaryText = function(project) {
             return _.sprintf(gettext("%(layers)d layers, %(operations)d operations"), {
                 layers: project.layers.length,

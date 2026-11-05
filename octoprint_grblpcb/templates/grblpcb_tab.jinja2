@@ -642,7 +642,7 @@
                     <h4 class="grblpcb-collapsible" data-bind="click: toggleProbeTable">
                         <i class="fas" data-bind="css: { 'fa-chevron-down': showProbeTable(), 'fa-chevron-right': !showProbeTable() }"></i>
                         {{ _("Probe Data") }}
-                        <small data-bind="text: '(' + heightmapPoints().length + ' pts)'"></small>
+                        <small data-bind="text: heightmapPointsText"></small>
                     </h4>
                     <div data-bind="visible: showProbeTable" class="grblpcb-probe-data-scroll">
                         <table class="table table-condensed table-bordered grblpcb-probe-table">
@@ -757,7 +757,7 @@
                                 <span>F<span data-bind="text: feed_rate"></span></span>
                                 <!-- /ko -->
                                 <!-- ko if: gcode_lines -->
-                                <span data-bind="text: gcode_lines + ' lines'"></span>
+                                <span data-bind="text: $parent.gcodeLinesText(gcode_lines)"></span>
                                 <!-- /ko -->
                             </div>
                             <div class="grblpcb-btn-wrap grblpcb-mt-3">
@@ -853,7 +853,7 @@
                     <!-- ko if: hasAlignmentTransform -->
                     <div class="grblpcb-align-transform">
                         <strong>{{ _("Transform:") }}</strong>
-                        <span data-bind="text: 'θ=' + alignmentTransform().theta_deg.toFixed(3) + '°  offset=(' + alignmentTransform().tx.toFixed(3) + ', ' + alignmentTransform().ty.toFixed(3) + ')mm  RMS=' + alignmentTransform().rms_error.toFixed(4) + 'mm'"></span>
+                        <span data-bind="text: alignmentTransformText"></span>
                     </div>
                     <div class="grblpcb-mb-6">
                         <button class="btn btn-mini btn-success"

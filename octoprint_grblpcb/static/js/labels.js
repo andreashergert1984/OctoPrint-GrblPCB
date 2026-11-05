@@ -16,7 +16,7 @@
             case "top_mask": return gettext("Top solder mask");
             case "bottom_mask": return gettext("Bottom solder mask");
             case "outline": return gettext("Outline");
-            case "drill": return gettext("Drill");
+            case "drill": return gettext("Drill holes");
             default: return type || "";
         }
     }

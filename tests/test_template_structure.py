@@ -50,3 +50,24 @@ def test_template_tags_are_balanced(template):
 @pytest.mark.parametrize("template", TEMPLATES, ids=lambda p: p.name)
 def test_template_knockout_comments_are_balanced(template):
     assert _knockout_balanced(template.read_text())
+
+
+# Quoted literals in text bindings that are not words to translate
+_UNITS = {"mm", "µm", "RPM", "mm/min", "mm/m"}
+_TEXT_BINDING = re.compile(r"text:\s*((?:[^,'\"]|'[^']*'|\"[^\"]*\")+)")
+
+
+def _untranslatable_text_literals(text):
+    found = []
+    for binding in re.findall(r'data-bind="([^"]*)"', text):
+        for expression in _TEXT_BINDING.findall(binding):
+            for literal in re.findall(r"'([^']*)'", expression):
+                if re.search(r"[A-Za-z]{2,}", literal) and literal.strip() not in _UNITS:
+                    found.append(literal)
+    return found
+
+
+@pytest.mark.parametrize("template", TEMPLATES, ids=lambda p: p.name)
+def test_text_bindings_have_no_fixed_words(template):
+    # Words in text bindings bypass gettext; build them in the view model
+    assert _untranslatable_text_literals(template.read_text()) == []

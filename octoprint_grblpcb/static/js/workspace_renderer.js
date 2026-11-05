@@ -653,15 +653,24 @@
         }
         if (!lines.length || !b) return;
 
-        // Anchor: centre of the board's top edge; the last line sits just
-        // above the board, earlier lines stack upwards
-        var anchor = this._w2s((b.min_x + b.max_x) / 2, b.max_y, 0);
+        // Anchor: centre of the top edge of the board, or of the probe grid
+        // when it reaches further (its points carry their own Z labels).
+        // The last line sits just above, earlier lines stack upwards.
+        var top = b.max_y;
+        var gap = 6;
+        if (this.showProbeGrid && this.probePoints.length) {
+            for (var k = 0; k < this.probePoints.length; k++) {
+                top = Math.max(top, this.probePoints[k].y);
+            }
+            gap = 22;  // clear the probe point marker and its Z value
+        }
+        var anchor = this._w2s((b.min_x + b.max_x) / 2, top, 0);
         var lineHeight = 13;
         ctx.textAlign = "center";
         for (var j = 0; j < lines.length; j++) {
             ctx.fillStyle = lines[j].color;
             ctx.font = lines[j].font;
-            ctx.fillText(lines[j].text, anchor.x, anchor.y - 6 - (lines.length - 1 - j) * lineHeight);
+            ctx.fillText(lines[j].text, anchor.x, anchor.y - gap - (lines.length - 1 - j) * lineHeight);
         }
         ctx.textAlign = "left";
     };
