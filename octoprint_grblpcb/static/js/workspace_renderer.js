@@ -239,6 +239,28 @@
         var canvasW = this._logicalWidth - padding * 2;
         var canvasH = this._logicalHeight - padding * 2;
 
+        if (this.viewMode === "3d") {
+            // Fit the projected corners: rotation and tilt change the
+            // on-screen extent of the board
+            var minSX = Infinity, maxSX = -Infinity, minSY = Infinity, maxSY = -Infinity;
+            var xs = [bounds.min_x, bounds.max_x], ys = [bounds.min_y, bounds.max_y];
+            var zs = [this._zMin || 0, this._zMax || 0];
+            for (var i = 0; i < 2; i++) {
+                for (var j = 0; j < 2; j++) {
+                    for (var k = 0; k < 2; k++) {
+                        var p = this._project3D(xs[i], ys[j], zs[k]);
+                        minSX = Math.min(minSX, p.x); maxSX = Math.max(maxSX, p.x);
+                        minSY = Math.min(minSY, p.y); maxSY = Math.max(maxSY, p.y);
+                    }
+                }
+            }
+            this.zoom = Math.min(canvasW / (maxSX - minSX || 1), canvasH / (maxSY - minSY || 1));
+            this.panX = this._logicalWidth / 2 - (minSX + maxSX) / 2 * this.zoom;
+            this.panY = this._logicalHeight / 2 + (minSY + maxSY) / 2 * this.zoom;
+            this.render();
+            return;
+        }
+
         this.zoom = Math.min(canvasW / worldW, canvasH / worldH);
 
         var cx = (bounds.min_x + bounds.max_x) / 2;
@@ -328,7 +350,13 @@
         };
     };
 
-    WorkspaceRenderer.prototype._worldToScreen3D = function(wx, wy, wz, zScaleOverride) {
+    WorkspaceRenderer.prototype._project3D = function(wx, wy, wz, zScaleOverride) {
+        // Projection without zoom and pan; x right, y up
+        var p = this._worldToScreen3D(wx, wy, wz, zScaleOverride, true);
+        return {x: p.x, y: -p.y};
+    };
+
+    WorkspaceRenderer.prototype._worldToScreen3D = function(wx, wy, wz, zScaleOverride, unitView) {
         // Isometric-like projection with configurable rotation
         var pitchRad = this.rotation3D.pitch * Math.PI / 180;
         var yawRad = this.rotation3D.yaw * Math.PI / 180;
@@ -347,9 +375,10 @@
         var sy = ry * Math.cos(pitchRad) - scaledZ * Math.sin(pitchRad);
         var sz = ry * Math.sin(pitchRad) + scaledZ * Math.cos(pitchRad);
 
+        var zoom = unitView ? 1 : this.zoom;
         return {
-            x: rx * this.zoom + this.panX,
-            y: -sy * this.zoom + this.panY,
+            x: rx * zoom + (unitView ? 0 : this.panX),
+            y: -sy * zoom + (unitView ? 0 : this.panY),
             depth: sz
         };
     };
