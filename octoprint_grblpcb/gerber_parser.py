@@ -411,14 +411,42 @@ def _region_to_points(region_cmd) -> list:
 # Excellon format patterns
 _HEADER_START = re.compile(r"^M48")
 _HEADER_END = re.compile(r"^%$|^M95")
-_TOOL_DEF = re.compile(r"^T(\d+)C([\d.]+)")
+# Tool definition, optionally with feed/speed before the diameter: T1F00S00C0.8
+_TOOL_DEF = re.compile(r"^T(\d+)(?:[FSBH][\d.]+)*C([\d.]+)")
 _TOOL_SELECT = re.compile(r"^T(\d+)$")
+# X and/or Y; a missing axis keeps its previous value (modal)
 _COORD_LINE = re.compile(
-    r"^X([+-]?[\d.]+)Y([+-]?[\d.]+)",
+    r"^(?:X([+-]?[\d.]+))?(?:Y([+-]?[\d.]+))?",
     re.IGNORECASE,
 )
-_UNIT_METRIC = re.compile(r"METRIC|M71", re.IGNORECASE)
-_UNIT_INCH = re.compile(r"INCH|M72", re.IGNORECASE)
+# METRIC|INCH [,LZ|,TZ] [,000.000]  (also M71 metric, M72 inch)
+_UNIT_LINE = re.compile(
+    r"^(METRIC|INCH|M71|M72)(?:,(LZ|TZ))?(?:,(0+)\.(0+))?",
+    re.IGNORECASE,
+)
+# KiCad comments: ;FILE_FORMAT=3:3  and  ; FORMAT={3:3/ absolute / metric / ...}
+_FILE_FORMAT = re.compile(r"^;\s*(?:FILE_FORMAT=|FORMAT=\{)(\d+):(\d+)")
+
+# Integer and decimal digits when the file does not say (KiCad, gerbv)
+_DEFAULT_DIGITS = {"metric": (3, 3), "inch": (2, 4)}
+
+
+def _excellon_number(text: str, digits: tuple, zeros: Optional[str]) -> float:
+    """
+    Convert an Excellon coordinate to a float in file units.
+
+    Numbers with a decimal point are taken as they are. Without one, the
+    format decides: TZ (trailing zeros kept) is right-aligned, LZ (leading
+    zeros kept, trailing ones dropped) is padded on the right.
+    """
+    if "." in text:
+        return float(text)
+    sign = -1.0 if text.startswith("-") else 1.0
+    number = text.lstrip("+-")
+    int_digits, dec_digits = digits
+    if zeros == "LZ":
+        number = number.ljust(int_digits + dec_digits, "0")
+    return sign * int(number) / 10 ** dec_digits
 
 
 @dataclass
@@ -444,31 +472,32 @@ def parse_excellon_file(filepath: str) -> tuple[PCBLayer, list[DrillInfo]]:
     lines = content.splitlines()
     tools: dict[int, ExcellonTool] = {}
     current_tool: Optional[int] = None
-    in_header = False
-    is_metric = True  # assume metric by default
+    units = "metric"  # assume metric by default
+    digits: Optional[tuple] = None  # from the file, else the unit default
+    zeros: Optional[str] = None  # "LZ", "TZ" or unknown
     scale = 1.0
+    x = y = 0.0
 
     for line in lines:
         line = line.strip()
-        if not line or line.startswith(";"):
+        if not line:
+            continue
+        m = _FILE_FORMAT.match(line)
+        if m:
+            digits = (int(m.group(1)), int(m.group(2)))
+            continue
+        if line.startswith(";") or _HEADER_START.match(line) or _HEADER_END.match(line):
             continue
 
-        # Header detection
-        if _HEADER_START.match(line):
-            in_header = True
-            continue
-        if _HEADER_END.match(line):
-            in_header = False
-            continue
-
-        # Unit detection (can be in or outside header)
-        if _UNIT_METRIC.search(line):
-            is_metric = True
-            scale = 1.0
-            continue
-        if _UNIT_INCH.search(line):
-            is_metric = False
-            scale = 25.4  # convert to mm
+        # Unit and number format (can be in or outside header)
+        m = _UNIT_LINE.match(line)
+        if m:
+            units = "inch" if m.group(1).upper() in ("INCH", "M72") else "metric"
+            scale = 25.4 if units == "inch" else 1.0
+            if m.group(2):
+                zeros = m.group(2).upper()
+            if m.group(3):
+                digits = (len(m.group(3)), len(m.group(4)))
             continue
 
         # Tool definitions (in header)
@@ -487,19 +516,12 @@ def parse_excellon_file(filepath: str) -> tuple[PCBLayer, list[DrillInfo]]:
 
         # Coordinate lines
         m = _COORD_LINE.match(line)
-        if m and current_tool is not None:
-            x = float(m.group(1))
-            y = float(m.group(2))
-
-            # Handle integer coordinates (no decimal point = needs scaling)
-            if "." not in m.group(1):
-                # Typical format: leading zero suppression, 2.4 or 3.3 format
-                x = x / 10000.0
-            if "." not in m.group(2):
-                y = y / 10000.0
-
-            x *= scale
-            y *= scale
+        if m and (m.group(1) or m.group(2)) and current_tool is not None:
+            number_format = digits or _DEFAULT_DIGITS[units]
+            if m.group(1):
+                x = _excellon_number(m.group(1), number_format, zeros) * scale
+            if m.group(2):
+                y = _excellon_number(m.group(2), number_format, zeros) * scale
 
             if current_tool in tools:
                 tools[current_tool].holes.append((x, y))
