@@ -2677,30 +2677,13 @@ class GrblPcbPlugin(
         elif event == Events.DISCONNECTED:
             self._logger.info("Printer disconnected")
 
-    # -------------------------------------------------------------------------
-    # Software Update Hook
-    # -------------------------------------------------------------------------
-
-    def get_update_information(self):
-        return dict(
-            grblpcb=dict(
-                displayName="GrblPCB Plugin",
-                displayVersion=self._plugin_version,
-                type="github_release",
-                user="ahergert",
-                repo="OctoPrint-GrblPCB",
-                current=self._plugin_version,
-                pip="https://github.com/ahergert/OctoPrint-GrblPCB/archive/{target_version}.zip",
-            )
-        )
-
 
 # Plugin metadata
 __plugin_name__ = "GrblPCB"
 __plugin_version__ = "0.1.0"
-__plugin_pythoncompat__ = ">=3.9,<4"
+__plugin_pythoncompat__ = ">=3.11,<4"
 __plugin_author__ = "Andreas Hergert"
-__plugin_url__ = "https://github.com/ahergert/OctoPrint-GrblPCB"
+__plugin_url__ = "https://git.hergert.info/octoprint/OctoPrint-GrblPCB"
 __plugin_license__ = "AGPLv3"
 __plugin_description__ = "GRBL-based CNC control for PCB isolation milling, drilling, and outline cutting"
 
@@ -2720,6 +2703,5 @@ def __plugin_load__():
 
     global __plugin_hooks__
     __plugin_hooks__ = {
-        "octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
         "octoprint.server.http.bodysize": __plugin_implementation__.bodysize_hook,
     }

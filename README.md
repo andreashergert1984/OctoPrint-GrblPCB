@@ -57,15 +57,15 @@ An OctoPrint plugin for PCB isolation milling on GRBL-based CNC machines. Import
 
 ## Installation
 
-> **Requires OctoPrint 1.12.0 or later.** This plugin uses the new `ConnectedPrinter` API
-> which is not available in OctoPrint 1.11.x or earlier. The plugin will refuse to load
-> on incompatible versions.
+> **Requires OctoPrint 2.0 and Python 3.11 or later.** The plugin uses the
+> `ConnectedPrinter` API, which OctoPrint 1.11.x does not have; on such versions it
+> refuses to load. Tested against the OctoPrint `dev` branch after 2.0.0rc7.
 
 ### From Source (Development)
 
 ```bash
 cd /path/to/your/plugins
-git clone https://github.com/ahergert/OctoPrint-GrblPCB.git
+git clone https://git.hergert.info/octoprint/OctoPrint-GrblPCB.git
 cd OctoPrint-GrblPCB
 source /path/to/octoprint/venv/bin/activate
 pip install -e .
@@ -85,34 +85,28 @@ Installed automatically via `pip`:
 | scipy ≥ 1.10 | Height-map interpolation |
 | numpy ≥ 1.24 | Numerical computation |
 
-### Required OctoPrint Settings
+The plugin brings its own GRBL connection type ("GRBL CNC Connection"), so OctoPrint's
+serial connection settings (hello command, checksums) do not apply to it.
 
-After installing the plugin:
-
-1. **Serial Connection → Advanced → "Hello" command**: Set to `M5`
-2. **Features → Send a checksum with the command**: Set to **Never**
+The plugin has no automatic update check; update with `git pull` and restart OctoPrint.
 
 ## Configuration
 
-All settings are accessible from the OctoPrint Settings panel under **GrblPCB**.
+Machine defaults live in the OctoPrint Settings panel under **GrblPCB**:
 
 | Group | Setting | Description |
 |-------|---------|-------------|
-| Feed | Default Jog Feed | Jog speed (mm/min) |
+| Feed | Default Feed / Jog Feed | Cutting and jog speed (mm/min) |
 | Feed | Safe Z Height | Clearance height for rapids (mm) |
-| Probe | Probe Depth | Max probe travel (mm, negative) |
-| Probe | Probe Feed Rate | Touch-probe speed (mm/min) |
-| Probe | Probe Grid Spacing | Autolevel grid resolution (mm) |
-| Tool | Tool Diameter | V-bit tip diameter (mm) |
-| Tool | Tool Angle | V-bit included angle (°) |
-| Tool | Cut Depth | Isolation engraving depth (mm) |
-| Tool | Number of Passes | Multi-pass isolation count |
-| Spindle | Default Spindle Speed | RPM |
-| Spindle | Startup Delay | Spin-up wait (s) |
-| Drill | Peck Depth | Peck-drill increment (mm) |
-| Drill | Retract Height | Peck-drill retract (mm) |
-| Outline | Tab Width / Height | Workholding tab dimensions (mm) |
-| Outline | Number of Tabs | Tabs per board edge |
+| Feed | Default WCS | Work coordinate system (G54 to G59) |
+| Probe | Probe Depth / Probe Feed | Max probe travel (mm, negative) and touch-probe speed |
+| Tool | Tool Diameter / Tool Angle | V-bit tip diameter (mm) and included angle |
+| Spindle | Default Speed, Min / Max RPM, Startup Delay | Spindle defaults |
+| Machine | Soft / Hard Limits, position display | Machine options |
+
+The per-job parameters are set in the **CNC/PCB → Platinenprojekt** tab before generating
+G-code: isolation (cut depth, depth per pass, passes, overlap), speeds and heights,
+drilling (feed, peck depth, board thickness, breakthrough), outline (tool, tabs).
 
 ## Usage
 
@@ -208,12 +202,6 @@ This plugin is licensed under the [GNU Affero General Public License v3.0](LICEN
 - [pygerber](https://github.com/Argmaster/pygerber) by Krzysztof Wiśniewski
 - Inspired by [octoprint-grbl-plugin](https://github.com/mic159/octoprint-grbl-plugin) by mic159
 
-## Contributing
+## Issues
 
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
-
-## Support
-
-- [GitHub Issues](https://github.com/ahergert/OctoPrint-GrblPCB/issues)
+- [https://git.hergert.info/octoprint/OctoPrint-GrblPCB/-/issues](https://git.hergert.info/octoprint/OctoPrint-GrblPCB/-/issues)

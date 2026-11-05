@@ -11,7 +11,7 @@ authors = [
 ]
 readme = "README.md"
 license = "AGPL-3.0-or-later"
-requires-python = ">=3.9, <4"
+requires-python = ">=3.11, <4"
 
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -21,7 +21,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: JavaScript",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
@@ -55,7 +54,7 @@ include = [
 grblpcb = "octoprint_grblpcb"
 
 [project.urls]
-Homepage = "https://github.com/ahergert/OctoPrint-GrblPCB"
+Homepage = "https://git.hergert.info/octoprint/OctoPrint-GrblPCB"
 
 [project.optional-dependencies]
 develop = [

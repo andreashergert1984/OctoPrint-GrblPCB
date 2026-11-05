@@ -72,5 +72,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Proper HTTP status codes (400, 404, 409, 500) with JSON error bodies
 - Structured logging via OctoPrint's `self._logger`
 
-[0.1.0]: https://github.com/ahergert/OctoPrint-GrblPCB/releases/tag/v0.1.0
+[0.1.0]: https://git.hergert.info/octoprint/OctoPrint-GrblPCB/-/tags/v0.1.0
 
