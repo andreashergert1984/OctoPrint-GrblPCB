@@ -12,7 +12,6 @@ Implements PCB surface probing and G-code Z-correction:
 import logging
 import math
 import re
-import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -284,7 +283,7 @@ def generate_probe_gcode(
         lines.append(f"G0 X{point.x:.4f} Y{point.y:.4f}")
         lines.append(f"G1 Z{travel_z:.3f} F{z_max_feed:.0f}")
         lines.append(f"G38.2 Z{probe_depth} F{probe_feed}")
-        lines.append(f"; >>> Record Z here <<<")
+        lines.append("; >>> Record Z here <<<")
         lines.append(f"G1 Z{travel_z:.3f} F{z_max_feed:.0f}")
         lines.append("")
 

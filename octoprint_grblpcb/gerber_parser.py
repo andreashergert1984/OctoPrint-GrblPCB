@@ -15,7 +15,6 @@ from typing import Optional
 
 from shapely.geometry import (
     LineString,
-    MultiLineString,
     MultiPolygon,
     Point,
     Polygon,
@@ -114,7 +113,6 @@ def _extract_geometries(parsed) -> list:
     Converts pygerber command objects (Flash2, Line2, Arc2, Region2)
     into Shapely geometries suitable for toolpath offset operations.
     """
-    from pygerber.gerberx3.parser2.command_buffer2 import ReadonlyCommandBuffer2
 
     geometries = []
     buf = parsed._command_buffer

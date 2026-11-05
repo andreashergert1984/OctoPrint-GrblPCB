@@ -10,9 +10,8 @@ import json
 import logging
 import os
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Optional
 
 
@@ -262,8 +261,8 @@ class PCBProject:
             "id": self.id,
             "name": self.name,
             "layers": {
-                lt.value if isinstance(lt, LayerType) else lt: l.to_dict()
-                for lt, l in self.layers.items()
+                lt.value if isinstance(lt, LayerType) else lt: layer.to_dict()
+                for lt, layer in self.layers.items()
             },
             "drills": [d.to_dict() for d in self.drills],
             "operations": [op.to_dict(include_gcode=include_gcode) for op in self.operations],

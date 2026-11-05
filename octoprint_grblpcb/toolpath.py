@@ -13,7 +13,6 @@ import logging
 import math
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 from shapely.geometry import (
     LinearRing,
@@ -23,7 +22,6 @@ from shapely.geometry import (
     Polygon,
     box,
 )
-from shapely.ops import unary_union
 
 _logger = logging.getLogger(__name__)
 
@@ -149,7 +147,7 @@ def generate_isolation_gcode(
     _logger.info(
         f"Generating isolation toolpaths: "
         f"{len(copper_geometry.geoms)} polygons, "
-        + (f"clear_gaps mode, " if dynamic_mode else f"{settings.passes} pass(es), ")
+        + ("clear_gaps mode, " if dynamic_mode else f"{settings.passes} pass(es), ")
         + f"tool={settings.tool_diameter}mm"
         + (f", max_width={settings.max_width}mm" if settings.max_width > 0 else "")
     )

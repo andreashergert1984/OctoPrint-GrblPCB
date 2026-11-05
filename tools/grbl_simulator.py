@@ -202,7 +202,7 @@ class GrblSimulator:
         if self.state == "Alarm":
             raise GrblError(9)
         words = WORD_RE.findall(line)
-        if not words or "".join(l + v for l, v in words) != line:
+        if not words or "".join(letter + value for letter, value in words) != line:
             raise GrblError(1)
         if jog:
             modal = (self.absolute, self.inches, self.feed, self.motion)

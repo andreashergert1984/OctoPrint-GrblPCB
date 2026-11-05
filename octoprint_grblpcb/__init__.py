@@ -13,7 +13,6 @@ Features:
 - Tool change management
 """
 
-import json
 import os
 import queue
 import threading
@@ -24,11 +23,9 @@ import octoprint.plugin
 from octoprint.events import Events
 from flask_babel import gettext
 import re
-import logging
 
 from .pcb_project import (
     PCBProject,
-    PCBLayer,
     LayerType,
     BoardSide,
     ProjectState,
@@ -113,7 +110,7 @@ class GrblPcbPlugin(
 
     def on_after_startup(self):
         self._logger.info("GrblPCB plugin started!")
-        self._logger.info(f"GRBL connector available for CNC connections")
+        self._logger.info("GRBL connector available for CNC connections")
 
         # Try to load the most recently modified project
         self._load_last_project()
@@ -601,7 +598,6 @@ class GrblPcbPlugin(
         return flask.jsonify(result="going to zero")
 
     def _handle_status(self, data):
-        import flask
         return self._handle_machine_check(data)
 
     def _build_machine_check_report(self, connector):
@@ -1379,7 +1375,7 @@ class GrblPcbPlugin(
     def _handle_get_layer_geometry(self, data):
         """Return serialised polygon geometry for canvas rendering."""
         import flask
-        from shapely.geometry import MultiPolygon, Polygon
+        from shapely.geometry import Polygon
 
         if self._project is None:
             return flask.jsonify(error=gettext("No project")), 400
@@ -2607,7 +2603,6 @@ class GrblPcbPlugin(
     def _handle_get_toolpath_preview(self, data):
         """Parse G-code from operations into point arrays for workspace rendering."""
         import flask
-        import re
 
         if self._project is None:
             return flask.jsonify(result="no_project", toolpaths=[])

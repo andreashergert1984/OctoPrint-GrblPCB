@@ -2,7 +2,6 @@
 """Tests for gerber_parser module — aperture shape handling."""
 
 import math
-import pytest
 from unittest.mock import MagicMock
 
 from octoprint_grblpcb.gerber_parser import (

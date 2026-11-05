@@ -151,6 +151,26 @@ plugin can stream them, so its planner runs empty and the status shows `Idle`
 between moves, as real GRBL does when it starves. Use `--time-scale 1` to see the
 status a real machine would report during a job.
 
+## Development Checks
+
+There is no CI pipeline; run the checks locally in the OctoPrint venv before pushing:
+
+```bash
+python -m ruff check octoprint_grblpcb tools tests
+python -m pytest
+```
+
+After changing user-facing texts, update the German translation:
+
+```bash
+python setup.py babel_extract && python setup.py babel_refresh
+# translate new entries in translations/de/LC_MESSAGES/messages.po
+python setup.py babel_compile && python setup.py babel_bundle --locale de
+```
+
+`tests/test_translations.py` fails while any text is untranslated or the bundled
+copy is out of date.
+
 ## Plugin Structure
 
 ```
@@ -176,7 +196,6 @@ OctoPrint-GrblPCB/
 │   └── translations/          # Bundled i18n files
 ├── tests/                     # Automated test suite (pytest)
 ├── tools/grbl_simulator.py    # GRBL 1.1 simulator for testing without hardware
-├── .github/workflows/ci.yml   # CI: lint, test, build
 ├── babel.cfg                  # i18n string extraction config
 ├── CHANGELOG.md
 ├── pyproject.toml

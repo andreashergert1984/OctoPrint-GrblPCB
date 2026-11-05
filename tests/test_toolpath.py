@@ -71,17 +71,17 @@ class TestGenerateIsolation:
         gcode = generate_isolation_gcode(copper, ToolpathSettings())
         lines = gcode.splitlines()
         # Must contain setup commands
-        assert any("G21" in l for l in lines)
-        assert any("G90" in l for l in lines)
-        assert any("M3 S" in l for l in lines)
+        assert any("G21" in line for line in lines)
+        assert any("G90" in line for line in lines)
+        assert any("M3 S" in line for line in lines)
 
     def test_postamble(self):
         copper = _make_square_copper()
         gcode = generate_isolation_gcode(copper, ToolpathSettings())
         lines = gcode.splitlines()
-        assert any("M5" in l for l in lines)
-        assert any("M2" in l for l in lines)
-        assert any("G0 X0 Y0" in l for l in lines)
+        assert any("M5" in line for line in lines)
+        assert any("M2" in line for line in lines)
+        assert any("G0 X0 Y0" in line for line in lines)
 
     def test_origin_offset(self):
         copper = _make_square_copper(10.0)
@@ -89,7 +89,7 @@ class TestGenerateIsolation:
             copper, ToolpathSettings(), origin_x=5.0, origin_y=3.0
         )
         # G1 moves should have negative coordinates since origin shifts
-        movement_lines = [l for l in gcode.splitlines() if l.startswith("G1 X")]
+        movement_lines = [line for line in gcode.splitlines() if line.startswith("G1 X")]
         assert len(movement_lines) > 0
         # All X values should be offset by -5, Y by -3
 
@@ -98,14 +98,14 @@ class TestGenerateIsolation:
         settings = ToolpathSettings(cut_depth=0.3, depth_per_pass=0.1)
         gcode = generate_isolation_gcode(copper, settings)
         # Should have 3 depth passes
-        depth_comments = [l for l in gcode.splitlines() if "; Depth pass" in l]
+        depth_comments = [line for line in gcode.splitlines() if "; Depth pass" in line]
         assert len(depth_comments) == 3
 
     def test_multi_pass(self):
         copper = _make_square_copper()
         settings = ToolpathSettings(passes=3)
         gcode = generate_isolation_gcode(copper, settings)
-        pass_comments = [l for l in gcode.splitlines() if "; --- Lateral Pass" in l]
+        pass_comments = [line for line in gcode.splitlines() if "; --- Lateral Pass" in line]
         assert len(pass_comments) == 3
 
     def test_empty_geometry(self):
@@ -127,7 +127,7 @@ class TestGenerateIsolation:
         # step_over = ew * 0.5 since pass_overlap == 0
         step_over = ew * 0.5
         expected = math.ceil((1.0 - ew) / step_over) + 1
-        pass_comments = [l for l in gcode.splitlines() if "; --- Lateral Pass" in l]
+        pass_comments = [line for line in gcode.splitlines() if "; --- Lateral Pass" in line]
         assert len(pass_comments) == expected
         assert "; Clearance width: 1.0 mm" in gcode
 
@@ -136,7 +136,7 @@ class TestGenerateIsolation:
         copper = _make_square_copper()
         settings = ToolpathSettings(max_width=0.05)
         gcode = generate_isolation_gcode(copper, settings)
-        pass_comments = [l for l in gcode.splitlines() if "; --- Lateral Pass" in l]
+        pass_comments = [line for line in gcode.splitlines() if "; --- Lateral Pass" in line]
         assert len(pass_comments) == 1
 
     def test_max_width_zero_uses_fixed_passes(self):
@@ -144,7 +144,7 @@ class TestGenerateIsolation:
         copper = _make_square_copper()
         settings = ToolpathSettings(passes=2, max_width=0.0)
         gcode = generate_isolation_gcode(copper, settings)
-        pass_comments = [l for l in gcode.splitlines() if "; --- Lateral Pass" in l]
+        pass_comments = [line for line in gcode.splitlines() if "; --- Lateral Pass" in line]
         assert len(pass_comments) == 2
         assert "Clearance width" not in gcode
 
@@ -159,7 +159,7 @@ class TestGenerateIsolation:
             clear_gaps=True,
         )
         gcode = generate_isolation_gcode(copper, settings)
-        pass_comments = [l for l in gcode.splitlines() if "; --- Lateral Pass" in l]
+        pass_comments = [line for line in gcode.splitlines() if "; --- Lateral Pass" in line]
         # Must have more than 1 pass (gap = 1mm, effective_width ~0.215mm)
         assert len(pass_comments) > 1
         assert "auto (clear gaps)" in gcode
@@ -169,7 +169,7 @@ class TestGenerateIsolation:
         copper = _make_square_copper(2.0)
         settings = ToolpathSettings(clear_gaps=True)
         gcode = generate_isolation_gcode(copper, settings)
-        pass_comments = [l for l in gcode.splitlines() if "; --- Lateral Pass" in l]
+        pass_comments = [line for line in gcode.splitlines() if "; --- Lateral Pass" in line]
         # Should produce some passes then stop — not the max 200
         assert 1 <= len(pass_comments) < 200
 
@@ -178,7 +178,7 @@ class TestGenerateIsolation:
         copper = _make_square_copper()
         settings = ToolpathSettings(passes=2, clear_gaps=False)
         gcode = generate_isolation_gcode(copper, settings)
-        pass_comments = [l for l in gcode.splitlines() if "; --- Lateral Pass" in l]
+        pass_comments = [line for line in gcode.splitlines() if "; --- Lateral Pass" in line]
         assert len(pass_comments) == 2
 
     def test_narrow_gap_prepass(self):
@@ -192,10 +192,10 @@ class TestGenerateIsolation:
         )
         gcode = generate_isolation_gcode(copper, settings)
         # Should have narrow-gap pre-pass paths
-        narrow_lines = [l for l in gcode.splitlines() if "narrow-gap" in l.lower()]
+        narrow_lines = [line for line in gcode.splitlines() if "narrow-gap" in line.lower()]
         assert len(narrow_lines) > 0, "Expected narrow-gap pre-pass paths"
         # Should also have normal lateral pass
-        pass_comments = [l for l in gcode.splitlines() if "; --- Lateral Pass" in l]
+        pass_comments = [line for line in gcode.splitlines() if "; --- Lateral Pass" in line]
         assert len(pass_comments) >= 1
 
     def test_narrow_gap_depth_limited(self):
@@ -229,7 +229,7 @@ class TestGenerateIsolation:
             tool_diameter=0.1, tool_angle=60.0, cut_depth=0.2,
         )
         gcode = generate_isolation_gcode(copper, settings)
-        narrow_lines = [l for l in gcode.splitlines() if "narrow-gap" in l.lower()]
+        narrow_lines = [line for line in gcode.splitlines() if "narrow-gap" in line.lower()]
         assert len(narrow_lines) == 0, "Should not have narrow-gap paths for wide gaps"
 
 
@@ -326,7 +326,7 @@ class TestGenerateDrill:
         lines = gcode.splitlines()
         # Count Z plunge moves for first hole (after its G0 XY move)
         plunges_per_hole = sum(
-            1 for l in lines if "G1 Z-" in l and "F" in l
+            1 for line in lines if "G1 Z-" in line and "F" in line
         )
         # 3 holes × 4 pecks = 12 plunge moves
         assert plunges_per_hole == 12
@@ -520,7 +520,6 @@ class TestComputeAlignment:
 
     def test_pure_rotation(self):
         """5° rotation around centroid."""
-        import numpy as np
 
         expected = [(0.0, 0.0), (50.0, 0.0), (50.0, 30.0)]
         cx = sum(p[0] for p in expected) / 3
@@ -689,7 +688,7 @@ class TestMaskExpose:
         )
         assert gcode
         # After origin subtraction, coords should be in 0..4, 0..3 range
-        lines = [l for l in gcode.splitlines() if l.startswith("G0 X") or l.startswith("G1 X")]
+        lines = [line for line in gcode.splitlines() if line.startswith("G0 X") or line.startswith("G1 X")]
         for line in lines:
             # Extract X value
             import re
@@ -735,7 +734,7 @@ class TestMaskExpose:
         assert gcode
         # With spot_size=1.0 and height=3, we get ≥2 scan lines
         # The first should go left-to-right, second right-to-left
-        g1_lines = [l for l in gcode.splitlines() if l.startswith("G1 X")]
+        g1_lines = [line for line in gcode.splitlines() if line.startswith("G1 X")]
         assert len(g1_lines) >= 2
 
 

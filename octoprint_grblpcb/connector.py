@@ -13,7 +13,6 @@ import time
 from gettext import gettext
 from typing import Any
 
-from octoprint.events import Events, eventManager
 from octoprint.printer import (
     ConnectedPrinterCapabilities,
     FirmwareInformation,

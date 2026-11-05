@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """Tests for autoleveling: height map, interpolation, G-code Z-correction."""
-import math
+
+import logging
+import queue
 
 import pytest
-import numpy as np
 
+from octoprint_grblpcb import GrblPcbPlugin
 from octoprint_grblpcb.autolevel import (
     HeightMap,
     ProbePoint,
@@ -87,7 +89,8 @@ class TestHeightMapGrid:
 def _make_completed_heightmap(grid_x=3, grid_y=3, z_func=None):
     """Helper: create a completed height map with z_func(x, y) for each point."""
     if z_func is None:
-        z_func = lambda x, y: 0.0
+        def z_func(x, y):
+            return 0.0
     hm = HeightMap()
     hm.generate_grid(0, 0, 10, 10, grid_x=grid_x, grid_y=grid_y, margin=0)
     for i, p in enumerate(hm.points):
@@ -238,7 +241,7 @@ class TestApplyAutolevel:
         # Z = -0.1 + 0.1 correction = 0.0
         lines = result.splitlines()
         # The G1 line should be corrected
-        corrected_z_lines = [l for l in lines if l.startswith("G1") and "Z" in l]
+        corrected_z_lines = [line for line in lines if line.startswith("G1") and "Z" in line]
         assert len(corrected_z_lines) > 0
 
     def test_preserves_comments(self):
@@ -262,16 +265,10 @@ class TestApplyAutolevel:
 # Probe result handling: never record substitute heights
 # =========================================================================
 
-import queue as _queue
-
-import pytest as _pytest
-
-from octoprint_grblpcb import GrblPcbPlugin
-
 
 class _Comm:
     def __init__(self, *responses):
-        self._response_queue = _queue.Queue()
+        self._response_queue = queue.Queue()
         for r in responses:
             self._response_queue.put(r)
 
@@ -284,10 +281,10 @@ def _plugin():
 
 def test_probe_result_in_work_coordinates():
     comm = _Comm(("probe", {"x": 1.0, "y": 2.0, "z": -1.2, "success": True}), ("ok",))
-    assert _plugin()._await_probe_result(comm, {"z": -1.0}) == (_pytest.approx(-0.2), None)
+    assert _plugin()._await_probe_result(comm, {"z": -1.0}) == (pytest.approx(-0.2), None)
 
 
-@_pytest.mark.parametrize(
+@pytest.mark.parametrize(
     "responses, reason",
     [
         ([("probe", {"x": 0.0, "y": 0.0, "z": -5.0, "success": False})], "no_contact"),
@@ -308,7 +305,7 @@ def test_user_stop_is_not_a_failure():
 
 class _ProbeComm:
     def __init__(self):
-        self._response_queue = _queue.Queue()
+        self._response_queue = queue.Queue()
         self._stream_mode = False
 
 
@@ -348,7 +345,7 @@ def _contact(z):
     return [("probe", {"x": 0.0, "y": 0.0, "z": z, "success": True}), ("ok",)]
 
 
-@_pytest.mark.parametrize(
+@pytest.mark.parametrize(
     "failure, reason",
     [
         ([("probe", {"x": 0.0, "y": 0.0, "z": -5.0, "success": False}), ("alarm", 5, "Probe fail")], "no_contact"),
@@ -359,8 +356,6 @@ def _contact(z):
 )
 def test_probe_loop_stops_without_recording_failed_point(failure, reason):
     from octoprint_grblpcb.pcb_project import PCBProject
-
-    import logging
 
     plugin = _plugin()
     plugin._logger = logging.getLogger("test")
@@ -375,7 +370,7 @@ def test_probe_loop_stops_without_recording_failed_point(failure, reason):
     plugin._autolevel_probe_loop(connector)
 
     points = plugin._height_map.points
-    assert points[0].probed and points[0].z == _pytest.approx(-0.1)
+    assert points[0].probed and points[0].z == pytest.approx(-0.1)
     assert not points[1].probed
     assert not any(p.probed for p in points[2:])
     failed = [m for m in plugin._plugin_manager.messages if m["type"] == "autolevel_failed"]

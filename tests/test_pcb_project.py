@@ -5,13 +5,11 @@ import os
 import pytest
 
 from octoprint_grblpcb.pcb_project import (
-    BoardSide,
     DrillInfo,
     LayerType,
     MillingOperation,
     PCBLayer,
     PCBProject,
-    ProjectState,
     delete_project,
     guess_layer_type,
     list_projects,
