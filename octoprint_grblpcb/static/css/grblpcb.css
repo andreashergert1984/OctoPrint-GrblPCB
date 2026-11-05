@@ -1,0 +1,986 @@
+/*
+ * OctoPrint-GrblPCB - Stylesheet
+ */
+
+/* Tab styling - minimal padding since canvas fills space */
+#tab_plugin_grblpcb {
+    padding: 0;
+}
+
+#tab_plugin_grblpcb > .nav-tabs {
+    margin: 0;
+    padding: 0 10px;
+    background: transparent;
+    border-bottom: 1px solid #d9d9d9;
+}
+
+#tab_plugin_grblpcb > .nav-tabs > li > a {
+    color: #666;
+    border: none;
+    padding: 8px 14px;
+    font-size: 13px;
+    border-radius: 3px 3px 0 0;
+}
+
+#tab_plugin_grblpcb > .nav-tabs > li > a:hover {
+    color: #333;
+    background: rgba(47, 150, 180, 0.04);
+    border: none;
+}
+
+#tab_plugin_grblpcb > .nav-tabs > li.active > a {
+    color: #333;
+    background: #fff;
+    border: none;
+    border-bottom: 2px solid #2f96b4;
+    box-shadow: inset 0 -1px 0 #fff;
+}
+
+/* Alarm warning - overlaid on top */
+.grblpcb-alarm-warning {
+    background: rgba(220, 53, 69, 0.9);
+    border: none;
+    color: #fff;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 20;
+    position: relative;
+}
+
+.grblpcb-alarm-warning .btn {
+    margin: 0;
+}
+
+/* ========================================================================= */
+/* Workspace Layout - persistent full-size canvas                            */
+/* ========================================================================= */
+
+.grblpcb-workspace-layout {
+    position: relative;
+    min-height: 500px;
+    height: calc(100vh - 145px);
+}
+
+/* Floating overlay sidebar */
+.grblpcb-workspace-sidebar {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 10;
+    width: 260px;
+    max-height: calc(100% - 16px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: #f3f5f7;
+    border: 1px solid #d7dde3;
+    border-radius: 4px;
+    padding: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.grblpcb-workspace-sidebar.collapsed {
+    transform: translateX(-100%) translateX(-12px);
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Scrollbar styling for sidebar */
+.grblpcb-workspace-sidebar::-webkit-scrollbar {
+    width: 5px;
+}
+.grblpcb-workspace-sidebar::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.05);
+}
+.grblpcb-workspace-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.2);
+    border-radius: 3px;
+}
+
+/* Toggle button for sidebar */
+.grblpcb-sidebar-toggle {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 11;
+    background: #f8f9fa;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    color: #666;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    transition: left 0.2s ease, background 0.15s;
+}
+
+.grblpcb-sidebar-toggle:hover {
+    background: #fff;
+    color: #333;
+}
+
+.grblpcb-sidebar-toggle.sidebar-open {
+    left: 276px;
+}
+
+/* Compact sections used throughout sidebar */
+.grblpcb-compact-section {
+    padding: 8px 8px 7px;
+    margin-bottom: 6px;
+    background: #fff;
+    border: 1px solid #dfe5ea;
+    border-radius: 4px;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+}
+
+.grblpcb-compact-section h4 {
+    font-size: 11px;
+    margin: 0 0 6px 0;
+    padding-bottom: 4px;
+    color: #435164;
+    border-bottom: 1px solid #edf1f4;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+/* Global text styling in sidebar */
+.grblpcb-workspace-sidebar,
+.grblpcb-workspace-sidebar label,
+.grblpcb-workspace-sidebar small,
+.grblpcb-workspace-sidebar span {
+    color: #555;
+}
+
+.grblpcb-workspace-sidebar .progress {
+    background: #efefef;
+}
+
+/* Default buttons in dark sidebar — override Bootstrap light gray */
+.grblpcb-workspace-sidebar .btn {
+    background: #f5f7f9;
+    border: 1px solid #cdd6df;
+    color: #444;
+    text-shadow: none;
+    box-shadow: none;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-weight: 500;
+}
+.grblpcb-workspace-sidebar .btn:hover,
+.grblpcb-workspace-sidebar .btn:focus {
+    background: #fff;
+    border-color: #bac7d2;
+    color: #222;
+}
+.grblpcb-workspace-sidebar .btn:active,
+.grblpcb-workspace-sidebar .btn.active {
+    background: #edf3f7;
+    border-color: #b4c3d0;
+    color: #222;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
+}
+.grblpcb-workspace-sidebar .btn[disabled],
+.grblpcb-workspace-sidebar .btn.disabled {
+    background: #fafbfc;
+    border-color: #e1e7ec;
+    color: #aaa;
+    opacity: 1;
+}
+
+/* Colored buttons — keep Bootstrap semantics but adjust for dark bg */
+.grblpcb-workspace-sidebar .btn-primary {
+    background: #0069d9;
+    border-color: #0062cc;
+    color: #fff;
+}
+.grblpcb-workspace-sidebar .btn-primary:hover {
+    background: #0056b3;
+    border-color: #004fa3;
+}
+.grblpcb-workspace-sidebar .btn-info {
+    background: #5bc0de;
+    border-color: #46b8da;
+    color: #fff;
+}
+.grblpcb-workspace-sidebar .btn-info:hover {
+    background: #31b0d5;
+    border-color: #269abc;
+}
+.grblpcb-workspace-sidebar .btn-warning {
+    background: #e0952c;
+    border-color: #cf8926;
+    color: #fff;
+}
+.grblpcb-workspace-sidebar .btn-warning:hover {
+    background: #c88425;
+    border-color: #b87a22;
+}
+.grblpcb-workspace-sidebar .btn-danger,
+.grblpcb-workspace-sidebar .grblpcb-estop {
+    background: #c9302c;
+    border-color: #b92c28;
+    color: #fff;
+}
+.grblpcb-workspace-sidebar .btn-danger:hover,
+.grblpcb-workspace-sidebar .grblpcb-estop:hover {
+    background: #ac2925;
+    border-color: #9c2520;
+}
+.grblpcb-workspace-sidebar .btn-success {
+    background: #449d44;
+    border-color: #3e8f3e;
+    color: #fff;
+}
+.grblpcb-workspace-sidebar .btn-success:hover {
+    background: #3d8b3d;
+    border-color: #357e35;
+}
+
+/* Inline guides and callouts */
+.grblpcb-help-box {
+    background: #f3f7fa;
+    border: 1px solid #dfe8ef;
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+}
+
+.grblpcb-help-box h5 {
+    margin: 0 0 6px 0;
+    font-size: 11px;
+    line-height: 1.2;
+    color: #35516b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 700;
+}
+
+.grblpcb-help-box .btn-mini {
+    padding: 2px 6px;
+    font-size: 10px;
+    line-height: 1.2;
+}
+
+.grblpcb-help-box.grblpcb-help-box-collapsed {
+    padding-bottom: 8px;
+}
+
+.grblpcb-help-body {
+    display: block;
+}
+
+.grblpcb-help-box.grblpcb-help-box-collapsed .grblpcb-help-body {
+    display: none;
+}
+
+.grblpcb-help-box ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.grblpcb-help-box li {
+    margin-bottom: 4px;
+    color: #4a4a4a;
+}
+
+.grblpcb-section-note {
+    margin-top: 6px;
+    color: #666;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.grblpcb-guide-inline {
+    background: #f8fafc;
+    border-left: 3px solid #5bc0de;
+    padding: 6px 8px;
+    font-size: 11px;
+    color: #555;
+    border-radius: 0 3px 3px 0;
+}
+
+.grblpcb-guide-inline strong {
+    color: #333;
+}
+
+/* Input fields in the sidebar */
+.grblpcb-workspace-sidebar input[type="text"],
+.grblpcb-workspace-sidebar input[type="number"],
+.grblpcb-workspace-sidebar select {
+    background: #fff;
+    border: 1px solid #cfd6dd;
+    color: #333;
+    border-radius: 3px;
+}
+.grblpcb-workspace-sidebar input[type="text"]:focus,
+.grblpcb-workspace-sidebar input[type="number"]:focus,
+.grblpcb-workspace-sidebar select:focus {
+    background: #fff;
+    border-color: rgba(47, 150, 180, 0.6);
+    outline: none;
+    box-shadow: 0 0 0 1px rgba(47, 150, 180, 0.15);
+}
+
+.grblpcb-workspace-sidebar input[type="file"] {
+    color: #444;
+}
+
+/* Bootstrap .add-on */
+.grblpcb-workspace-sidebar .add-on {
+    background: #eef2f5;
+    border: 1px solid #cfd6dd;
+    color: #4a5665;
+    text-shadow: none;
+}
+
+/* Checkbox styling */
+.grblpcb-workspace-sidebar input[type="checkbox"] {
+    accent-color: #2f96b4;
+}
+
+/* ========================================================================= */
+/* Compact Status Bar                                                        */
+/* ========================================================================= */
+
+.grblpcb-status-compact {
+    padding: 4px 6px;
+}
+
+.grblpcb-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+}
+
+.grblpcb-state-badge {
+    font-size: 11px;
+    font-weight: bold;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: #eef3f7;
+}
+
+.grblpcb-state-badge.text-success { color: #3d8b3d; }
+.grblpcb-state-badge.text-info { color: #2b7aa5; }
+.grblpcb-state-badge.text-warning { color: #b8781d; }
+.grblpcb-state-badge.text-danger { color: #b52b27; }
+.grblpcb-state-badge.text-primary { color: #2c5eaa; }
+.grblpcb-state-badge.text-muted { color: #6d7b88; }
+
+.grblpcb-status-feeds {
+    font-size: 10px;
+    font-family: monospace;
+    color: #4d5864;
+}
+
+.grblpcb-pos-mini {
+    width: 100%;
+    font-size: 10px;
+    font-family: monospace;
+    color: #394754;
+    border-collapse: collapse;
+}
+
+.grblpcb-pos-mini td {
+    padding: 1px 3px;
+    text-align: right;
+}
+
+.grblpcb-pos-label {
+    color: #6f7f90 !important;
+    text-align: left !important;
+    width: 14px;
+    font-weight: bold;
+}
+
+/* ========================================================================= */
+/* CNC Control compact styles                                                */
+/* ========================================================================= */
+
+.grblpcb-jog-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 3px;
+    max-width: 140px;
+}
+
+.grblpcb-jog-grid-compact .btn {
+    padding: 4px 2px;
+    font-size: 11px;
+    min-width: 0;
+}
+
+.grblpcb-step-presets {
+    margin-top: 6px;
+}
+
+.grblpcb-step-presets .btn {
+    margin-right: 2px;
+    margin-bottom: 2px;
+}
+
+.grblpcb-step-presets .btn.active {
+    background: rgba(91, 192, 222, 0.4);
+    border-color: rgba(91, 192, 222, 0.6);
+    color: #fff;
+}
+
+.grblpcb-btn-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    align-items: center;
+}
+
+.grblpcb-btn-wrap .btn {
+    font-size: 11px;
+}
+
+/* Emergency stop */
+.grblpcb-estop {
+    font-weight: bold;
+}
+
+/* WCS buttons */
+.grblpcb-compact-section .btn.active {
+    background: rgba(92, 184, 92, 0.4);
+    border-color: rgba(92, 184, 92, 0.6);
+    color: #fff;
+}
+
+/* ========================================================================= */
+/* PCB Project compact styles                                                */
+/* ========================================================================= */
+
+.grblpcb-project-browser-compact {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.grblpcb-project-list-scroll {
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.grblpcb-project-item {
+    padding: 4px 6px;
+    border-radius: 3px;
+    margin-bottom: 2px;
+    cursor: pointer;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid transparent;
+}
+
+.grblpcb-project-item:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.grblpcb-project-item.active {
+    background: rgba(91, 192, 222, 0.15);
+    border-color: rgba(91, 192, 222, 0.3);
+}
+
+.grblpcb-layer-list {
+    margin-bottom: 4px;
+}
+
+.grblpcb-layer-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    font-size: 11px;
+}
+
+.grblpcb-layer-item label {
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+.grblpcb-layer-item small {
+    flex: 1;
+}
+
+/* ========================================================================= */
+/* Autolevel compact styles                                                  */
+/* ========================================================================= */
+
+.grblpcb-grid-inputs label {
+    display: block;
+    font-size: 11px;
+    margin-bottom: 3px;
+}
+
+.grblpcb-grid-inputs input {
+    font-size: 11px;
+}
+
+.grblpcb-probe-data-scroll {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 4px;
+}
+
+.grblpcb-probe-data-scroll table {
+    margin-bottom: 0;
+}
+
+.grblpcb-probe-data-scroll th,
+.grblpcb-probe-data-scroll td {
+    padding: 1px 4px !important;
+}
+
+/* ========================================================================= */
+/* Operations compact styles                                                 */
+/* ========================================================================= */
+
+.grblpcb-operations-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.grblpcb-op-item {
+    padding: 4px 6px;
+    margin-bottom: 3px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 3px;
+}
+
+/* ========================================================================= */
+/* View Controls                                                             */
+/* ========================================================================= */
+
+.grblpcb-view-controls {
+    border-top: 1px solid rgba(255,255,255,0.1);
+    margin-top: 4px;
+    padding-top: 8px;
+}
+
+.grblpcb-layer-toggles {
+    margin-top: 4px;
+}
+
+.grblpcb-layer-toggles label {
+    display: block;
+    font-size: 11px;
+    margin-bottom: 0;
+    padding-left: 18px;
+}
+
+.grblpcb-layer-toggles input[type="checkbox"] {
+    margin-top: 2px;
+    margin-left: -18px;
+}
+
+/* ========================================================================= */
+/* Canvas Container                                                          */
+/* ========================================================================= */
+
+.grblpcb-workspace-canvas-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    background: #e7eef5;
+    border-radius: 0 0 4px 4px;
+    overflow: hidden;
+}
+
+.grblpcb-workspace-canvas-container canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+
+.grblpcb-workspace-canvas-container canvas:active {
+    cursor: grabbing;
+}
+
+.grblpcb-workspace-hint {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 13px;
+    pointer-events: none;
+}
+
+.grblpcb-workspace-hint i {
+    font-size: 20px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+/* ========================================================================= */
+/* Navbar indicator                                                          */
+/* ========================================================================= */
+
+#navbar_plugin_grblpcb {
+    padding: 10px 15px;
+}
+
+#navbar_plugin_grblpcb .grblpcb-navbar-state {
+    font-weight: bold;
+    margin-left: 5px;
+}
+
+/* ========================================================================= */
+/* Board Transform                                                           */
+/* ========================================================================= */
+
+.grblpcb-transform-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.grblpcb-transform-row .btn-group {
+    margin-bottom: 0;
+}
+.grblpcb-transform-row .btn-mini {
+    padding: 1px 6px;
+    font-size: 11px;
+}
+.grblpcb-transform-row .input-append {
+    margin-bottom: 0;
+}
+
+/* ========================================================================= */
+/* Inline Generation Parameters                                              */
+/* ========================================================================= */
+
+.grblpcb-gen-params {
+    margin-bottom: 8px;
+    padding: 6px;
+    background: #f7f9fb;
+    border: 1px solid #dfe7ef;
+    border-radius: 4px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.grblpcb-param-group {
+    margin-bottom: 4px;
+    padding: 6px 7px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.grblpcb-param-group:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 6px;
+}
+.grblpcb-param-group h5 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+.grblpcb-param-group h5.grblpcb-param-heading {
+    margin: 0 0 6px;
+    color: #3c4f65;
+}
+
+.grblpcb-param-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 3px;
+    font-size: 11px;
+}
+
+.grblpcb-param-row label {
+    color: #495c73;
+    font-size: 10px;
+    min-width: 55px;
+    margin-bottom: 0;
+    white-space: nowrap;
+}
+
+.grblpcb-param-row .input-mini {
+    margin-bottom: 0;
+    height: 20px;
+    font-size: 11px;
+    padding: 1px 4px;
+}
+
+.grblpcb-param-row .input-append {
+    margin-bottom: 0;
+}
+
+.grblpcb-param-row .add-on {
+    font-size: 10px;
+    padding: 2px 4px;
+    height: 20px;
+    line-height: 20px;
+}
+
+/* ========================================================================= */
+/* Execution Progress                                                        */
+/* ========================================================================= */
+
+.grblpcb-execution-panel {
+    padding: 6px;
+    background: rgba(0,100,0,0.2);
+    border: 1px solid rgba(0,255,0,0.3);
+    border-radius: 4px;
+    margin-top: 6px;
+}
+
+.grblpcb-execution-panel .progress {
+    margin-bottom: 4px;
+    height: 14px;
+}
+
+/* ========================================================================= */
+/* Utility Classes                                                           */
+/* ========================================================================= */
+
+/* Margins */
+.grblpcb-mt-3 { margin-top: 3px; }
+.grblpcb-mt-4 { margin-top: 4px; }
+.grblpcb-mt-5 { margin-top: 5px; }
+.grblpcb-mt-6 { margin-top: 6px; }
+.grblpcb-mt-8 { margin-top: 8px; }
+.grblpcb-mt-10 { margin-top: 10px; }
+.grblpcb-mb-0 { margin-bottom: 0; }
+.grblpcb-mb-4 { margin-bottom: 4px; }
+.grblpcb-mb-6 { margin-bottom: 6px; }
+.grblpcb-mb-10 { margin-bottom: 10px; }
+.grblpcb-ml-2 { margin-left: 2px; }
+.grblpcb-ml-4 { margin-left: 4px; }
+.grblpcb-ml-6 { margin-left: 6px; }
+
+/* Text sizes */
+.grblpcb-text-xs { font-size: 9px; }
+.grblpcb-text-sm { font-size: 10px; }
+.grblpcb-text-base { font-size: 11px; }
+
+/* Text colors (dark-sidebar-aware) */
+.grblpcb-text-muted { color: rgba(255,255,255,0.5); }
+.grblpcb-text-dim { color: rgba(255,255,255,0.6); }
+.grblpcb-text-soft { color: rgba(255,255,255,0.7); }
+.grblpcb-text-light { color: rgba(255,255,255,0.8); }
+
+/* Text utilities */
+.grblpcb-word-break { word-break: break-word; }
+.grblpcb-opacity-muted { opacity: 0.6; }
+
+/* Input widths */
+.grblpcb-w-35 { width: 35px; }
+.grblpcb-w-40 { width: 40px; }
+.grblpcb-w-45 { width: 45px; }
+.grblpcb-w-50 { width: 50px; }
+.grblpcb-w-55 { width: 55px; }
+.grblpcb-w-60 { width: 60px; }
+.grblpcb-input-block { width: 100%; box-sizing: border-box; }
+
+/* ========================================================================= */
+/* Layout Utilities                                                          */
+/* ========================================================================= */
+
+.grblpcb-flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.grblpcb-flex-1 { flex: 1; }
+
+.grblpcb-collapsible { cursor: pointer; }
+
+.grblpcb-collapse-icon {
+    float: right;
+    font-size: 10px;
+}
+
+/* ========================================================================= */
+/* Jog Control                                                               */
+/* ========================================================================= */
+
+.grblpcb-jog-layout {
+    display: flex;
+    gap: 8px;
+    align-items: start;
+}
+
+.grblpcb-jog-z-col {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.grblpcb-jog-z-col .btn {
+    display: block;
+}
+
+/* ========================================================================= */
+/* File Input                                                                */
+/* ========================================================================= */
+
+.grblpcb-file-input {
+    font-size: 10px;
+    width: 100%;
+}
+
+/* ========================================================================= */
+/* Layer Controls                                                            */
+/* ========================================================================= */
+
+.grblpcb-layer-delete {
+    float: right;
+    padding: 0 4px;
+}
+
+/* ========================================================================= */
+/* Transform / Rotation Controls                                             */
+/* ========================================================================= */
+
+.grblpcb-rotation-input {
+    width: 40px;
+    height: 20px;
+    font-size: 11px;
+    padding: 1px 4px;
+}
+
+.grblpcb-rotation-addon {
+    font-size: 10px;
+    padding: 2px 4px;
+    height: 20px;
+    line-height: 20px;
+}
+
+/* ========================================================================= */
+/* Autolevel                                                                 */
+/* ========================================================================= */
+
+.grblpcb-autolevel-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.grblpcb-progress-compact {
+    margin-bottom: 0;
+    height: 12px;
+}
+
+.grblpcb-probe-table {
+    font-size: 10px;
+    margin-bottom: 0;
+}
+
+/* ========================================================================= */
+/* Real-time Override Controls                                               */
+/* ========================================================================= */
+
+.grblpcb-override-section {
+    margin-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 8px;
+}
+
+.grblpcb-override-title {
+    margin: 0 0 6px 0;
+    color: rgba(255,255,255,0.7);
+    font-size: 11px;
+}
+
+.grblpcb-override-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+
+.grblpcb-override-row:last-child {
+    margin-bottom: 0;
+}
+
+.grblpcb-override-label {
+    width: 50px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.6);
+}
+
+.grblpcb-override-value {
+    min-width: 36px;
+    text-align: center;
+    font-size: 10px;
+}
+
+.grblpcb-override-btn {
+    padding: 1px 4px;
+    font-size: 10px;
+}
+
+/* ========================================================================= */
+/* Double-Sided Alignment                                                    */
+/* ========================================================================= */
+
+.grblpcb-align-data {
+    font-size: 10px;
+    margin-bottom: 6px;
+    padding: 6px 8px;
+    background: #f3f7fa;
+    border: 1px solid #dfe6ee;
+    border-radius: 4px;
+    color: #2d3744;
+}
+
+.grblpcb-align-heading {
+    color: #374152;
+    font-weight: 600;
+}
+
+.grblpcb-align-hole-row {
+    color: #475569;
+    margin-left: 8px;
+    line-height: 1.5;
+}
+
+.grblpcb-align-transform {
+    font-size: 10px;
+    margin-bottom: 6px;
+    padding: 6px 8px;
+    background: #edf9f0;
+    border-radius: 4px;
+    border: 1px solid #cbe7d2;
+    color: #1f4d2f;
+}
+
+.grblpcb-align-transform strong {
+    color: #1d6f3d;
+}
+
+.grblpcb-align-status {
+    font-size: 10px;
+    color: #4b5563;
+    font-style: italic;
+}
+
+/* ========================================================================= */
+/* Operation Details                                                         */
+/* ========================================================================= */
+
+.grblpcb-op-details {
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 2px;
+}
+
+/* ========================================================================= */
+/* View Toggle                                                               */
+/* ========================================================================= */
+
+.grblpcb-view-toggle {
+    margin-bottom: 6px;
+    display: flex;
+}
+

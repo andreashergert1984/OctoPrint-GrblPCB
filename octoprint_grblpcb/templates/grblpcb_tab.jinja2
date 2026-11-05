@@ -1,0 +1,932 @@
+<!-- Sub-Tab Navigation -->
+    <ul class="nav nav-tabs">
+        <li data-bind="css: { active: activeSubTab() === 'cnc' }">
+            <a href="#" data-bind="click: function(data, event) { $root.switchTab('cnc'); event.preventDefault(); event.stopPropagation(); return false; }">{{ _("CNC Control") }}</a>
+        </li>
+        <li data-bind="css: { active: activeSubTab() === 'pcb' }">
+            <a href="#" data-bind="click: function(data, event) { $root.switchTab('pcb'); event.preventDefault(); event.stopPropagation(); return false; }">{{ _("PCB Project") }}</a>
+        </li>
+        <li data-bind="css: { active: activeSubTab() === 'autolevel' }">
+            <a href="#" data-bind="click: function(data, event) { $root.switchTab('autolevel'); event.preventDefault(); event.stopPropagation(); return false; }">{{ _("Autolevel") }}</a>
+        </li>
+        <li data-bind="css: { active: activeSubTab() === 'operations' }">
+            <a href="#" data-bind="click: function(data, event) { $root.switchTab('operations'); event.preventDefault(); event.stopPropagation(); return false; }">
+                {{ _("Operations") }}
+                <span class="badge" data-bind="text: projectOperations().length, visible: projectOperations().length > 0"></span>
+            </a>
+        </li>
+    </ul>
+
+    <!-- Alarm Warning (always visible, overlaid) -->
+    <div class="grblpcb-alarm-warning" data-bind="visible: isAlarm">
+        <strong>⚠️ {{ _("ALARM STATE") }}</strong>
+        <button class="btn btn-warning btn-small" data-bind="click: unlock">
+            <i class="fas fa-unlock"></i> {{ _("Unlock ($X)") }}
+        </button>
+        <button class="btn btn-primary btn-small" data-bind="click: homeAll">
+            <i class="fas fa-home"></i> {{ _("Home All") }}
+        </button>
+    </div>
+
+    <!-- ================================================================== -->
+    <!-- Persistent Workspace Layout (always visible)                       -->
+    <!-- ================================================================== -->
+    <div class="grblpcb-workspace-layout">
+        <!-- Sidebar toggle button -->
+        <button class="grblpcb-sidebar-toggle sidebar-open" data-bind="click: toggleWorkspaceSidebar,
+            css: { 'sidebar-open': workspaceSidebarOpen() }" title="{{ _('Toggle controls panel') }}">
+            <i class="fas" data-bind="css: { 'fa-chevron-left': workspaceSidebarOpen(), 'fa-chevron-right': !workspaceSidebarOpen() }"></i>
+        </button>
+
+        <!-- Floating Sidebar: Tab Content + View Controls -->
+        <div class="grblpcb-workspace-sidebar" data-bind="css: { collapsed: !workspaceSidebarOpen() }">
+
+            <!-- ========================================================== -->
+            <!-- Compact Status Bar (always visible)                        -->
+            <!-- ========================================================== -->
+            <div class="grblpcb-compact-section grblpcb-status-compact">
+                <div class="grblpcb-status-row">
+                    <span class="grblpcb-state-badge" data-bind="text: grblState, css: stateClass"></span>
+                    <span class="grblpcb-status-feeds">
+                        F<span data-bind="text: feedRate"></span>
+                        S<span data-bind="text: spindleSpeed"></span>
+                    </span>
+                </div>
+                <table class="grblpcb-pos-mini">
+                    <tr>
+                        <td class="grblpcb-pos-label">W</td>
+                        <td data-bind="text: workPosX"></td>
+                        <td data-bind="text: workPosY"></td>
+                        <td data-bind="text: workPosZ"></td>
+                    </tr>
+                    <tr>
+                        <td class="grblpcb-pos-label">M</td>
+                        <td data-bind="text: machinePosX"></td>
+                        <td data-bind="text: machinePosY"></td>
+                        <td data-bind="text: machinePosZ"></td>
+                    </tr>
+                </table>
+                <div class="grblpcb-section-note">
+                    {{ _("Tip: home first, then check the zero and run a short machine check before the first job.") }}
+                </div>
+            </div>
+
+            <div class="grblpcb-help-box" data-bind="visible: showDetailedHelp, css: { 'grblpcb-help-box-collapsed': !showQuickGuideDetails() }">
+                <h5>
+                    {{ _("Quick Guide") }}
+                    <button type="button" class="btn btn-mini pull-right" data-bind="click: function() { showQuickGuideDetails(!showQuickGuideDetails()); }">
+                        <span data-bind="text: quickGuideToggleLabel"></span>
+                    </button>
+                </h5>
+                <div class="grblpcb-help-body" data-bind="visible: showQuickGuideDetails">
+                    <ul>
+                        <li>{{ _("1. Connect to GRBL and home the machine.") }}</li>
+                        <li>{{ _("2. Set X/Y/Z zero at the board origin or probe point.") }}</li>
+                        <li>{{ _("3. Use Check to confirm the controller is idle and safe.") }}</li>
+                        <li>{{ _("4. Start with a sample file before a real PCB.") }}</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="grblpcb-help-box" data-bind="visible: showDetailedHelp, css: { 'grblpcb-help-box-collapsed': !showExperiencedUsersDetails() }">
+                <h5>
+                    {{ _("For Experienced Users") }}
+                    <button type="button" class="btn btn-mini pull-right" data-bind="click: function() { showExperiencedUsersDetails(!showExperiencedUsersDetails()); }">
+                        <span data-bind="text: experiencedUsersToggleLabel"></span>
+                    </button>
+                </h5>
+                <div class="grblpcb-help-body" data-bind="visible: showExperiencedUsersDetails">
+                    <ul>
+                        <li>{{ _("Use the status bar to check state, feed, spindle, and position at a glance.") }}</li>
+                        <li>{{ _("Run Probe or autolevel only after the setup is mechanically stable.") }}</li>
+                        <li>{{ _("Preview routing and drilling separately before combining them.") }}</li>
+                        <li>{{ _("Tune feed, spindle, and probe settings on scrap material before production runs.") }}</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="grblpcb-help-box" data-bind="visible: showMiniGuide">
+                <h5>{{ _("Mini Guide") }} <button type="button" class="btn btn-mini pull-right" data-bind="click: function() { showQuickGuide(!showQuickGuide()); }"><span data-bind="text: showQuickGuide() ? 'Hide' : 'Show'"></span></button></h5>
+                <div data-bind="visible: showQuickGuide">
+                    <ul>
+                        <li>{{ _("Home the machine first.") }}</li>
+                        <li>{{ _("Set zero on the board.") }}</li>
+                        <li>{{ _("Run Check before milling.") }}</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- ========================================================== -->
+            <!-- CNC Control Tab Content                                    -->
+            <!-- ========================================================== -->
+            <div data-bind="visible: activeSubTab() === 'cnc'">
+                <!-- Jog Control -->
+                <div class="grblpcb-compact-section">
+                    <h4><i class="fas fa-arrows-alt"></i> {{ _("Jog") }}</h4>
+                    <div class="grblpcb-jog-layout">
+                        <div class="grblpcb-jog-grid-compact">
+                            <div></div>
+                            <button class="btn btn-small" data-bind="click: jogYPlus, enable: canJog">Y+</button>
+                            <div></div>
+                            <button class="btn btn-small" data-bind="click: jogXMinus, enable: canJog">X-</button>
+                            <button class="btn btn-small btn-default" data-bind="click: gotoZero, enable: isIdle" title="{{ _('Go to 0,0') }}">⊙</button>
+                            <button class="btn btn-small" data-bind="click: jogXPlus, enable: canJog">X+</button>
+                            <div></div>
+                            <button class="btn btn-small" data-bind="click: jogYMinus, enable: canJog">Y-</button>
+                            <div></div>
+                        </div>
+                        <div class="grblpcb-jog-z-col">
+                            <button class="btn btn-small" data-bind="click: jogZPlus, enable: canJog">Z+</button>
+                            <button class="btn btn-small" data-bind="click: jogZMinus, enable: canJog">Z-</button>
+                        </div>
+                    </div>
+                    <div class="grblpcb-step-presets">
+                        <button class="btn btn-mini" data-bind="click: function() { setJogDistance(0.01); }, css: { active: jogDistance() == 0.01 }">0.01</button>
+                        <button class="btn btn-mini" data-bind="click: function() { setJogDistance(0.1); }, css: { active: jogDistance() == 0.1 }">0.1</button>
+                        <button class="btn btn-mini" data-bind="click: function() { setJogDistance(1); }, css: { active: jogDistance() == 1 }">1</button>
+                        <button class="btn btn-mini" data-bind="click: function() { setJogDistance(10); }, css: { active: jogDistance() == 10 }">10</button>
+                        <button class="btn btn-mini" data-bind="click: function() { setJogDistance(50); }, css: { active: jogDistance() == 50 }">50</button>
+                    </div>
+                    <div class="grblpcb-mt-4">
+                        <label class="grblpcb-text-base">{{ _("Feed:") }} <input type="number" class="input-mini grblpcb-w-50" data-bind="value: jogFeed"> mm/min</label>
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("Tip: use 10 mm or 1 mm jogs when confirming direction and travel. Reserve 0.1 mm for fine adjustment.") }}
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("If an axis moves in the wrong direction, stop and correct the machine configuration before continuing.") }}
+                    </div>
+                </div>
+
+                <!-- Machine Control -->
+                <div class="grblpcb-compact-section">
+                    <h4><i class="fas fa-cog"></i> {{ _("Machine") }}</h4>
+                    <div class="grblpcb-btn-wrap">
+                        <button class="btn btn-small btn-primary" data-bind="click: homeAll, enable: isIdle">
+                            <i class="fas fa-home"></i> {{ _("Home") }}
+                        </button>
+                        <button class="btn btn-small btn-warning" data-bind="click: unlock">
+                            <i class="fas fa-unlock"></i> {{ _("Unlock") }}
+                        </button>
+                        <button class="btn btn-small grblpcb-estop" data-bind="click: softReset">
+                            <i class="fas fa-stop"></i> {{ _("RST") }}
+                        </button>
+                        <button class="btn btn-small" data-bind="click: feedHold">
+                            <i class="fas fa-pause"></i>
+                        </button>
+                        <button class="btn btn-small btn-success" data-bind="click: resume">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button class="btn btn-small btn-info" data-bind="click: runMachineCheck">
+                            <i class="fas fa-stethoscope"></i> {{ _("Check") }}
+                        </button>
+                    </div>
+                    <div class="grblpcb-guide-inline" data-bind="visible: showHelpNotes">
+                        <strong>{{ _("Before milling:") }}</strong> {{ _("Home → unlock if needed → set zero → run Check. If the controller is not Idle, do not start the job.") }}
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("For repeatability, verify one axis at a time and compare the travel with a ruler or dial indicator.") }}
+                    </div>
+                    <div class="grblpcb-mt-4" data-bind="visible: machineCheckStatus">
+                        <strong data-bind="text: machineCheckStatus"></strong>
+                        <ul class="grblpcb-mb-0" data-bind="foreach: machineCheckChecks">
+                            <li data-bind="css: { 'text-success': ok && severity === 'success', 'text-warning': !ok && severity === 'warning', 'text-error': !ok && severity === 'error' }">
+                                <span data-bind="text: message"></span>
+                            </li>
+                        </ul>
+                        <div class="grblpcb-word-break grblpcb-mt-4" data-bind="visible: machineCheckLimitations().length > 0">
+                            <small data-bind="foreach: machineCheckLimitations">
+                                <div data-bind="text: $data"></div>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WCS -->
+                <div class="grblpcb-compact-section">
+                    <h4><i class="fas fa-crosshairs"></i> {{ _("Work Coords") }}</h4>
+                    <div class="grblpcb-btn-wrap" title="{{ _('Selected work coordinate system, e.g. G54-G59. This tells GRBL where your zero point lives in the machine coordinate system.') }}">
+                        <!-- ko foreach: wcsOptions -->
+                        <button class="btn btn-mini" data-bind="text: $data, click: function() { $parent.setWCS($data); }, css: { active: $parent.currentWCS() === $data }" title="{{ _('Current work coordinate system:') }} {{ _('G54-G59') }}"></button>
+                        <!-- /ko -->
+                    </div>
+                    <div class="grblpcb-btn-wrap grblpcb-mt-4">
+                        <button class="btn btn-mini" data-bind="click: zeroX, enable: isIdle" title="{{ _('Set current X position as 0 in the active work coordinate system.') }}">0X</button>
+                        <button class="btn btn-mini" data-bind="click: zeroY, enable: isIdle" title="{{ _('Set current Y position as 0 in the active work coordinate system.') }}">0Y</button>
+                        <button class="btn btn-mini" data-bind="click: zeroZ, enable: isIdle" title="{{ _('Set current Z position as 0 in the active work coordinate system.') }}">0Z</button>
+                        <button class="btn btn-mini btn-primary" data-bind="click: zeroAll, enable: isIdle" title="{{ _('Set X, Y and Z to zero in the current work coordinate system.') }}">{{ _("0 All") }}</button>
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("Tip: zero only after the tool is above the board. Keep the same origin for both sides of a double-sided board.") }}
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("Current work coordinate system: the active G54-G59 setup defines where your board origin is. G0/G1 positions are then relative to that origin, not to the machine home.") }}
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("Advanced: if you re-zero after a tool change, document the reference point so later layers still line up.") }}
+                    </div>
+                </div>
+
+                <!-- Probing -->
+                <div class="grblpcb-compact-section">
+                    <h4><i class="fas fa-search-plus"></i> {{ _("Probe") }}</h4>
+                    <div class="grblpcb-btn-wrap">
+                        <button class="btn btn-small btn-info" data-bind="click: probeZ, enable: isIdle">Z</button>
+                        <button class="btn btn-small" data-bind="click: probeX, enable: isIdle">X</button>
+                        <button class="btn btn-small" data-bind="click: probeY, enable: isIdle">Y</button>
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("Tip: probe only on a clean conductive surface and watch the first probe carefully for unexpected contact.") }}
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("For repeatability checks, probe the same point several times and compare the spread before trusting the result.") }}
+                    </div>
+                </div>
+
+                <!-- Spindle -->
+                <div class="grblpcb-compact-section">
+                    <h4><i class="fas fa-sync-alt"></i> {{ _("Spindle") }}</h4>
+                    <div class="grblpcb-btn-wrap">
+                        <button class="btn btn-small btn-success" data-bind="click: spindleOn, enable: isIdle">ON</button>
+                        <button class="btn btn-small btn-danger" data-bind="click: spindleOff">OFF</button>
+                        <input type="number" class="input-mini grblpcb-w-55" data-bind="value: spindleSpeedTarget">
+                        <button class="btn btn-mini" data-bind="click: setSpindleSpeed, enable: isIdle">{{ _("Set") }}</button>
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("Tip: start conservative on a new tool or board material, then increase after a successful test cut.") }}
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("If spindle noise or burrs increase, reduce feed or speed before changing the toolpath itself.") }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================================== -->
+            <!-- PCB Project Tab Content                                    -->
+            <!-- ========================================================== -->
+            <div data-bind="visible: activeSubTab() === 'pcb'">
+                <!-- Project Header -->
+                <div class="grblpcb-compact-section">
+                    <h4><i class="fas fa-folder-open"></i> {{ _("Project") }}</h4>
+                    <div class="grblpcb-mb-6">
+                        <input type="text" class="input-small grblpcb-input-block" data-bind="value: projectName" placeholder="{{ _('Project name') }}">
+                    </div>
+                    <div class="grblpcb-btn-wrap">
+                        <button class="btn btn-small btn-primary" data-bind="click: newProject">
+                            <i class="fas fa-plus"></i> {{ _("New") }}
+                        </button>
+                        <button class="btn btn-small" data-bind="click: toggleProjectBrowser">
+                            <i class="fas fa-folder"></i> {{ _("Browse") }}
+                            <span class="badge grblpcb-text-xs" data-bind="text: savedProjects().length, visible: savedProjects().length > 0"></span>
+                        </button>
+                    </div>
+                    <!-- Active project info -->
+                    <div data-bind="visible: hasProject" class="grblpcb-mt-6">
+                        <span class="label label-success grblpcb-text-sm">
+                            <i class="fas fa-check"></i>
+                            <span data-bind="text: project() ? project().name : ''"></span>
+                        </span>
+                        <span data-bind="visible: boardWidth() > 0" class="grblpcb-text-sm grblpcb-text-soft">
+                            <span data-bind="text: boardWidth().toFixed(1)"></span>&times;<span data-bind="text: boardHeight().toFixed(1)"></span>mm
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Saved Projects Browser -->
+                <div data-bind="visible: showProjectBrowser" class="grblpcb-compact-section grblpcb-project-browser-compact">
+                    <h4><i class="fas fa-list"></i> {{ _("Saved Projects") }}</h4>
+                    <div data-bind="visible: savedProjects().length === 0">
+                        <small class="grblpcb-text-muted">{{ _("No saved projects.") }}</small>
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("Saved projects keep imported layers, generated toolpaths, and alignment settings together.") }}
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("Tip: saved projects are ideal for repeat jobs because they preserve the layer combination and the last-used alignment choices.") }}
+                    </div>
+                    <div data-bind="foreach: savedProjects" class="grblpcb-project-list-scroll">
+                        <div class="grblpcb-project-item" data-bind="click: $parent.loadProject, css: { active: $parent.project() && $parent.project().id === $data.id }">
+                            <div class="grblpcb-flex-between">
+                                <strong data-bind="text: $data.name" class="grblpcb-text-base"></strong>
+                                <button class="btn btn-mini btn-danger" title="{{ _('Delete') }}"
+                                        data-bind="click: function(data, event) { event.stopPropagation(); $parent.deleteProject(data); }">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <small class="grblpcb-text-muted">
+                                <span data-bind="visible: $data.board_width > 0, text: $data.board_width.toFixed(1) + '×' + $data.board_height.toFixed(1) + 'mm'"></span>
+                                <span data-bind="text: $data.layers.length + ' layers, ' + $data.operations_count + ' ops'"></span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File Upload -->
+                <div class="grblpcb-compact-section" data-bind="visible: hasProject">
+                    <h4><i class="fas fa-upload"></i> {{ _("Import Files") }}</h4>
+                    <input type="file" id="grblpcb-file-input" multiple
+                           accept=".gbr,.gtl,.gbl,.gto,.gbo,.gts,.gbs,.gm1,.gko,.drl,.exc,.xln"
+                           data-bind="event: { change: uploadFiles }"
+                           class="grblpcb-file-input">
+                    <div data-bind="visible: uploadMessage" class="grblpcb-mt-4">
+                        <small data-bind="text: uploadMessage,
+                            style: { color: uploadMessage().indexOf('Error') === 0 ? '#b94a48' : '#555' }"
+                            class="grblpcb-word-break"></small>
+                    </div>
+                </div>
+
+                <!-- Imported Layers -->
+                <div class="grblpcb-compact-section" data-bind="visible: projectLayers().length > 0">
+                    <h4><i class="fas fa-layer-group"></i> {{ _("Layers") }}</h4>
+                    <div data-bind="foreach: projectLayers" class="grblpcb-layer-list">
+                        <div class="grblpcb-layer-item">
+                            <label class="checkbox grblpcb-mb-0">
+                                <input type="checkbox" checked data-bind="checked: $parent.wsLayerVisible($data.layer_type),
+                                    click: function() { $parent.toggleGerberLayer($data.layer_type); return true; }">
+                                <span class="label grblpcb-text-xs" data-bind="text: layer_type, css: {
+                                    'label-success': layer_type === 'top_copper',
+                                    'label-info': layer_type === 'bottom_copper',
+                                    'label-warning': layer_type === 'drill',
+                                    'label-important': layer_type === 'outline'
+                                }"></span>
+                            </label>
+                            <small class="grblpcb-text-muted" data-bind="text: width.toFixed(1) + '×' + height.toFixed(1)"></small>
+                            <button class="btn btn-mini btn-danger grblpcb-layer-delete"
+                                    data-bind="click: function() { $parent.removeLayer(layer_type); }">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Board Transform -->
+                <div class="grblpcb-compact-section" data-bind="visible: projectLayers().length > 0">
+                    <h4><i class="fas fa-sync-alt"></i> {{ _("Transform") }}</h4>
+                    <div class="grblpcb-transform-row">
+                        <div class="btn-group">
+                            <button class="btn btn-mini" title="{{ _('Rotate 90° CCW') }}"
+                                    data-bind="click: function() { rotateProject(90); }, enable: !busyGenerating()">
+                                <i class="fas fa-undo"></i> 90°
+                            </button>
+                            <button class="btn btn-mini" title="{{ _('Rotate 180°') }}"
+                                    data-bind="click: function() { rotateProject(180); }, enable: !busyGenerating()">
+                                <i class="fas fa-sync"></i> 180°
+                            </button>
+                            <button class="btn btn-mini" title="{{ _('Rotate 90° CW') }}"
+                                    data-bind="click: function() { rotateProject(-90); }, enable: !busyGenerating()">
+                                <i class="fas fa-redo"></i> 90°
+                            </button>
+                        </div>
+                        <div class="input-append grblpcb-ml-6">
+                            <input type="number" step="1" class="input-mini grblpcb-rotation-input" data-bind="value: customRotationAngle"
+                                   title="{{ _('Custom angle (CCW)') }}">
+                            <span class="add-on grblpcb-rotation-addon">°</span>
+                        </div>
+                        <button class="btn btn-mini" title="{{ _('Rotate by custom angle') }}"
+                                data-bind="click: function() { rotateProject(parseFloat(customRotationAngle())); }, enable: !busyGenerating()">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <div class="grblpcb-section-note">
+                        {{ _("Tip: keep the board orientation consistent. If you rotate here, all imported layers and drill positions rotate together.") }}
+                    </div>
+                </div>
+
+                <!-- Generate G-code -->
+                <div class="grblpcb-compact-section" data-bind="visible: hasProject">
+                    <h4 class="grblpcb-collapsible" data-bind="click: function() { showGenParams(!showGenParams()); }">
+                        <i class="fas fa-cogs"></i> {{ _("Generate G-code") }}
+                        <i class="fas grblpcb-collapse-icon" data-bind="css: {'fa-chevron-down': showGenParams(), 'fa-chevron-right': !showGenParams()}"></i>
+                    </h4>
+
+                    <!-- Collapsible generation parameters -->
+                    <div data-bind="visible: showGenParams" class="grblpcb-gen-params">
+
+                        <!-- ── Isolation Milling ── -->
+                        <div class="grblpcb-param-group">
+                            <h5 class="grblpcb-param-heading"><i class="fas fa-route"></i> {{ _("Isolation Milling") }}</h5>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Tool ⌀") }}</label>
+                                <div class="input-append"><input type="number" step="0.01" class="input-mini grblpcb-w-50" data-bind="value: genToolDiameter" title="{{ _('V-bit tip diameter') }}"><span class="add-on">mm</span></div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("V-angle") }}</label>
+                                <div class="input-append"><input type="number" step="1" class="input-mini grblpcb-w-45" data-bind="value: genToolAngle" title="{{ _('V-bit included angle') }}"><span class="add-on">°</span></div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Cut depth") }}</label>
+                                <div class="input-append"><input type="number" step="0.01" class="input-mini grblpcb-w-50" data-bind="value: genCutDepth" title="{{ _('Total isolation cut depth') }}"><span class="add-on">mm</span></div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Depth/pass") }}</label>
+                                <div class="input-append"><input type="number" step="0.01" min="0" class="input-mini grblpcb-w-50" data-bind="value: genDepthPerPass" title="{{ _('Depth per Z-pass (0 = full depth in one pass)') }}"><span class="add-on">mm</span></div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Passes") }}</label>
+                                <input type="number" min="1" class="input-mini grblpcb-w-40" data-bind="value: genPasses, disable: genClearGaps" title="{{ _('Number of lateral isolation passes') }}">
+                                <label class="grblpcb-ml-4">{{ _("Overlap") }}</label>
+                                <div class="input-append"><input type="number" step="0.01" class="input-mini grblpcb-w-40" data-bind="value: genPassOverlap" title="{{ _('Extra lateral offset per pass') }}"><span class="add-on">mm</span></div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label class="checkbox" title="{{ _('Automatically add passes until all gaps between copper features are fully cleared') }}">
+                                    <input type="checkbox" data-bind="checked: genClearGaps"> {{ _("Clear all gaps") }}
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- ── Speeds & Heights ── -->
+                        <div class="grblpcb-param-group">
+                            <h5 class="grblpcb-param-heading"><i class="fas fa-tachometer-alt"></i> {{ _("Speeds & Heights") }}</h5>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Feed") }}</label>
+                                <div class="input-append"><input type="number" class="input-mini grblpcb-w-55" data-bind="value: genFeedRate" title="{{ _('XY cutting feed rate') }}"><span class="add-on">mm/m</span></div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Plunge") }}</label>
+                                <div class="input-append"><input type="number" class="input-mini grblpcb-w-55" data-bind="value: genPlungeRate" title="{{ _('Z plunge feed rate') }}"><span class="add-on">mm/m</span></div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Spindle") }}</label>
+                                <div class="input-append"><input type="number" class="input-mini grblpcb-w-60" data-bind="value: genSpindleSpeed"><span class="add-on">RPM</span></div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Safe Z") }}</label>
+                                <div class="input-append"><input type="number" step="0.5" class="input-mini grblpcb-w-45" data-bind="value: genSafeZ" title="{{ _('Safe Z height for tool changes') }}"><span class="add-on">mm</span></div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Travel Z") }}</label>
+                                <div class="input-append"><input type="number" step="0.5" class="input-mini grblpcb-w-45" data-bind="value: genTravelZ" title="{{ _('Z height for rapid moves between cuts') }}"><span class="add-on">mm</span></div>
+                            </div>
+                        </div>
+
+                        <!-- ── Drilling ── -->
+                        <div class="grblpcb-param-group">
+                            <h5 class="grblpcb-param-heading"><i class="fas fa-circle"></i> {{ _("Drilling") }}</h5>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Drill feed") }}</label>
+                                <div class="input-append"><input type="number" class="input-mini grblpcb-w-55" data-bind="value: genDrillFeed"><span class="add-on">mm/m</span></div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Peck depth") }}</label>
+                                <div class="input-append"><input type="number" step="0.1" class="input-mini grblpcb-w-45" data-bind="value: genPeckDepth" title="{{ _('Depth per peck cycle') }}"><span class="add-on">mm</span></div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Board") }}</label>
+                                <div class="input-append"><input type="number" step="0.1" class="input-mini grblpcb-w-45" data-bind="value: genBoardThickness" title="{{ _('PCB board thickness') }}"><span class="add-on">mm</span></div>
+                            </div>
+                        </div>
+
+                        <!-- ── Outline ── -->
+                        <div class="grblpcb-param-group">
+                            <h5 class="grblpcb-param-heading"><i class="fas fa-vector-square"></i> {{ _("Outline") }}</h5>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Tool ⌀") }}</label>
+                                <div class="input-append grblpcb-mb-0">
+                                    <input type="number" step="0.1" min="0.1" class="input-mini grblpcb-w-45" data-bind="value: genOutlineDiameter">
+                                    <span class="add-on">mm</span>
+                                </div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Tabs") }}</label>
+                                <input type="number" min="0" class="input-mini grblpcb-w-35" data-bind="value: genNumTabs">
+                                <label class="grblpcb-ml-4">{{ _("W") }}</label>
+                                <input type="number" step="0.5" class="input-mini grblpcb-w-35" data-bind="value: genTabWidth">
+                                <label class="grblpcb-ml-2">{{ _("H") }}</label>
+                                <input type="number" step="0.1" class="input-mini grblpcb-w-35" data-bind="value: genTabHeight">
+                            </div>
+                        </div>
+
+                        <!-- ── UV Mask Exposure ── -->
+                        <div class="grblpcb-param-group">
+                            <h5 class="grblpcb-param-heading"><i class="fas fa-sun"></i> {{ _("Solder Mask (UV)") }}</h5>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("LED Offset") }}</label>
+                                <label class="grblpcb-ml-2">X</label>
+                                <div class="input-append grblpcb-mb-0">
+                                    <input type="number" step="0.1" class="input-mini grblpcb-w-45" data-bind="value: genUvOffsetX">
+                                    <span class="add-on">mm</span>
+                                </div>
+                                <label class="grblpcb-ml-2">Y</label>
+                                <div class="input-append grblpcb-mb-0">
+                                    <input type="number" step="0.1" class="input-mini grblpcb-w-45" data-bind="value: genUvOffsetY">
+                                    <span class="add-on">mm</span>
+                                </div>
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Spot ⌀") }}</label>
+                                <div class="input-append grblpcb-mb-0">
+                                    <input type="number" step="0.1" min="0.1" class="input-mini grblpcb-w-45" data-bind="value: genUvSpotSize">
+                                    <span class="add-on">mm</span>
+                                </div>
+                                <label class="grblpcb-ml-4">{{ _("Power") }}</label>
+                                <input type="number" min="0" max="255" class="input-mini grblpcb-w-35" data-bind="value: genUvPower">
+                            </div>
+                            <div class="grblpcb-param-row">
+                                <label>{{ _("Speed") }}</label>
+                                <div class="input-append grblpcb-mb-0">
+                                    <input type="number" step="10" min="1" class="input-mini grblpcb-w-45" data-bind="value: genUvExposeSpeed">
+                                    <span class="add-on">mm/min</span>
+                                </div>
+                                <label class="grblpcb-ml-4">Z</label>
+                                <div class="input-append grblpcb-mb-0">
+                                    <input type="number" step="0.5" class="input-mini grblpcb-w-45" data-bind="value: genUvExposeZ">
+                                    <span class="add-on">mm</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-small btn-primary btn-block grblpcb-mb-4"
+                            data-bind="click: function() { generateIsolation('top_copper'); }, enable: canGenerateIsolation() && !busyGenerating()">
+                        <i class="fas" data-bind="css: {'fa-route': !busyGenerating(), 'fa-spinner fa-spin': busyGenerating()}"></i> {{ _("Isolation (Top)") }}
+                    </button>
+                    <button class="btn btn-small btn-block grblpcb-mb-4"
+                            data-bind="click: function() { generateIsolation('bottom_copper'); }, enable: hasCopperLayer() && !busyGenerating()">
+                        <i class="fas" data-bind="css: {'fa-route': !busyGenerating(), 'fa-spinner fa-spin': busyGenerating()}"></i> {{ _("Isolation (Bottom)") }}
+                    </button>
+                    <button class="btn btn-small btn-info btn-block grblpcb-mb-4"
+                            data-bind="click: generateDrill, enable: hasDrillHoles() && !busyGenerating(),
+                                       attr: { title: hasDrillLayer() && !hasDrillHoles() ? 'Drill file contains no holes' : '' }">
+                        <i class="fas" data-bind="css: {'fa-circle': !busyGenerating(), 'fa-spinner fa-spin': busyGenerating()}"></i> {{ _("Drilling") }}
+                        <!-- ko if: hasDrillLayer() && !hasDrillHoles() -->
+                        <small class="grblpcb-opacity-muted">{{ _("(no holes)") }}</small>
+                        <!-- /ko -->
+                        <!-- ko if: hasDrillHoles() -->
+                        <small class="grblpcb-opacity-muted" data-bind="text: '(' + drillHoleCount() + ' holes)'"></small>
+                        <!-- /ko -->
+                    </button>
+                    <button class="btn btn-small btn-warning btn-block grblpcb-mb-4"
+                            data-bind="click: generateOutline, enable: hasProject() && !busyGenerating()">
+                        <i class="fas" data-bind="css: {'fa-vector-square': !busyGenerating(), 'fa-spinner fa-spin': busyGenerating()}"></i> {{ _("Outline Cut") }}
+                    </button>
+                    <button class="btn btn-small btn-block grblpcb-mb-4" style="background-color: #9b59b6; color: #fff;"
+                            data-bind="click: function() { generateMaskExpose('top_mask'); }, enable: hasProject() && !busyGenerating()"
+                            title="{{ _("Expose solder mask using UV LED raster scan") }}">
+                        <i class="fas" data-bind="css: {'fa-sun': !busyGenerating(), 'fa-spinner fa-spin': busyGenerating()}"></i> {{ _("Mask Expose (Top)") }}
+                    </button>
+                    <button class="btn btn-small btn-block" style="background-color: #8e44ad; color: #fff;"
+                            data-bind="click: function() { generateMaskExpose('bottom_mask'); }, enable: hasProject() && !busyGenerating()"
+                            title="{{ _("Expose solder mask using UV LED raster scan") }}">
+                        <i class="fas" data-bind="css: {'fa-sun': !busyGenerating(), 'fa-spinner fa-spin': busyGenerating()}"></i> {{ _("Mask Expose (Bottom)") }}
+                    </button>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes" title="{{ _('Interpretation: G0 = rapid move, G1 = feed move, Z changes are tool height values, and the active WCS defines the board origin.') }}">
+                        {{ _("Tip: generate and preview one operation at a time first, then combine only when the alignment and tool settings look correct.") }}
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes" title="{{ _('G-code is just a toolpath program. The important pieces are the active WCS, feed values, spindle speed, and the cut depth per layer.') }}">
+                        {{ _("Advanced: compare the preview of routing and drilling separately before you run a combined job on the machine.") }}
+                    </div>
+                    <div class="grblpcb-guide-inline" data-bind="visible: showHelpNotes" title="{{ _('Quick meaning: G0 = move quickly, G1 = cut/move at feed speed, G54-G59 = the chosen board origin, Z = vertical position.') }}">
+                        <strong>{{ _("G-code quick guide:") }}</strong> {{ _("G0 is a fast travel move, G1 is a cutting or feed move, and the current WCS decides where the board coordinate system starts.") }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================================== -->
+            <!-- Autolevel Tab Content                                      -->
+            <!-- ========================================================== -->
+            <div data-bind="visible: activeSubTab() === 'autolevel'">
+                <!-- Probe Grid Setup -->
+                <div class="grblpcb-compact-section">
+                    <h4><i class="fas fa-th"></i> {{ _("Probe Grid") }}</h4>
+                    <div class="grblpcb-grid-inputs">
+                        <label>X: <input type="number" class="input-mini grblpcb-w-45" min="2" max="20"
+                                   data-bind="value: autolevelGridX"></label>
+                        <label>Y: <input type="number" class="input-mini grblpcb-w-45" min="2" max="20"
+                                   data-bind="value: autolevelGridY"></label>
+                        <label>{{ _("Margin:") }} <input type="number" class="input-mini grblpcb-w-45" step="0.5" min="0"
+                                   data-bind="value: autolevelMargin"> mm</label>
+                    </div>
+                    <button class="btn btn-primary btn-small btn-block" data-bind="click: setupAutolevel, enable: canSetupGrid">
+                        <i class="fas fa-th"></i> {{ _("Generate Grid") }}
+                    </button>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("For beginners: start with a smaller grid and larger margin. For experienced users: tighten the grid when you need more precise compensation.") }}
+                    </div>
+                    <div data-bind="visible: hasHeightmap" class="grblpcb-mt-8">
+                        <div class="grblpcb-autolevel-actions">
+                            <button class="btn btn-success btn-small grblpcb-flex-1" data-bind="click: startAutolevel, enable: canAutolevel">
+                                <i class="fas fa-play"></i> {{ _("Probe") }}
+                            </button>
+                            <button class="btn btn-danger btn-small grblpcb-flex-1" data-bind="click: stopAutolevel">
+                                <i class="fas fa-stop"></i> {{ _("Stop") }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Progress -->
+                <div class="grblpcb-compact-section" data-bind="visible: hasHeightmap">
+                    <h4><i class="fas fa-chart-line"></i> {{ _("Progress") }}</h4>
+                    <div data-bind="visible: autolevelStatus">
+                        <small data-bind="text: autolevelStatus" class="grblpcb-word-break"></small>
+                    </div>
+                    <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
+                        {{ _("Autolevel can take a while. Do not move the machine manually while probing is active.") }}
+                    </div>
+                    <div data-bind="visible: autolevelProgress() > 0" class="grblpcb-mt-5">
+                        <div class="progress grblpcb-progress-compact">
+                            <div class="bar" data-bind="style: { width: autolevelProgress() + '%' }, css: {
+                                'bar-success': autolevelProgress() >= 100,
+                                'bar-info': autolevelProgress() < 100
+                            }"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Probe Data Table (collapsible) -->
+                <div class="grblpcb-compact-section" data-bind="visible: heightmapPoints().length > 0">
+                    <h4 class="grblpcb-collapsible" data-bind="click: toggleProbeTable">
+                        <i class="fas" data-bind="css: { 'fa-chevron-down': showProbeTable(), 'fa-chevron-right': !showProbeTable() }"></i>
+                        {{ _("Probe Data") }}
+                        <small data-bind="text: '(' + heightmapPoints().length + ' pts)'"></small>
+                    </h4>
+                    <div data-bind="visible: showProbeTable" class="grblpcb-probe-data-scroll">
+                        <table class="table table-condensed table-bordered grblpcb-probe-table">
+                            <thead>
+                                <tr><th>#</th><th>X</th><th>Y</th><th>Z</th></tr>
+                            </thead>
+                            <tbody data-bind="foreach: heightmapPoints">
+                                <tr data-bind="css: { success: probed, warning: !probed }">
+                                    <td data-bind="text: $index() + 1"></td>
+                                    <td data-bind="text: x.toFixed(2)"></td>
+                                    <td data-bind="text: y.toFixed(2)"></td>
+                                    <td data-bind="text: probed ? z.toFixed(4) : '—'"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================================== -->
+            <!-- Operations Tab Content                                     -->
+            <!-- ========================================================== -->
+            <div data-bind="visible: activeSubTab() === 'operations'">
+                <div class="grblpcb-compact-section">
+                    <h4><i class="fas fa-list"></i> {{ _("Operations") }}</h4>
+                    <div data-bind="visible: projectOperations().length === 0">
+                        <small class="grblpcb-text-muted">{{ _("No operations yet. Generate G-code in PCB Project tab.") }}</small>
+                    </div>
+
+                    <!-- Execution Progress Panel -->
+                    <div class="grblpcb-execution-panel" data-bind="visible: executionActive() || executionStatus()">
+                        <div data-bind="visible: executionActive">
+                            <div class="progress">
+                                <div class="bar bar-success" data-bind="style: { width: executionProgress() + '%' }"></div>
+                            </div>
+                        </div>
+                        <small data-bind="text: executionStatus" class="grblpcb-word-break"></small>
+                        <div class="grblpcb-btn-wrap grblpcb-mt-4" data-bind="visible: executionActive">
+                            <button class="btn btn-mini btn-danger" data-bind="click: stopExecution">
+                                <i class="fas fa-stop"></i> {{ _("Stop") }}
+                            </button>
+                            <button class="btn btn-mini btn-warning" data-bind="click: confirmToolChange">
+                                <i class="fas fa-check"></i> {{ _("Confirm Tool Change") }}
+                            </button>
+                        </div>
+
+                        <!-- Real-time Override Controls -->
+                        <div data-bind="visible: executionActive" class="grblpcb-override-section">
+                            <h5 class="grblpcb-override-title"><i class="fas fa-sliders-h"></i> {{ _("Real-time Overrides") }}</h5>
+
+                            <!-- Feed Override -->
+                            <div class="grblpcb-override-row">
+                                <span class="grblpcb-override-label">{{ _("Feed") }}</span>
+                                <span class="label label-info grblpcb-override-value" data-bind="text: feedOverride() + '%'"></span>
+                                <button class="btn btn-mini grblpcb-override-btn" data-bind="click: feedMinus10" title="-10%">-10</button>
+                                <button class="btn btn-mini grblpcb-override-btn" data-bind="click: feedMinus1" title="-1%">-1</button>
+                                <button class="btn btn-mini btn-success grblpcb-override-btn" data-bind="click: feedReset" title="Reset to 100%">100%</button>
+                                <button class="btn btn-mini grblpcb-override-btn" data-bind="click: feedPlus1" title="+1%">+1</button>
+                                <button class="btn btn-mini grblpcb-override-btn" data-bind="click: feedPlus10" title="+10%">+10</button>
+                            </div>
+
+                            <!-- Rapid Override -->
+                            <div class="grblpcb-override-row">
+                                <span class="grblpcb-override-label">{{ _("Rapid") }}</span>
+                                <span class="label label-info grblpcb-override-value" data-bind="text: rapidOverride() + '%'"></span>
+                                <button class="btn btn-mini grblpcb-override-btn" data-bind="click: rapidQuarter" title="25%">25%</button>
+                                <button class="btn btn-mini grblpcb-override-btn" data-bind="click: rapidHalf" title="50%">50%</button>
+                                <button class="btn btn-mini btn-success grblpcb-override-btn" data-bind="click: rapidFull" title="100%">100%</button>
+                            </div>
+
+                            <!-- Spindle Override -->
+                            <div class="grblpcb-override-row">
+                                <span class="grblpcb-override-label">{{ _("Spindle") }}</span>
+                                <span class="label label-info grblpcb-override-value" data-bind="text: spindleOverride() + '%'"></span>
+                                <button class="btn btn-mini grblpcb-override-btn" data-bind="click: spindleMinus10" title="-10%">-10</button>
+                                <button class="btn btn-mini grblpcb-override-btn" data-bind="click: spindleMinus1" title="-1%">-1</button>
+                                <button class="btn btn-mini btn-success grblpcb-override-btn" data-bind="click: spindleReset" title="Reset to 100%">100%</button>
+                                <button class="btn btn-mini grblpcb-override-btn" data-bind="click: spindlePlus1" title="+1%">+1</button>
+                                <button class="btn btn-mini grblpcb-override-btn" data-bind="click: spindlePlus10" title="+10%">+10</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div data-bind="foreach: projectOperations" class="grblpcb-operations-list">
+                        <div class="grblpcb-op-item">
+                            <div class="grblpcb-flex-between">
+                                <div>
+                                    <span class="label grblpcb-text-xs" data-bind="text: operation_type, css: {
+                                        'label-success': operation_type === 'isolation',
+                                        'label-info': operation_type === 'drill',
+                                        'label-warning': operation_type === 'outline',
+                                        'label-important': operation_type === 'mask_expose'
+                                    }"></span>
+                                    <small data-bind="text: name" class="grblpcb-text-light"></small>
+                                </div>
+                                <div>
+                                    <span class="label grblpcb-text-xs" data-bind="css: {
+                                        'label-success': has_gcode, 'label-default': !has_gcode
+                                    }, text: has_gcode ? 'G' : '—'"></span>
+                                    <span class="label grblpcb-text-xs" data-bind="css: {
+                                        'label-success': has_leveled_gcode, 'label-default': !has_leveled_gcode
+                                    }, text: has_leveled_gcode ? 'L' : '—'"></span>
+                                </div>
+                            </div>
+                            <!-- Operation details -->
+                            <div class="grblpcb-op-details">
+                                <!-- ko if: tool_diameter -->
+                                <span>{{ _("Tool:") }} <span data-bind="text: tool_diameter"></span>mm</span>
+                                <!-- /ko -->
+                                <!-- ko if: cut_depth -->
+                                <span>{{ _("Depth:") }} <span data-bind="text: cut_depth"></span>mm</span>
+                                <!-- /ko -->
+                                <!-- ko if: feed_rate -->
+                                <span>F<span data-bind="text: feed_rate"></span></span>
+                                <!-- /ko -->
+                                <!-- ko if: gcode_lines -->
+                                <span data-bind="text: gcode_lines + ' lines'"></span>
+                                <!-- /ko -->
+                            </div>
+                            <div class="grblpcb-btn-wrap grblpcb-mt-3">
+                                <button class="btn btn-mini btn-success" title="{{ _('Send to CNC') }}"
+                                        data-bind="click: function() { $parent.sendToCnc($index()); }, enable: has_gcode && $parent.isGrblConnector()">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                                <button class="btn btn-mini" title="{{ _('Download') }}"
+                                        data-bind="click: function() { $parent.downloadGcode($index()); }, enable: has_gcode">
+                                    <i class="fas fa-download"></i>
+                                </button>
+                                <button class="btn btn-mini btn-info" title="{{ _('Apply Autolevel') }}"
+                                        data-bind="click: function() { $parent.applyAutolevel($index()); }, enable: has_gcode && $parent.hasHeightmap()">
+                                    <i class="fas fa-level-up-alt"></i>
+                                </button>
+                                <button class="btn btn-mini" title="{{ _('Mirror') }}"
+                                        data-bind="click: function() { $parent.mirrorGcode($index()); }, enable: has_gcode">
+                                    <i class="fas fa-arrows-alt-h"></i>
+                                </button>
+                                <button class="btn btn-mini" title="{{ _('Move Up') }}"
+                                        data-bind="click: function() { $parent.moveOperationUp($index()); }, enable: $index() > 0">
+                                    <i class="fas fa-arrow-up"></i>
+                                </button>
+                                <button class="btn btn-mini" title="{{ _('Move Down') }}"
+                                        data-bind="click: function() { $parent.moveOperationDown($index()); }, enable: $index() < $parent.projectOperations().length - 1">
+                                    <i class="fas fa-arrow-down"></i>
+                                </button>
+                                <button class="btn btn-mini btn-danger" title="{{ _('Delete') }}"
+                                        data-bind="click: function() { $parent.deleteOperation($index()); }">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================================== -->
+            <!-- Double-Sided Alignment                                     -->
+            <!-- ========================================================== -->
+            <div data-bind="visible: activeSubTab() === 'operations'">
+                <div class="grblpcb-compact-section" data-bind="visible: hasProject">
+                    <h4><i class="fas fa-sync-alt"></i> {{ _("Double-Sided Alignment") }}</h4>
+
+                    <!-- Step 1: Set alignment holes -->
+                    <div class="grblpcb-mb-6">
+                        <button class="btn btn-mini btn-info"
+                                data-bind="click: setAlignmentHolesFromDrills, enable: projectDrills().length > 0"
+                                title="{{ _('Automatically pick the 2 farthest-apart drill holes as alignment references') }}">
+                            <i class="fas fa-crosshairs"></i> {{ _("Auto-Select Alignment Holes") }}
+                        </button>
+                        <small class="muted grblpcb-text-muted">
+                            {{ _("Picks 2 corner holes from drills") }}
+                        </small>
+                    </div>
+
+                    <!-- Show selected holes -->
+                    <!-- ko if: alignmentHoles().length > 0 -->
+                    <div class="grblpcb-align-data">
+                        <strong class="grblpcb-align-heading">{{ _("Alignment Holes:") }}</strong>
+                        <!-- ko foreach: alignmentHoles -->
+                        <div class="grblpcb-align-hole-row">
+                            <i class="fas" data-bind="css: { 'fa-check text-success': probed, 'fa-circle text-muted': !probed }"></i>
+                            Hole <span data-bind="text: $index() + 1"></span>:
+                            expected (<span data-bind="text: expected_x.toFixed(2)"></span>, <span data-bind="text: expected_y.toFixed(2)"></span>)
+                            <!-- ko if: probed -->
+                            → measured (<span data-bind="text: measured_x.toFixed(3)"></span>, <span data-bind="text: measured_y.toFixed(3)"></span>)
+                            <span class="text-warning" data-bind="text: '  Δ' + (Math.sqrt(Math.pow(measured_x - expected_x, 2) + Math.pow(measured_y - expected_y, 2))).toFixed(3) + 'mm'"></span>
+                            <!-- /ko -->
+                        </div>
+                        <!-- /ko -->
+                    </div>
+                    <!-- /ko -->
+
+                    <!-- Step 2: Probe alignment holes -->
+                    <div class="grblpcb-mb-6">
+                        <!-- ko ifnot: alignmentProbing -->
+                        <button class="btn btn-mini btn-warning"
+                                data-bind="click: probeAlignment, enable: alignmentHoles().length >= 2 && isGrblConnector()"
+                                title="{{ _('Probe each alignment hole to find its actual XY center') }}">
+                            <i class="fas fa-bullseye"></i> {{ _("Probe Alignment Holes") }}
+                        </button>
+                        <!-- /ko -->
+                        <!-- ko if: alignmentProbing -->
+                        <button class="btn btn-mini btn-danger"
+                                data-bind="click: stopAlignmentProbe">
+                            <i class="fas fa-stop"></i> {{ _("Stop Probing") }}
+                        </button>
+                        <!-- /ko -->
+                    </div>
+
+                    <!-- Step 3: Compute + Apply -->
+                    <!-- ko if: hasAlignmentTransform -->
+                    <div class="grblpcb-align-transform">
+                        <strong>{{ _("Transform:") }}</strong>
+                        <span data-bind="text: 'θ=' + alignmentTransform().theta_deg.toFixed(3) + '°  offset=(' + alignmentTransform().tx.toFixed(3) + ', ' + alignmentTransform().ty.toFixed(3) + ')mm  RMS=' + alignmentTransform().rms_error.toFixed(4) + 'mm'"></span>
+                    </div>
+                    <div class="grblpcb-mb-6">
+                        <button class="btn btn-mini btn-success"
+                                data-bind="click: applyAlignmentToAll"
+                                title="{{ _('Apply alignment compensation to all mirrored operations') }}">
+                            <i class="fas fa-check-double"></i> {{ _("Apply to All Mirrored Ops") }}
+                        </button>
+                    </div>
+                    <!-- /ko -->
+
+                    <!-- Status line -->
+                    <!-- ko if: alignmentStatus -->
+                    <div class="grblpcb-align-status"
+                         data-bind="text: alignmentStatus"></div>
+                    <!-- /ko -->
+
+                    <div class="grblpcb-mt-4">
+                        <button class="btn btn-mini"
+                                data-bind="click: clearAlignment, enable: alignmentHoles().length > 0"
+                                title="{{ _('Clear all alignment data') }}">
+                            <i class="fas fa-eraser"></i> {{ _("Clear") }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================================== -->
+            <!-- View Controls (always visible)                             -->
+            <!-- ========================================================== -->
+            <div class="grblpcb-compact-section grblpcb-view-controls">
+                <h4><i class="fas fa-eye"></i> {{ _("View") }}</h4>
+                <div class="btn-group grblpcb-view-toggle">
+                    <button class="btn btn-small grblpcb-flex-1"
+                            data-bind="click: function() { setWorkspaceView('2d'); }, css: { active: workspaceViewMode() === '2d' }">2D</button>
+                    <button class="btn btn-small grblpcb-flex-1"
+                            data-bind="click: function() { setWorkspaceView('3d'); }, css: { active: workspaceViewMode() === '3d' }">3D</button>
+                </div>
+                <button class="btn btn-small btn-block grblpcb-mb-6" data-bind="click: fitWorkspaceView">
+                    <i class="fas fa-expand"></i> {{ _("Fit View") }}
+                </button>
+
+                <!-- Layer toggles -->
+                <div class="grblpcb-layer-toggles">
+                    <label class="checkbox"><input type="checkbox" data-bind="checked: wsShowBoard"> {{ _("Board") }}</label>
+                    <label class="checkbox"><input type="checkbox" data-bind="checked: wsShowProbeGrid"> {{ _("Probe Points") }}</label>
+                    <label class="checkbox"><input type="checkbox" data-bind="checked: wsShowHeightmap"> {{ _("Heat Map") }}</label>
+                    <label class="checkbox"><input type="checkbox" data-bind="checked: wsShowToolpaths"> {{ _("Toolpaths") }}</label>
+                    <label class="checkbox"><input type="checkbox" data-bind="checked: wsShowCopper"> {{ _("Copper Fill") }}</label>
+                    <label class="checkbox"><input type="checkbox" data-bind="checked: wsShowMachinePos"> {{ _("Machine Pos") }}</label>
+                    <label class="checkbox"><input type="checkbox" data-bind="checked: wsShowLayers"> {{ _("Gerber Layers") }}</label>
+                </div>
+            </div>
+
+            <!-- Toolpath selector -->
+            <div class="grblpcb-compact-section" data-bind="visible: projectOperations().length > 0">
+                <h4><i class="fas fa-route"></i> {{ _("Toolpaths") }}</h4>
+                <div data-bind="foreach: workspaceToolpathList">
+                    <label class="checkbox grblpcb-text-base">
+                        <input type="checkbox" data-bind="checked: $data.visible">
+                        <span data-bind="text: $data.name, style: { color: $data.color }"></span>
+                    </label>
+                </div>
+                <button class="btn btn-mini" data-bind="click: loadToolpathsIntoWorkspace">
+                    <i class="fas fa-sync"></i> {{ _("Refresh") }}
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Canvas Workspace (always visible) -->
+        <div class="grblpcb-workspace-canvas-container">
+            <canvas id="grblpcb-workspace-canvas"></canvas>
+            <div class="grblpcb-workspace-hint" data-bind="visible: !hasProject() && projectLayers().length === 0">
+                <p><i class="fas fa-mouse-pointer"></i></p>
+                <p>{{ _("Create or load a project in the PCB Project tab to begin.") }}</p>
+                <p class="grblpcb-text-base">{{ _("Scroll to zoom &middot; Drag to pan &middot; 3D: drag to rotate") }}</p>
+            </div>
+        </div>
+    </div>
+</div>

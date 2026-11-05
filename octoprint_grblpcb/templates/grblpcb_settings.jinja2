@@ -1,0 +1,232 @@
+<form class="form-horizontal">
+    <h3>{{ _('GRBL CNC / PCB Milling Settings') }}</h3>
+
+    <div class="alert alert-info">
+        <strong>{{ _('Quick guide') }}:</strong>
+        {{ _('Use conservative defaults first. Keep safe Z high enough for clamps, set probe depth below your board height, and test new tool/material combinations on scrap before a real PCB job.') }}
+        <div class="grblpcb-section-note">{{ _('Beginner: change one parameter at a time. Advanced: tune feed, spindle, and probe settings together after a successful test cut.') }}</div>
+    </div>
+
+    <fieldset>
+        <legend>{{ _('UI Help Mode') }}</legend>
+        <div class="control-group">
+            <label class="control-label">{{ _('Help mode') }}</label>
+            <div class="controls">
+                <select data-bind="value: settings.plugins.grblpcb.ui_help_mode">
+                    <option value="compact">{{ _('Compact') }}</option>
+                    <option value="mini">{{ _('Mini Guide') }}</option>
+                    <option value="detailed">{{ _('Detailed Help') }}</option>
+                </select>
+                <span class="help-inline">{{ _('Compact hides most hints, Mini Guide shows a small collapsible guide, and Detailed Help shows all guidance blocks.') }}</span>
+            </div>
+        </div>
+    </fieldset>
+    
+    <!-- General CNC Settings -->
+    <fieldset>
+        <legend>{{ _('General Settings') }}</legend>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Default Feed Rate') }}</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" class="input-small" data-bind="value: settings.plugins.grblpcb.default_feed_rate">
+                    <span class="add-on">mm/min</span>
+                </div>
+                <span class="help-inline">{{ _('Default feed rate for milling operations') }}</span>
+                <div class="help-inline">{{ _('Start lower for a new tool or board material, then increase after a successful test cut.') }}</div>
+                <div class="help-inline">{{ _('If you are unsure, keep this conservative and tune the speed in the toolpath preview first.') }}</div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Default Jog Feed') }}</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" class="input-small" data-bind="value: settings.plugins.grblpcb.default_jog_feed">
+                    <span class="add-on">mm/min</span>
+                </div>
+                <span class="help-inline">{{ _('Feed rate for jogging movements') }}</span>
+                <div class="help-inline">{{ _('Use a slower jog speed when the machine is close to the board or clamps.') }}</div>
+                <div class="help-inline">{{ _('Experienced users may raise this for long travel moves, but only after confirming direction and clearance.') }}</div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Safe Z Height') }}</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" step="0.1" class="input-small" data-bind="value: settings.plugins.grblpcb.safe_z_height">
+                    <span class="add-on">mm</span>
+                </div>
+                <span class="help-inline">{{ _('Height for rapid XY moves') }}</span>
+                <div class="help-inline">{{ _('This should clear the tallest clamp, connector, and the tool itself during travel moves.') }}</div>
+                <div class="help-inline">{{ _('A safe Z that is too low is one of the easiest ways to crash the machine.') }}</div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Default WCS') }}</label>
+            <div class="controls">
+                <select data-bind="value: settings.plugins.grblpcb.wcs_default">
+                    <option value="G54">G54</option>
+                    <option value="G55">G55</option>
+                    <option value="G56">G56</option>
+                    <option value="G57">G57</option>
+                    <option value="G58">G58</option>
+                    <option value="G59">G59</option>
+                </select>
+                <span class="help-inline">{{ _('Work coordinate system to use on startup') }}</span>
+            </div>
+        </div>
+    </fieldset>
+    
+    <!-- Probing Settings -->
+    <fieldset>
+        <legend>{{ _('Probing Settings') }}</legend>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Probe Depth') }}</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" step="0.1" class="input-small" data-bind="value: settings.plugins.grblpcb.probe_depth">
+                    <span class="add-on">mm</span>
+                </div>
+                <span class="help-inline">{{ _('Maximum probe travel (negative for Z probing down)') }}</span>
+                <div class="help-inline">{{ _('Set this slightly deeper than the expected board height difference, but not so deep that it risks the bed.') }}</div>
+                <div class="help-inline">{{ _('For precise work, keep a note of the actual board thickness and probe pad height you used.') }}</div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Probe Feed Rate') }}</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" class="input-small" data-bind="value: settings.plugins.grblpcb.probe_feed">
+                    <span class="add-on">mm/min</span>
+                </div>
+            </div>
+        </div>
+    </fieldset>
+    
+    <!-- Tool Settings -->
+    <fieldset>
+        <legend>{{ _('Tool Settings') }}</legend>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Tool Diameter') }}</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" step="0.01" class="input-small" data-bind="value: settings.plugins.grblpcb.tool_diameter">
+                    <span class="add-on">mm</span>
+                </div>
+                <span class="help-inline">{{ _('V-bit tip diameter') }}</span>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Tool Angle') }}</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" class="input-small" data-bind="value: settings.plugins.grblpcb.tool_angle">
+                    <span class="add-on">°</span>
+                </div>
+                <span class="help-inline">{{ _('V-bit angle (e.g., 30°, 45°, 60°)') }}</span>
+            </div>
+        </div>
+    </fieldset>
+    
+    <!-- Spindle Settings -->
+    <fieldset>
+        <legend>{{ _('Spindle Settings') }}</legend>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Default Spindle Speed') }}</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" class="input-small" data-bind="value: settings.plugins.grblpcb.default_spindle_speed">
+                    <span class="add-on">RPM</span>
+                </div>
+                <span class="help-inline">{{ _('Match this to the tool and copper thickness; test on scrap first if unsure.') }}</span>
+                <div class="help-inline">{{ _('Too much speed can burn tools; too little can leave burrs or tear traces.') }}</div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Minimum Spindle RPM') }}</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" class="input-small" data-bind="value: settings.plugins.grblpcb.spindle_min_rpm">
+                    <span class="add-on">RPM</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Maximum Spindle RPM') }}</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" class="input-small" data-bind="value: settings.plugins.grblpcb.spindle_max_rpm">
+                    <span class="add-on">RPM</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Spindle Startup Delay') }}</label>
+            <div class="controls">
+                <div class="input-append">
+                    <input type="number" step="0.1" class="input-small" data-bind="value: settings.plugins.grblpcb.spindle_delay">
+                    <span class="add-on">s</span>
+                </div>
+                <span class="help-inline">{{ _('Delay after M3 to let spindle reach speed') }}</span>
+                <div class="help-inline">{{ _('Increase this if the spindle takes longer to stabilize before cutting starts.') }}</div>
+                <div class="help-inline">{{ _('Use a longer delay when the spindle needs time to settle at the selected RPM.') }}</div>
+            </div>
+        </div>
+    </fieldset>
+    
+    <!-- Safety Settings -->
+    <fieldset>
+        <legend>{{ _('Safety Settings') }}</legend>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Soft Limits') }}</label>
+            <div class="controls">
+                <label class="checkbox">
+                    <input type="checkbox" data-bind="checked: settings.plugins.grblpcb.soft_limits">
+                    {{ _('Enable soft limits') }}
+                </label>
+            </div>
+        </div>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Hard Limits') }}</label>
+            <div class="controls">
+                <label class="checkbox">
+                    <input type="checkbox" data-bind="checked: settings.plugins.grblpcb.hard_limits">
+                    {{ _('Enable hard limits (endstops)') }}
+                </label>
+            </div>
+        </div>
+    </fieldset>
+    
+    <!-- UI Settings -->
+    <fieldset>
+        <legend>{{ _('UI Settings') }}</legend>
+        
+        <div class="control-group">
+            <label class="control-label">{{ _('Position Display') }}</label>
+            <div class="controls">
+                <label class="checkbox">
+                    <input type="checkbox" data-bind="checked: settings.plugins.grblpcb.show_machine_position">
+                    {{ _('Show machine position') }}
+                </label>
+                <label class="checkbox">
+                    <input type="checkbox" data-bind="checked: settings.plugins.grblpcb.show_work_position">
+                    {{ _('Show work position') }}
+                </label>
+            </div>
+        </div>
+    </fieldset>
+</form>

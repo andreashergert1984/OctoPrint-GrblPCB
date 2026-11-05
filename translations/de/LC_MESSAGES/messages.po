@@ -1,0 +1,1033 @@
+# German translations for OctoPrint-GrblPCB.
+# Copyright (C) 2025 The OctoPrint Project
+# This file is distributed under the same license as the OctoPrint-GrblPCB
+# project.
+# Andreas Hergert <andreas@hergert.info>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: OctoPrint-GrblPCB 0.1.0\n"
+"Report-Msgid-Bugs-To: i18n@octoprint.org\n"
+"POT-Creation-Date: 2025-07-17 13:51+0100\n"
+"PO-Revision-Date: 2025-07-19 18:00+0100\n"
+"Last-Translator: Andreas Hergert <andreas@hergert.info>\n"
+"Language: de\n"
+"Language-Team: de <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.16.0\n"
+
+#: octoprint_grblpcb/__init__.py:291
+msgid "GRBL CNC Connection"
+msgstr "GRBL-CNC-Verbindung"
+
+#: octoprint_grblpcb/__init__.py:299
+msgid "GRBL CNC / PCB Milling"
+msgstr "GRBL-CNC / Platinenfräsen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:108
+msgid "Untitled PCB"
+msgstr "Unbenannte Platine"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:365
+#, python-format
+msgid "Project '%s' created"
+msgstr "Projekt „%s“ erstellt"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:370
+msgid "Error creating project: "
+msgstr "Fehler beim Erstellen des Projekts: "
+
+#: octoprint_grblpcb/static/js/grblpcb.js:370
+#: octoprint_grblpcb/static/js/grblpcb.js:401
+#: octoprint_grblpcb/static/js/grblpcb.js:425
+msgid "unknown"
+msgstr "unbekannt"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:396
+#, python-format
+msgid "Project '%s' loaded"
+msgstr "Projekt „%s“ geladen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:401
+msgid "Error loading project: "
+msgstr "Fehler beim Laden des Projekts: "
+
+#: octoprint_grblpcb/static/js/grblpcb.js:406
+#, python-format
+msgid "Delete project '%s'? This cannot be undone."
+msgstr "Projekt „%s“ löschen? Dies kann nicht rückgängig gemacht werden."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:422
+#, python-format
+msgid "Project '%s' deleted"
+msgstr "Projekt „%s“ gelöscht"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:425
+msgid "Error deleting project: "
+msgstr "Fehler beim Löschen des Projekts: "
+
+#: octoprint_grblpcb/static/js/grblpcb.js:500
+#, python-format
+msgid "Uploading %d file(s)..."
+msgstr "%d Datei(en) werden hochgeladen…"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:515
+#, python-format
+msgid "Uploaded %d file(s). Board: %s x %s mm"
+msgstr "%d Datei(en) hochgeladen. Platine: %s × %s mm"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:526
+msgid "Upload failed: "
+msgstr "Upload fehlgeschlagen: "
+
+#: octoprint_grblpcb/static/js/grblpcb.js:526
+msgid "unknown error"
+msgstr "unbekannter Fehler"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:549
+#, python-format
+msgid "Rotating board by %d°..."
+msgstr "Platine wird um %d° gedreht…"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:554
+#, python-format
+msgid "Rotated %d° — board: %s × %s mm"
+msgstr "%d° gedreht — Platine: %s × %s mm"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:563
+msgid "Rotation error: "
+msgstr "Drehungsfehler: "
+
+#: octoprint_grblpcb/static/js/grblpcb.js:563
+#: octoprint_grblpcb/static/js/grblpcb.js:598
+#: octoprint_grblpcb/static/js/grblpcb.js:622
+#: octoprint_grblpcb/static/js/grblpcb.js:650
+#: octoprint_grblpcb/static/js/grblpcb.js:704
+#: octoprint_grblpcb/static/js/grblpcb.js:1116
+msgid "failed"
+msgstr "fehlgeschlagen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:578
+msgid "Generating isolation toolpaths..."
+msgstr "Isolationsfräsbahnen werden erzeugt…"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:594
+#, python-format
+msgid "Isolation G-code generated: %d lines"
+msgstr "Isolations-G-Code erzeugt: %d Zeilen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:598
+#: octoprint_grblpcb/static/js/grblpcb.js:622
+#: octoprint_grblpcb/static/js/grblpcb.js:650
+#: octoprint_grblpcb/static/js/grblpcb.js:704
+#: octoprint_grblpcb/static/js/grblpcb.js:1015
+#: octoprint_grblpcb/static/js/grblpcb.js:1116
+msgid "Error: "
+msgstr "Fehler: "
+
+#: octoprint_grblpcb/static/js/grblpcb.js:607
+msgid "Generating drill G-code..."
+msgstr "Bohr-G-Code wird erzeugt…"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:618
+#, python-format
+msgid "Drill G-code generated: %d lines"
+msgstr "Bohr-G-Code erzeugt: %d Zeilen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:631
+msgid "Generating outline G-code..."
+msgstr "Umriss-G-Code wird erzeugt…"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:646
+#, python-format
+msgid "Outline G-code generated: %d lines"
+msgstr "Umriss-G-Code erzeugt: %d Zeilen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:679
+#, python-format
+msgid "Grid ready: %d probe points"
+msgstr "Raster bereit: %d Messpunkte"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:688
+msgid "Probing started..."
+msgstr "Abtastung gestartet…"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:694
+#: octoprint_grblpcb/static/js/grblpcb.js:1004
+msgid "Probing stopped"
+msgstr "Abtastung gestoppt"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:701
+#, python-format
+msgid "Autolevel applied: %d lines"
+msgstr "Autolevel angewendet: %d Zeilen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:917
+msgid "Mirrored G-code created"
+msgstr "Gespiegelter G-Code erstellt"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:942
+msgid "Need at least 2 drill holes"
+msgstr "Mindestens 2 Bohrlöcher erforderlich"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:972
+#, python-format
+msgid "Set %d alignment holes (dist=%smm)"
+msgstr "%d Ausrichtungslöcher gesetzt (Abstand=%smm)"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:984
+#, python-format
+msgid "Set %d alignment holes"
+msgstr "%d Ausrichtungslöcher gesetzt"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:990
+msgid "Set alignment holes first"
+msgstr "Zuerst Ausrichtungslöcher festlegen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:994
+msgid "Probing alignment holes..."
+msgstr "Ausrichtungslöcher werden abgetastet…"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:997
+msgid "Failed to start alignment probing"
+msgstr "Ausrichtungsabtastung konnte nicht gestartet werden"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1014
+msgid "Computation failed"
+msgstr "Berechnung fehlgeschlagen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1039
+msgid "No mirrored operations found to align"
+msgstr "Keine gespiegelten Operationen zum Ausrichten gefunden"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1047
+msgid "Alignment cleared"
+msgstr "Ausrichtung zurückgesetzt"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1056
+msgid "Delete this operation?"
+msgstr "Diese Operation löschen?"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1062
+msgid "Operation deleted"
+msgstr "Operation gelöscht"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1105
+msgid "Send this operation to the CNC machine for execution?"
+msgstr "Diese Operation zur Ausführung an die CNC-Maschine senden?"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1108
+msgid "Starting..."
+msgstr "Wird gestartet…"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1112
+msgid "Streaming: "
+msgstr "Übertragung: "
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1124
+msgid "Stopped"
+msgstr "Gestoppt"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1131
+msgid "Resuming after tool change..."
+msgstr "Fortsetzen nach Werkzeugwechsel…"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1272
+#, python-format
+msgid "Probing point %d/%d (%d%%) Z=%s"
+msgstr "Messpunkt %d/%d (%d%%) Z=%s"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1285
+msgid "Probing complete! Height map ready."
+msgstr "Abtastung abgeschlossen! Höhenkarte bereit."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1294
+#, python-format
+msgid "Probing hole %d/%d (%d%%)"
+msgstr "Loch %d/%d wird abgetastet (%d%%)"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1308
+msgid "All holes probed! Click 'Compute Transform' to calculate alignment."
+msgstr "Alle Löcher abgetastet! „Transformation berechnen“ klicken, um die Ausrichtung zu berechnen."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1312
+msgid "Probing finished (not all holes probed)"
+msgstr "Abtastung beendet (nicht alle Löcher abgetastet)"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1322
+#, python-format
+msgid "Completed in %ss"
+msgstr "Abgeschlossen in %ss"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1326
+#, python-format
+msgid "Stopped at line %d"
+msgstr "Gestoppt bei Zeile %d"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1328
+#, python-format
+msgid "⚠️ TOOL CHANGE required at line %d — click Confirm when ready"
+msgstr "⚠️ WERKZEUGWECHSEL erforderlich bei Zeile %d — „Bestätigen“ klicken, wenn bereit"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1330
+#, python-format
+msgid "⏸ Program pause at line %d — click Confirm to continue"
+msgstr "⏸ Programmpause bei Zeile %d — „Bestätigen“ klicken, um fortzufahren"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1332
+#, python-format
+msgid "ETA: %ds"
+msgstr "Restzeit: %ds"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1334
+#, python-format
+msgid "Line %d/%d (%d%%)"
+msgstr "Zeile %d/%d (%d%%)"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1338
+#, python-format
+msgid "Streaming started: %s"
+msgstr "Übertragung gestartet: %s"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:554
+msgid "Top Cu"
+msgstr "Oben Cu"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:555
+msgid "Bot Cu"
+msgstr "Unten Cu"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:556
+msgid "Drill"
+msgstr "Bohren"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:557
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:371
+msgid "Outline"
+msgstr "Umriss"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:558
+msgid "Top Silk"
+msgstr "Oben Silk"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:559
+msgid "Bot Silk"
+msgstr "Unten Silk"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:560
+msgid "Top Mask"
+msgstr "Oben Mask"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:561
+msgid "Bot Mask"
+msgstr "Unten Mask"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:750
+#, python-format
+msgid "Board: %s x %s mm"
+msgstr "Platine: %s × %s mm"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:1014
+msgid "Z (mm)"
+msgstr "Z (mm)"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:1064
+#, python-format
+msgid "Probe: %d/%d (%dx%d)"
+msgstr "Messpunkte: %d/%d (%d×%d)"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:1067
+#, python-format
+msgid "Z range: %s .. %s mm"
+msgstr "Z-Bereich: %s .. %s mm"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:1068
+#, python-format
+msgid "Z span: %s mm"
+msgstr "Z-Spanne: %s mm"
+
+#: octoprint_grblpcb/static/js/workspace_renderer.js:1075
+#, python-format
+msgid "Toolpaths: %d/%d"
+msgstr "Fräsbahnen: %d/%d"
+
+#: octoprint_grblpcb/templates/grblpcb_connection_option.jinja2:3
+#, python-format
+msgid ""
+"\n"
+"        No serial port found. Is your CNC connected?\n"
+"        Try %(refresh)srefreshing%(endrefresh)s or check %(link)sGRBL "
+"documentation%(endlink)s.\n"
+"    "
+msgstr ""
+"\n"
+"        Kein serieller Port gefunden. Ist Ihre CNC-Maschine angeschlossen?\n"
+"        Versuchen Sie %(refresh)szu aktualisieren%(endrefresh)s oder lesen Sie die %(link)sGRBL-Dokumentation%(endlink)s.\n"
+"    "
+
+#: octoprint_grblpcb/templates/grblpcb_connection_option.jinja2:9
+msgid "Serial Port"
+msgstr "Serieller Port"
+
+#: octoprint_grblpcb/templates/grblpcb_connection_option.jinja2:15
+msgid "Baudrate"
+msgstr "Baudrate"
+
+#: octoprint_grblpcb/templates/grblpcb_connection_option.jinja2:24
+msgid "GRBL CNC Connection - for GRBL 1.1 compatible controllers"
+msgstr "GRBL-CNC-Verbindung – für GRBL-1.1-kompatible Controller"
+
+#: octoprint_grblpcb/templates/grblpcb_navbar.jinja2:2
+msgid "CNC:"
+msgstr "CNC:"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:2
+msgid "GRBL CNC / PCB Milling Settings"
+msgstr "GRBL-CNC / Platinenfräsen – Einstellungen"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:6
+msgid "General Settings"
+msgstr "Allgemeine Einstellungen"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:9
+msgid "Default Feed Rate"
+msgstr "Standard-Vorschub"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:15
+msgid "Default feed rate for milling operations"
+msgstr "Standard-Vorschubgeschwindigkeit für Fräsoperationen"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:20
+msgid "Default Jog Feed"
+msgstr "Standard-Tippvorschub"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:26
+msgid "Feed rate for jogging movements"
+msgstr "Vorschubgeschwindigkeit für Tippbewegungen"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:31
+msgid "Safe Z Height"
+msgstr "Sichere Z-Höhe"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:37
+msgid "Height for rapid XY moves"
+msgstr "Höhe für schnelle XY-Bewegungen"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:42
+msgid "Default WCS"
+msgstr "Standard-WKS"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:52
+msgid "Work coordinate system to use on startup"
+msgstr "Werkstück-Koordinatensystem beim Start"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:59
+msgid "Probing Settings"
+msgstr "Abtast-Einstellungen"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:62
+msgid "Probe Depth"
+msgstr "Abtasttiefe"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:68
+msgid "Maximum probe travel (negative for Z probing down)"
+msgstr "Maximaler Tastweg (negativ für Z-Abtastung nach unten)"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:73
+msgid "Probe Feed Rate"
+msgstr "Abtast-Vorschub"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:85
+msgid "Tool Settings"
+msgstr "Werkzeug-Einstellungen"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:88
+msgid "Tool Diameter"
+msgstr "Werkzeugdurchmesser"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:94
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:305
+msgid "V-bit tip diameter"
+msgstr "Spitzendurchmesser des V-Fräsers"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:99
+msgid "Tool Angle"
+msgstr "Werkzeugwinkel"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:105
+msgid "V-bit angle (e.g., 30°, 45°, 60°)"
+msgstr "V-Fräser-Winkel (z. B. 30°, 45°, 60°)"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:112
+msgid "Spindle Settings"
+msgstr "Spindel-Einstellungen"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:115
+msgid "Default Spindle Speed"
+msgstr "Standard-Spindeldrehzahl"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:125
+msgid "Minimum Spindle RPM"
+msgstr "Minimale Spindeldrehzahl"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:135
+msgid "Maximum Spindle RPM"
+msgstr "Maximale Spindeldrehzahl"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:145
+msgid "Spindle Startup Delay"
+msgstr "Spindel-Anlaufverzögerung"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:151
+msgid "Delay after M3 to let spindle reach speed"
+msgstr "Verzögerung nach M3, damit die Spindel die Drehzahl erreicht"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:158
+msgid "Safety Settings"
+msgstr "Sicherheitseinstellungen"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:161
+msgid "Soft Limits"
+msgstr "Softwarebegrenzungen"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:165
+msgid "Enable soft limits"
+msgstr "Softwarebegrenzungen aktivieren"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:171
+msgid "Hard Limits"
+msgstr "Hardware-Endschalter"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:175
+msgid "Enable hard limits (endstops)"
+msgstr "Hardware-Endschalter aktivieren"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:183
+msgid "UI Settings"
+msgstr "Oberflächen-Einstellungen"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:186
+msgid "Position Display"
+msgstr "Positionsanzeige"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:190
+msgid "Show machine position"
+msgstr "Maschinenposition anzeigen"
+
+#: octoprint_grblpcb/templates/grblpcb_settings.jinja2:194
+msgid "Show work position"
+msgstr "Werkstückposition anzeigen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:5
+msgid "CNC Control"
+msgstr "CNC-Steuerung"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:8
+msgid "PCB Project"
+msgstr "Platinenprojekt"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:11
+msgid "Autolevel"
+msgstr "Autolevel"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:15
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:492
+msgid "Operations"
+msgstr "Operationen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:23
+msgid "ALARM STATE"
+msgstr "ALARMZUSTAND"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:25
+msgid "Unlock ($X)"
+msgstr "Entsperren ($X)"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:28
+msgid "Home All"
+msgstr "Alle Achsen referenzieren"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:38
+msgid "Toggle controls panel"
+msgstr "Steuerungspanel ein-/ausblenden"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:78
+msgid "Jog"
+msgstr "Tippbetrieb"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:85
+msgid "Go to 0,0"
+msgstr "Gehe zu 0,0"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:104
+msgid "Feed:"
+msgstr "Vorschub:"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:110
+msgid "Machine"
+msgstr "Maschine"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:113
+msgid "Home"
+msgstr "Referenzfahrt"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:116
+msgid "Unlock"
+msgstr "Entsperren"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:119
+msgid "RST"
+msgstr "RST"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:132
+msgid "Work Coords"
+msgstr "Werkstückkoordinaten"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:142
+msgid "0 All"
+msgstr "Alle nullen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:148
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:437
+msgid "Probe"
+msgstr "Abtasten"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:158
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:339
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:540
+msgid "Spindle"
+msgstr "Spindel"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:163
+msgid "Set"
+msgstr "Setzen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:174
+msgid "Project"
+msgstr "Projekt"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:176
+msgid "Project name"
+msgstr "Projektname"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:180
+msgid "New"
+msgstr "Neu"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:183
+msgid "Browse"
+msgstr "Durchsuchen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:201
+msgid "Saved Projects"
+msgstr "Gespeicherte Projekte"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:203
+msgid "No saved projects."
+msgstr "Keine gespeicherten Projekte."
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:209
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:610
+msgid "Delete"
+msgstr "Löschen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:224
+msgid "Import Files"
+msgstr "Dateien importieren"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:238
+msgid "Layers"
+msgstr "Lagen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:262
+msgid "Transform"
+msgstr "Transformation"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:265
+msgid "Rotate 90° CCW"
+msgstr "90° gegen Uhrzeigersinn drehen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:269
+msgid "Rotate 180°"
+msgstr "180° drehen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:273
+msgid "Rotate 90° CW"
+msgstr "90° im Uhrzeigersinn drehen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:280
+msgid "Custom angle (CCW)"
+msgstr "Benutzerdefinierter Winkel (gegen UZS)"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:283
+msgid "Rotate by custom angle"
+msgstr "Um benutzerdefinierten Winkel drehen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:293
+msgid "Generate G-code"
+msgstr "G-Code erzeugen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:302
+msgid "Isolation Milling"
+msgstr "Isolationsfräsen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:304
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:373
+msgid "Tool ⌀"
+msgstr "Werkzeug ⌀"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:308
+msgid "V-angle"
+msgstr "V-Winkel"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:309
+msgid "V-bit included angle"
+msgstr "V-Fräser-Öffnungswinkel"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:312
+msgid "Cut depth"
+msgstr "Schnitttiefe"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:313
+msgid "Total isolation cut depth"
+msgstr "Gesamttiefe der Isolationsfräsung"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:316
+msgid "Depth/pass"
+msgstr "Tiefe/Durchgang"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:317
+msgid "Depth per Z-pass (0 = full depth in one pass)"
+msgstr "Tiefe pro Z-Durchgang (0 = volle Tiefe in einem Durchgang)"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:320
+msgid "Passes"
+msgstr "Durchgänge"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:321
+msgid "Number of lateral isolation passes"
+msgstr "Anzahl der seitlichen Isolationsdurchgänge"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:322
+msgid "Overlap"
+msgstr "Überlappung"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:323
+msgid "Extra lateral offset per pass"
+msgstr "Zusätzlicher seitlicher Versatz pro Durchgang"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:326
+msgid "Automatically add passes until all gaps between copper features are fully cleared"
+msgstr "Automatisch Durchgänge hinzufügen, bis alle Lücken zwischen Kupferflächen vollständig freigestellt sind"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:327
+msgid "Clear all gaps"
+msgstr "Alle Lücken fräsen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:332
+msgid "Speeds & Heights"
+msgstr "Geschwindigkeiten & Höhen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:331
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:520
+msgid "Feed"
+msgstr "Vorschub"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:332
+msgid "XY cutting feed rate"
+msgstr "XY-Vorschub beim Fräsen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:335
+msgid "Plunge"
+msgstr "Eintauchen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:336
+msgid "Z plunge feed rate"
+msgstr "Z-Eintauchvorschub"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:343
+msgid "Safe Z"
+msgstr "Sicheres Z"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:344
+msgid "Safe Z height for tool changes"
+msgstr "Sichere Z-Höhe für Werkzeugwechsel"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:347
+msgid "Travel Z"
+msgstr "Verfahrhöhe Z"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:348
+msgid "Z height for rapid moves between cuts"
+msgstr "Z-Höhe für Eilgangbewegungen zwischen Schnitten"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:354
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:401
+msgid "Drilling"
+msgstr "Bohren"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:356
+msgid "Drill feed"
+msgstr "Bohrvorschub"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:360
+msgid "Peck depth"
+msgstr "Picktiefe"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:361
+msgid "Depth per peck cycle"
+msgstr "Tiefe pro Pickzyklus"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:364
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:722
+msgid "Board"
+msgstr "Platine"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:365
+msgid "PCB board thickness"
+msgstr "Platinendicke"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:380
+msgid "Tabs"
+msgstr "Stege"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:382
+msgid "W"
+msgstr "B"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:384
+msgid "H"
+msgstr "H"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:392
+msgid "Isolation (Top)"
+msgstr "Isolation (Oberseite)"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:396
+msgid "Isolation (Bottom)"
+msgstr "Isolation (Unterseite)"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:403
+msgid "(no holes)"
+msgstr "(keine Löcher)"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:411
+msgid "Outline Cut"
+msgstr "Umrissschnitt"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2
+msgid "Solder Mask (UV)"
+msgstr "Lötstoppmaske (UV)"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2
+msgid "LED Offset"
+msgstr "LED-Versatz"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2
+msgid "Spot ⌀"
+msgstr "Spot-⌀"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2
+msgid "Power"
+msgstr "Leistung"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2
+msgid "Speed"
+msgstr "Geschwindigkeit"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2
+msgid "Mask Expose (Top)"
+msgstr "Maske belichten (Oberseite)"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2
+msgid "Mask Expose (Bottom)"
+msgstr "Maske belichten (Unterseite)"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2
+msgid "Expose solder mask using UV LED raster scan"
+msgstr "Lötstoppmaske per UV-LED-Rasterscan belichten"
+
+#: octoprint_grblpcb/static/js/grblpcb.js
+msgid "Generating mask exposure G-code..."
+msgstr "Maskenbelichtungs-G-Code wird erzeugt…"
+
+#: octoprint_grblpcb/static/js/grblpcb.js
+msgid "Mask exposure G-code generated: %d lines"
+msgstr "Maskenbelichtungs-G-Code erzeugt: %d Zeilen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:422
+msgid "Probe Grid"
+msgstr "Abtastraster"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:428
+msgid "Margin:"
+msgstr "Rand:"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:432
+msgid "Generate Grid"
+msgstr "Raster erzeugen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:440
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:507
+msgid "Stop"
+msgstr "Stopp"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:448
+msgid "Progress"
+msgstr "Fortschritt"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:466
+msgid "Probe Data"
+msgstr "Messdaten"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:494
+msgid "No operations yet. Generate G-code in PCB Project tab."
+msgstr "Noch keine Operationen. G-Code im Platinenprojekt-Tab erzeugen."
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:510
+msgid "Confirm Tool Change"
+msgstr "Werkzeugwechsel bestätigen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:516
+msgid "Real-time Overrides"
+msgstr "Echtzeit-Übersteuerungen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:531
+msgid "Rapid"
+msgstr "Eilgang"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:573
+msgid "Tool:"
+msgstr "Werkzeug:"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:576
+msgid "Depth:"
+msgstr "Tiefe:"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:586
+msgid "Send to CNC"
+msgstr "An CNC senden"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:590
+msgid "Download"
+msgstr "Herunterladen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:594
+msgid "Apply Autolevel"
+msgstr "Autolevel anwenden"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:598
+msgid "Mirror"
+msgstr "Spiegeln"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:602
+msgid "Move Up"
+msgstr "Nach oben"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:606
+msgid "Move Down"
+msgstr "Nach unten"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:625
+msgid "Double-Sided Alignment"
+msgstr "Doppelseitige Ausrichtung"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:631
+msgid ""
+"Automatically pick the 2 farthest-apart drill holes as alignment "
+"references"
+msgstr ""
+"Automatisch die 2 am weitesten voneinander entfernten Bohrlöcher als "
+"Ausrichtungsreferenzen wählen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:632
+msgid "Auto-Select Alignment Holes"
+msgstr "Ausrichtungslöcher automatisch wählen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:635
+msgid "Picks 2 corner holes from drills"
+msgstr "Wählt 2 Ecklöcher aus den Bohrungen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:642
+msgid "Alignment Holes:"
+msgstr "Ausrichtungslöcher:"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:662
+msgid "Probe each alignment hole to find its actual XY center"
+msgstr "Jedes Ausrichtungsloch abtasten, um seine tatsächliche XY-Mitte zu finden"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:663
+msgid "Probe Alignment Holes"
+msgstr "Ausrichtungslöcher abtasten"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:669
+msgid "Stop Probing"
+msgstr "Abtastung stoppen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:677
+msgid "Transform:"
+msgstr "Transformation:"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:683
+msgid "Apply alignment compensation to all mirrored operations"
+msgstr "Ausrichtungskorrektur auf alle gespiegelten Operationen anwenden"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:684
+msgid "Apply to All Mirrored Ops"
+msgstr "Auf alle gespiegelten Ops anwenden"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:698
+msgid "Clear all alignment data"
+msgstr "Alle Ausrichtungsdaten löschen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:699
+msgid "Clear"
+msgstr "Zurücksetzen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:709
+msgid "View"
+msgstr "Ansicht"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:717
+msgid "Fit View"
+msgstr "Ansicht anpassen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:723
+msgid "Probe Points"
+msgstr "Messpunkte"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:724
+msgid "Heat Map"
+msgstr "Höhenkarte"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:725
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:734
+msgid "Toolpaths"
+msgstr "Fräsbahnen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:726
+msgid "Copper Fill"
+msgstr "Kupferfüllung"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:727
+msgid "Machine Pos"
+msgstr "Maschinenpos."
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:728
+msgid "Gerber Layers"
+msgstr "Gerber-Lagen"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:742
+msgid "Refresh"
+msgstr "Aktualisieren"
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:752
+msgid "Create or load a project in the PCB Project tab to begin."
+msgstr "Erstellen oder laden Sie ein Projekt im Platinenprojekt-Tab, um zu beginnen."
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:753
+msgid "Scroll to zoom &middot; Drag to pan &middot; 3D: drag to rotate"
+msgstr "Scrollen zum Zoomen &middot; Ziehen zum Verschieben &middot; 3D: Ziehen zum Drehen"

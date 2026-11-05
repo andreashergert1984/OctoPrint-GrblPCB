@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "OctoPrint-GrblPCB"
+version = "0.1.0"
+description = "OctoPrint plugin for GRBL-based CNC machines for PCB isolation milling"
+authors = [
+    {name = "Andreas Hergert", email = "andreas@hergert.info"}
+]
+readme = "README.md"
+license = "AGPL-3.0-or-later"
+requires-python = ">=3.9, <4"
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: Flask",
+    "Intended Audience :: Manufacturing",
+    "Operating System :: OS Independent",
+    "Programming Language :: JavaScript",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+]
+
+dependencies = [
+    "pygerber>=2.4",
+    "pyserial>=3.4",
+    "shapely>=2.0",
+    "scipy>=1.10",
+    "numpy>=1.24",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+octoprint_grblpcb = [
+    "translations/**/*",
+    "static/**/*",
+    "templates/**/*",
+]
+
+[tool.setuptools.packages.find]
+include = [
+    "octoprint_grblpcb",
+    "octoprint_grblpcb.*"
+]
+
+[project.entry-points."octoprint.plugin"]
+grblpcb = "octoprint_grblpcb"
+
+[project.urls]
+Homepage = "https://github.com/ahergert/OctoPrint-GrblPCB"
+
+[project.optional-dependencies]
+develop = [
+    "go-task-bin"
+]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::pyparsing.PyparsingDeprecationWarning:pygerber.gerberx3.tokenizer.grammar",
+]

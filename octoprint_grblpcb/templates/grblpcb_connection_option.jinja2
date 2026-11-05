@@ -1,0 +1,26 @@
+<div class="alert alert-error grblpcb-mb-10"
+     data-bind="visible: !validPort()">
+    <small>{% trans link="<a href='https://docs.grbl.org' target='_blank' rel='noopener noreferrer'>"|safe, endlink="</a>"|safe, refresh="<a href='javascript:void(0)' data-bind='click: $root.requestData'>"|safe, endrefresh="</a>"|safe %}
+        No serial port found. Is your CNC connected?
+        Try {{ refresh }}refreshing{{ endrefresh }} or check {{ link }}GRBL documentation{{ endlink }}.
+    {% endtrans %}</small>
+</div>
+
+<label for="grbl_connection_ports">{{ _("Serial Port") }}</label>
+<select id="grbl_connection_ports"
+        class="connection_parameter"
+        data-connection-parameter="port"
+        data-bind="options: portOptions, optionsCaption: 'AUTO', value: currentPort"></select>
+
+<label for="grbl_connection_baudrates">{{ _("Baudrate") }}</label>
+<select id="grbl_connection_baudrates"
+        class="connection_parameter"
+        data-connection-parameter="baudrate"
+        data-bind="options: baudrateOptions, optionsCaption: 'AUTO', value: currentBaudrate"></select>
+
+<div class="alert alert-info grblpcb-mt-10">
+    <small>
+        <i class="fas fa-info-circle"></i>
+        {{ _("GRBL CNC Connection - for GRBL 1.1 compatible controllers") }}
+    </small>
+</div>
