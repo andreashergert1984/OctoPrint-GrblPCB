@@ -1381,6 +1381,9 @@ $(function() {
             self.executionActive(true);
             self.executionProgress(0);
             self.executionStatus(gettext("Starting..."));
+            // Progress messages can arrive before the HTTP answer (a tool
+            // change in the first lines); the answer must not overwrite them
+            self._streamProgressSeen = false;
             OctoPrint.simpleApiCommand("grblpcb", "send_to_cnc", {
                 operation_index: operationIndex,
                 force: !!force
@@ -1396,7 +1399,9 @@ $(function() {
                     }
                     return;
                 }
-                self.executionStatus(_.sprintf(gettext("Streaming: %s"), self.executionOperationLabel));
+                if (!self._streamProgressSeen) {
+                    self.executionStatus(_.sprintf(gettext("Streaming: %s"), self.executionOperationLabel));
+                }
                 self.executionTotalLines(response.total_lines || 0);
             }).fail(function(xhr) {
                 self.executionActive(false);
@@ -1694,6 +1699,7 @@ $(function() {
                 
                 var errorSuffix = (data.errors && data.errors > 0) ? _.sprintf(gettext(" (%d GRBL errors)"), data.errors) : "";
                 
+                self._streamProgressSeen = true;
                 self.executionPaused(["tool_change", "pause", "confirm_again", "waiting_for_idle"].indexOf(data.status) !== -1);
 
                 if (data.status === "completed") {

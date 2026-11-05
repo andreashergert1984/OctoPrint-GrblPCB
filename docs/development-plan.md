@@ -24,14 +24,14 @@ autolevel and streaming out, without an external CAM tool.
 | Homing, unlock, jog, work coordinate systems, zeroing | simulator run |
 | Manual commands locked while a job runs, allowed in a pause | simulator run, tests |
 | Gerber RS-274X and Excellon import (LZ/TZ, file formats) | real KiCad files, tests |
-| Isolation routing, multi-pass, depth passes | simulator run, tests |
-| Drilling with peck cycles and breakthrough | simulator run, tests |
-| Outline cut with tabs and breakthrough | G-code inspected, tests |
+| Isolation routing: climb milling, overlapping passes, depth passes, narrow-gap pass, warning for gaps below the tool tip | simulator run, geometric tests |
+| Drilling with peck cycles, breakthrough, tool changes per drill size | simulator run (3 tool changes), tests |
+| Outline cut on the Edge.Cuts centre line, cutouts, tabs, breakthrough | geometric tests |
 | Solder mask UV exposure toolpaths | simulator run, G-code inspected |
 | Autolevel: probe grid, interpolation, Z correction, drift check | simulator run, tests |
 | Leveled G-code bound to work zero and board side | simulator run, tests |
-| Double-sided alignment via probed holes | simulator run (offset and rotated holes), tests |
-| Program pause (M0) and tool change (M6) with confirmation | simulator run (M0), tests (M0, M6) |
+| Double-sided boards: back side from mirrored geometry, alignment via probed holes | simulator run end to end on the two-layer fixture, tests |
+| Program pause (M0) and tool change (M6) with confirmation | simulator run, tests |
 | 2D/3D workspace view | simulator run, JS test for fit view |
 | German translation, translation guard test | tests |
 | Development container (`docker/`) | image build |

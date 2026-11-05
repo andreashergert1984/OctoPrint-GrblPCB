@@ -1,0 +1,16 @@
+%TF.GenerationSoftware,OctoPrint-GrblPCB test fixture*%
+%TF.FileFunction,Profile,NP*%
+%FSLAX46Y46*%
+G04 Two-layer test board 60 x 40 mm: pads on both sides, one trace per side,*
+G04 an SMD pad only on the bottom, corner mounting holes*
+%MOMM*%
+%LPD*%
+G01*
+%ADD10C,0.100000*%
+D10*
+X0Y0D02*
+X60000000Y0D01*
+X60000000Y40000000D01*
+X0Y40000000D01*
+X0Y0D01*
+M02*
