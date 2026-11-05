@@ -145,6 +145,10 @@ Add the path (or a glob such as `/tmp/ttyGRBL*`) under **Settings → Serial
 Connection → Additional serial ports** (`plugins.serial_connector.additionalPorts`);
 the GRBL connection then lists it. `--homing` starts in `Alarm` like a machine
 with `$22=1`, `--time-scale` sets how fast moves run (default 5 % of real time).
+`--hole X,Y,D` (machine coordinates, repeatable) adds drilled holes whose walls
+X/Y probes find, for testing double-sided alignment; `--probe-diameter` sets the
+probe tip. The simulator also models GRBL's 128-byte RX buffer and prints a
+warning if a sender overfills it.
 
 At the default time scale the simulated machine finishes moves faster than the
 plugin can stream them, so its planner runs empty and the status shows `Idle`

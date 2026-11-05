@@ -1782,7 +1782,7 @@ msgstr "Ausrichtungskorrektur auf alle gespiegelten Operationen anwenden"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:864
 msgid "Apply to All Mirrored Ops"
-msgstr "Auf alle gespiegelten Ops anwenden"
+msgstr "Auf alle gespiegelten Operationen anwenden"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:878
 msgid "Clear all alignment data"

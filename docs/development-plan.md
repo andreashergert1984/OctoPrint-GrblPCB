@@ -18,20 +18,21 @@ autolevel and streaming out, without an external CAM tool.
 |------|------------|
 | GRBL connection type (`ConnectedPrinter`, OctoPrint 2.x) | simulator run, tests |
 | Status reports, errors, alarms (shown in OctoPrint) | simulator run, tests |
-| Streaming with character counting, reader thread | simulator run, tests |
+| Streaming with character counting, reader thread | simulator run (RX buffer modelled), tests |
 | Feed hold, resume, soft reset | simulator run |
-| Real-time overrides (feed, rapid, spindle) | implemented, not exercised |
+| Real-time overrides (feed, rapid, spindle) | simulator run |
 | Homing, unlock, jog, work coordinate systems, zeroing | simulator run |
+| Manual commands locked while a job runs, allowed in a pause | simulator run, tests |
 | Gerber RS-274X and Excellon import (LZ/TZ, file formats) | real KiCad files, tests |
 | Isolation routing, multi-pass, depth passes | simulator run, tests |
-| Drilling with peck cycles and breakthrough | G-code inspected, tests |
+| Drilling with peck cycles and breakthrough | simulator run, tests |
 | Outline cut with tabs and breakthrough | G-code inspected, tests |
-| Solder mask UV exposure toolpaths | implemented, not exercised |
+| Solder mask UV exposure toolpaths | simulator run, G-code inspected |
 | Autolevel: probe grid, interpolation, Z correction, drift check | simulator run, tests |
-| Leveled G-code bound to the work zero it was probed with | tests |
-| Double-sided alignment via probed holes | implemented, not exercised |
-| Tool change (M6) and program pause (M0) with confirmation | implemented, not exercised |
-| 2D/3D workspace view | 2D seen in simulator run |
+| Leveled G-code bound to work zero and board side | simulator run, tests |
+| Double-sided alignment via probed holes | simulator run (offset and rotated holes), tests |
+| Program pause (M0) and tool change (M6) with confirmation | simulator run (M0), tests (M0, M6) |
+| 2D/3D workspace view | simulator run, JS test for fit view |
 | German translation, translation guard test | tests |
 | Development container (`docker/`) | image build |
 
@@ -39,8 +40,6 @@ autolevel and streaming out, without an external CAM tool.
 
 - First run on the real machine: jog directions, probe wiring, a test cut on
   scrap board, then a real board.
-- Exercise the parts marked "not exercised" above in the simulator, then on
-  the machine.
 - Camera support for fiducial alignment (original phase 4 idea).
 - Tool and material presets (feeds, speeds, depths per tool).
 - Job queue across operations (today each operation is sent on its own).
