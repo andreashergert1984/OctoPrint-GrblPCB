@@ -86,6 +86,10 @@ class PCBLayer:
     width: float = 0.0
     height: float = 0.0
     parsed: bool = False
+    # Drill files: routed slot commands the parser cannot turn into holes
+    unsupported_slots: int = 0
+    # Drill files: G85 slots turned into rows of overlapping holes
+    drilled_slots: int = 0
     # SVG preview (base64 or path)
     svg_preview: str = ""
 
@@ -101,6 +105,8 @@ class PCBLayer:
             "width": self.width,
             "height": self.height,
             "parsed": self.parsed,
+            "unsupported_slots": self.unsupported_slots,
+            "drilled_slots": self.drilled_slots,
         }
 
     @classmethod
@@ -118,6 +124,13 @@ class DrillInfo:
     diameter: float  # mm
     holes: list  # list of (x, y) tuples
     count: int = 0
+    # Drilled slots: (first index, number of holes) into ``holes``. These
+    # holes overlap and must be drilled in the stored order.
+    slot_runs: list = field(default_factory=list)
+
+    def slot_indices(self) -> set:
+        """Indices of all holes that belong to a slot."""
+        return {i for first, length in self.slot_runs for i in range(first, first + length)}
 
     def to_dict(self) -> dict:
         return {
@@ -125,6 +138,7 @@ class DrillInfo:
             "diameter": self.diameter,
             "holes": self.holes,
             "count": self.count,
+            "slot_runs": self.slot_runs,
         }
 
 
@@ -324,8 +338,15 @@ class PCBProject:
         project_dir = self.get_project_dir(base_dir)
         os.makedirs(project_dir, exist_ok=True)
         filepath = os.path.join(project_dir, "project.json")
-        with open(filepath, "w") as f:
+        # Write next to the file and swap it in: a crash or a full disk in
+        # the middle of writing must not destroy the project (the file
+        # holds the G-code and the height map)
+        tmp_path = filepath + ".tmp"
+        with open(tmp_path, "w") as f:
             json.dump(self.to_dict(include_gcode=True), f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, filepath)
         _logger.info(f"Project saved: {filepath}")
 
     @classmethod
@@ -370,6 +391,7 @@ class PCBProject:
                 diameter=drill_data["diameter"],
                 holes=drill_data["holes"],
                 count=drill_data.get("count", len(drill_data["holes"])),
+                slot_runs=[tuple(run) for run in drill_data.get("slot_runs", [])],
             ))
 
         # Restore operations

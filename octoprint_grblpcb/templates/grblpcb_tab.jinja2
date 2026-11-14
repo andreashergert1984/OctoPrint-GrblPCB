@@ -64,6 +64,7 @@
                 <div class="grblpcb-status-row">
                     <span class="grblpcb-state-badge text-muted">{{ _("Not connected") }}</span>
                 </div>
+                <div class="grblpcb-connect-hint">{{ _("To connect: in the Connection panel choose the connection type \"GRBL CNC Connection\" and the port of the mill, then click Connect. The type \"Serial Connection\" is for 3D printers and does not work with GRBL.") }}</div>
                 <!-- /ko -->
             </div>
 
@@ -134,19 +135,19 @@
                         <button class="btn btn-small btn-warning" data-bind="click: unlock, enable: manualAllowed">
                             <i class="fas fa-unlock"></i> {{ _("Unlock") }}
                         </button>
-                        <button class="btn btn-small" data-bind="click: runMachineCheck"
+                        <button class="btn btn-small" data-bind="click: runMachineCheck, enable: isConnected"
                                 title="{{ _('Check that the controller is idle and nothing is running') }}">
                             <i class="fas fa-stethoscope"></i> {{ _("Check") }}
                         </button>
                     </div>
                     <div class="grblpcb-btn-wrap grblpcb-mt-4">
-                        <button class="btn btn-small" data-bind="click: feedHold" title="{{ _('Feed hold: stop the motion, can be resumed') }}">
+                        <button class="btn btn-small" data-bind="click: feedHold, enable: isConnected" title="{{ _('Feed hold: stop the motion, can be resumed') }}">
                             <i class="fas fa-pause"></i> {{ _("Hold") }}
                         </button>
-                        <button class="btn btn-small" data-bind="click: resume" title="{{ _('Resume after a feed hold') }}">
+                        <button class="btn btn-small" data-bind="click: resume, enable: isConnected" title="{{ _('Resume after a feed hold') }}">
                             <i class="fas fa-play"></i> {{ _("Resume") }}
                         </button>
-                        <button class="btn btn-small btn-danger" data-bind="click: softReset"
+                        <button class="btn btn-small btn-danger" data-bind="click: softReset, enable: isConnected"
                                 title="{{ _('Soft reset (Ctrl-X): stops everything at once; in motion the position may be lost') }}">
                             <i class="fas fa-stop"></i> {{ _("Reset") }}
                         </button>
@@ -556,6 +557,17 @@
             <!-- Autolevel Tab Content                                      -->
             <!-- ========================================================== -->
             <div data-bind="visible: activeSubTab() === 'autolevel'">
+                <div class="grblpcb-compact-section grblpcb-guide-inline">
+                    <strong>{{ _("Before probing:") }}</strong>
+                    <ol class="grblpcb-guide-steps">
+                        <li>{{ _("Clamp the board and put the engraving bit into the spindle.") }}</li>
+                        <li>{{ _("Connect the probe: one clip on the copper, one on the bit. Test it by touching them together; the status must show the probe pin.") }}</li>
+                        <li>{{ _("Jog to the lower left corner of the board and set X and Y to zero.") }}</li>
+                        <li>{{ _("Probe Z on the copper and set Z to zero (Machine tab).") }}</li>
+                    </ol>
+                    {{ _("The run touches the copper at every grid point and stores the heights. Leveled G-code then follows the real surface, so the cut is equally deep everywhere.") }}
+                </div>
+
                 <!-- Probe Grid Setup -->
                 <div class="grblpcb-compact-section">
                     <h4><i class="fas fa-th"></i> {{ _("Probe Grid") }}</h4>
@@ -636,7 +648,8 @@
                 <div class="grblpcb-compact-section">
                     <h4><i class="fas fa-list"></i> {{ _("Operations") }}</h4>
                     <div data-bind="visible: projectOperations().length === 0">
-                        <small class="grblpcb-text-muted">{{ _("No operations yet. Generate G-code in PCB Project tab.") }}</small>
+                        <small class="grblpcb-text-muted">{{ _("No operations yet. Generate the toolpaths first:") }}</small>
+                        <button class="btn btn-small" data-bind="click: function() { switchTab('pcb'); }"><i class="fas fa-arrow-left"></i> {{ _("Go to the Board tab") }}</button>
                     </div>
 
                     <!-- Execution Progress Panel -->
@@ -843,6 +856,11 @@
         <!-- Main Canvas Workspace (always visible) -->
         <div class="grblpcb-workspace-canvas-container">
             <canvas id="grblpcb-workspace-canvas"></canvas>
+
+            <button class="btn btn-small grblpcb-wide-toggle" data-bind="click: toggleWideView, css: { active: wideView }"
+                    title="{{ _('Wide view: use the whole page width for the workspace and hide the OctoPrint side panels') }}">
+                <i class="fas" data-bind="css: { 'fa-expand-alt': !wideView(), 'fa-compress-alt': wideView() }"></i>
+            </button>
 
             <button class="btn btn-small grblpcb-sidebar-toggle" data-bind="click: toggleWorkspaceSidebar"
                     title="{{ _('Show or hide the control panel') }}">

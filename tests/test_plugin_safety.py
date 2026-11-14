@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Safety and validation tests for plugin API handlers."""
 
-import threading
 
 from flask import Flask
 from flask_babel import Babel
@@ -167,35 +166,6 @@ class TestPluginSafety:
 
         assert dest.endswith("board_1.gtl")
 
-    def test_safe_pause_before_manual_intervention_retracts_and_stops_spindle(self):
-        class CommStub:
-            def __init__(self):
-                self.sent = []
-
-            def send_command(self, line):
-                self.sent.append(line)
-
-        class DummyPrinter:
-            def __init__(self):
-                self._comm = CommStub()
-                self._plugin_settings = None
-                self._stream_stop = threading.Event()
-
-            def _wait_response(self, timeout=5.0):
-                return ("ok", None, None)
-
-            def _safe_pause_before_manual_intervention(self):
-                if self._comm is None:
-                    return
-                self._comm.send_command("G90")
-                self._comm.send_command("G1 Z5.000 F120")
-                self._comm.send_command("M5")
-
-        printer = DummyPrinter()
-        printer._safe_pause_before_manual_intervention()
-
-        assert printer._comm.sent[:3] == ["G90", "G1 Z5.000 F120", "M5"]
-
     def test_machine_check_reports_ready_state(self):
         connector = _ConnectorStub(streaming=False, state="Idle")
         self.plugin._get_grbl_connector = lambda: connector
@@ -318,6 +288,7 @@ class TestManualCommandsDuringJob:
         self.app = Flask(__name__)
         Babel(self.app)
         self.plugin = GrblPcbPlugin()
+        self.plugin._user_can = lambda permission: True
 
     def _jog(self, connector):
         self.plugin._get_grbl_connector = lambda: connector

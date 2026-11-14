@@ -16,6 +16,7 @@ from typing import Any
 
 from octoprint.printer import (
     ConnectedPrinterCapabilities,
+    ErrorInformation,
     FirmwareInformation,
 )
 from octoprint.printer.connection import (
@@ -25,6 +26,15 @@ from octoprint.printer.connection import (
 from octoprint.printer.job import PrintJob
 
 from .grbl_comm import GrblComm, grbl_serial_list
+
+
+class _StreamAbort(Exception):
+    """Ends a running job: stopped by the user or failed for ``reason``."""
+
+    def __init__(self, reason: str, **info):
+        super().__init__(reason)
+        self.reason = reason
+        self.info = dict(info, reason=reason)
 
 
 class ConnectedGrblPrinter(ConnectedPrinter):
@@ -43,6 +53,13 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         temperature_offsets=False,  # GRBL doesn't have temperatures
     )
     
+    # Defaults for state that __init__ sets per instance
+    _status_seq = 0
+    _link_lost = False
+    _stream_error_count = 0
+    _stream_failure = None
+    _stream_notes: dict = {}
+
     # Injected by plugin
     _event_bus = None
     _file_manager = None
@@ -98,6 +115,16 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         self._stream_start_time = 0
         self._tool_change_event = threading.Event()
         self._paused_for_intervention = threading.Event()
+        self._stream_notes = {}
+        self._stream_error_count = 0
+        self._stream_failure = None
+        # (line index, bytes) of lines sent but not yet answered by GRBL
+        self._stream_pending = []
+        # Held while a line is sent, so a stop never races with one more line
+        self._stream_send_lock = threading.Lock()
+        # Counts status reports: lets waiters tell a fresh report from an old one
+        self._status_seq = 0
+        self._link_lost = False
         
         self._logger = logging.getLogger(__name__)
     
@@ -131,22 +158,26 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                 response_callback=self._on_grbl_response,
                 error_callback=self._on_grbl_error,
                 alarm_callback=self._on_grbl_alarm,
+                disconnect_callback=self._on_connection_lost,
             )
+            self._link_lost = False
             self._comm.connect()
             
             # Wait for GRBL to wake up and send banner
-            time.sleep(2)
+            time.sleep(self.WAKE_UP_DELAY)
             
             # Send soft reset and get status
             self._comm.soft_reset()
             time.sleep(0.5)
-            self._comm.request_status()
+            self._await_first_status()
+            # Travel and homing settings for the pre-flight check
+            self._comm.send_command("$$")
             
             # Set firmware info
             self.firmware_info = FirmwareInformation(
                 name="GRBL",
                 data={
-                    "FIRMWARE_NAME": "GRBL",
+                    "FIRMWARE_NAME": self._comm.banner or "GRBL",
                     "port": self._port,
                     "baudrate": self._baudrate,
                 }
@@ -162,13 +193,71 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         except Exception as e:
             self._logger.error(f"Failed to connect to GRBL: {e}")
             self.state = ConnectedPrinterState.ERROR
-            self._comm = None
+            comm, self._comm = self._comm, None
+            if comm is not None:
+                # Do not keep the port open: the next attempt needs it
+                try:
+                    comm.disconnect()
+                except Exception:
+                    self._logger.debug("Closing the port after a failed connect failed", exc_info=True)
             raise
+
+    WAKE_UP_DELAY = 2.0  # seconds; boards with a bootloader reset on connect
+    FIRST_STATUS_TIMEOUT = 3.0
+
+    def _await_first_status(self):
+        """
+        Make sure a GRBL controller answers on this port.
+
+        Without this check a wrong port or baud rate looked "Operational"
+        and every command went nowhere.
+        """
+        seq = self._status_seq
+        deadline = time.monotonic() + self.FIRST_STATUS_TIMEOUT
+        while time.monotonic() < deadline:
+            self._comm.request_status()
+            time.sleep(0.1)
+            if self._status_seq > seq:
+                return
+        raise ConnectionError(gettext(
+            "No GRBL status report on %(port)s at %(baudrate)s baud. Check the port and the baud rate."
+        ) % {"port": self._port, "baudrate": self._baudrate})
+
+    def _on_connection_lost(self, reason: str):
+        """The serial port died (cable pulled, controller reset its USB)."""
+        self._logger.error(f"Connection to GRBL lost: {reason}")
+        self._link_lost = True
+        self._stream_stop.set()
+        self._tool_change_event.set()
+        self._stop_polling.set()
+        comm, self._comm = self._comm, None
+        if comm is not None:
+            try:
+                comm.disconnect()
+            except Exception:
+                self._logger.debug("Closing the lost port failed", exc_info=True)
+        self._z_zeroed = False
+        self._grbl_state = "Unknown"
+        self.error_info = ErrorInformation(
+            error=gettext("Connection to GRBL lost"),
+            reason=reason,
+            consequence=gettext("The position and the work zero may be lost. Reconnect, home or check the zero before milling."),
+        )
+        self.state = ConnectedPrinterState.CLOSED_WITH_ERROR
+        if self._plugin_manager:
+            self._plugin_manager.send_plugin_message(
+                "grblpcb", {"type": "connection_lost", "message": reason}
+            )
     
     def disconnect(self, *args, **kwargs):
         """Disconnect from GRBL controller."""
         self._logger.info("Disconnecting from GRBL")
-        
+
+        # A running job must not outlive the connection
+        if self.is_streaming():
+            self.stop_streaming()
+            self._stream_thread.join(timeout=2.0)
+
         self._stop_status_polling()
         
         if self._comm is not None:
@@ -222,6 +311,7 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         """Handle GRBL status update."""
         was_alarm = self._grbl_state == "Alarm"
         self._grbl_state = status.get("state", "Unknown")
+        self._status_seq += 1
         if was_alarm != (self._grbl_state == "Alarm"):
             # Refresh OctoPrint's state text (see get_state_string)
             self._listener.on_printer_state_changed(self.state)
@@ -300,6 +390,39 @@ class ConnectedGrblPrinter(ConnectedPrinter):
     # Command Interface
     # -------------------------------------------------------------------------
     
+    def travel_limits(self):
+        """
+        Machine travel from GRBL's settings, or None if they are unknown.
+
+        ``homing`` tells whether machine coordinates mean anything: without
+        a homing cycle GRBL counts from wherever it was switched on.
+        """
+        settings = self._comm.settings if self._comm is not None else {}
+        try:
+            travel = {axis: float(settings[number]) for axis, number in (("x", 130), ("y", 131), ("z", 132))}
+        except (KeyError, ValueError):
+            return None
+        return {
+            "travel": travel,
+            "homing": settings.get(22, "0") not in ("0", ""),
+            "soft_limits": settings.get(20, "0") not in ("0", ""),
+        }
+
+    def _reject_during_job(self, what: str) -> bool:
+        """
+        True (and a log line) if a manual command must not go out now.
+
+        OctoPrint's terminal and control tab end up here as well. A line
+        mixed into a running job moves the machine in the middle of a cut
+        and breaks the character counting of the stream.
+        """
+        if self.accepts_manual_commands():
+            return False
+        self._listener.on_printer_logs(
+            f"!!! {what} " + gettext("not sent: a job is running. Wait for a pause or stop the job.")
+        )
+        return True
+
     def commands(self, *commands, tags=None, force=False, **kwargs):
         """Send G-code commands to GRBL."""
         if self._comm is None:
@@ -307,6 +430,9 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         
         if len(commands) == 1 and isinstance(commands[0], (list, tuple)):
             commands = commands[0]
+
+        if self._reject_during_job(", ".join(str(c) for c in commands)):
+            return
         
         for command in commands:
             self._listener.on_printer_logs(f">>> {command}")
@@ -327,6 +453,8 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         
         mode = "G91" if relative else "G90"
         jog_cmd = f"$J={mode} G21 {' '.join(parts)} F{speed}"
+        if self._reject_during_job(jog_cmd):
+            return
         
         self._listener.on_printer_logs(f">>> {jog_cmd}")
         self._comm.send_command(jog_cmd)
@@ -337,6 +465,8 @@ class ConnectedGrblPrinter(ConnectedPrinter):
             return
         
         # GRBL homes all axes with $H
+        if self._reject_during_job("$H"):
+            return
         self._comm.send_command("$H")
     
     # -------------------------------------------------------------------------
@@ -480,15 +610,42 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         self._stream_thread.start()
         return True
     
+    HOLD_TIMEOUT = 3.0  # seconds to wait for the machine to stand still
+
     def stop_streaming(self):
-        """Stop the current G-code stream."""
-        self._stream_stop.set()
-        if self._comm:
-            self._comm.feed_hold()
-            time.sleep(0.1)
-            self._comm.soft_reset()
+        """Stop the current G-code stream and the machine."""
+        with self._stream_send_lock:
+            self._stream_stop.set()
         self._tool_change_event.set()  # unblock any waiting tool change
-    
+        self._halt_machine()
+
+    def _halt_machine(self):
+        """
+        Feed hold, wait until the axes stand still, then soft reset.
+
+        A reset while the axes still move makes GRBL drop the step pulses:
+        ALARM:3, the position is lost and the board has to be zeroed again.
+        After a completed hold the reset keeps the position.
+        """
+        comm = self._comm
+        if comm is None:
+            return
+        try:
+            seq = self._status_seq
+            comm.feed_hold()
+            deadline = time.monotonic() + self.HOLD_TIMEOUT
+            while time.monotonic() < deadline:
+                comm.request_status()
+                time.sleep(0.05)
+                # Two reports later the state certainly reflects the hold
+                if self._status_seq >= seq + 2 and self._grbl_state in ("Hold:0", "Idle", "Alarm", "Door:0"):
+                    break
+            else:
+                self._logger.warning("Machine did not confirm the feed hold in time; resetting anyway")
+            comm.soft_reset()
+        except OSError as e:
+            self._logger.error(f"Could not halt the machine: {e}")
+
     def pause_streaming(self):
         """Pause G-code streaming."""
         self._stream_pause.set()
@@ -524,10 +681,12 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         }
 
     def _safe_pause_before_manual_intervention(self):
-        """Put machine in a safer state before waiting for operator input."""
-        if self._comm is None:
-            return
+        """
+        Tool up and spindle off before the user works on the machine.
 
+        Returns only when GRBL reports Idle: the user is asked to change
+        the tool once nothing moves any more.
+        """
         safe_z = 5.0
         z_feed = 120.0
         if self._plugin_settings is not None:
@@ -538,122 +697,173 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                 pass
 
         # Force absolute mode so the retract move cannot be interpreted relative.
-        self._comm.send_command("G90")
-        self._comm.send_command(f"G1 Z{safe_z:.3f} F{z_feed:.0f}")
-        self._comm.send_command("M5")
+        for command in ("G90", f"G1 Z{safe_z:.3f} F{z_feed:.0f}", "M5"):
+            self._send_counted(command, None)
+        self._drain()
+        self._wait_idle()
 
-        # Consume best-effort acknowledgements for the 3 safety commands.
-        for _ in range(3):
-            resp = self._wait_response(timeout=2.0)
-            if resp is None:
-                break
-            if resp[0] == "alarm":
-                self._stream_stop.set()
-                break
+    # ----- sending with character counting --------------------------------
+
+    RX_BUFFER_SIZE = 127  # GRBL's serial RX buffer holds 128 bytes
+    LINK_TIMEOUT = 5.0  # seconds without a byte from GRBL (status is polled 4x/s)
+
+    def _stream_comm(self) -> GrblComm:
+        """The connection, or abort the job if it is gone."""
+        comm = self._comm
+        if comm is None or self._link_lost:
+            raise _StreamAbort("connection_lost")
+        return comm
+
+    def _check_stop(self):
+        if self._stream_stop.is_set():
+            raise _StreamAbort("connection_lost" if self._link_lost else "stopped")
+
+    def _take_response(self, resp):
+        """Account one answer of GRBL; errors and alarms end the job."""
+        kind = resp[0]
+        if kind == "ok":
+            if self._stream_pending:
+                self._stream_pending.pop(0)
+        elif kind == "error":
+            line_index = self._stream_pending.pop(0)[0] if self._stream_pending else None
+            self._stream_error_count += 1
+            self._logger.error(f"GRBL error {resp[1]} ({resp[2]}) at line index {line_index}")
+            raise _StreamAbort("grbl_error", code=resp[1], message=resp[2], line_index=line_index)
+        elif kind == "alarm":
+            self._logger.error(f"ALARM during stream: {resp[2]}")
+            raise _StreamAbort("alarm", code=resp[1], message=resp[2])
+
+    def _pump(self, timeout: float = 0.0) -> bool:
+        """
+        Handle the answers GRBL sent: all that are waiting; with ``timeout``
+        wait that long for the first one. Returns False if none came.
+        """
+        responses = self._stream_comm()._response_queue
+        try:
+            resp = responses.get(timeout=timeout) if timeout > 0 else responses.get_nowait()
+        except queue.Empty:
+            if timeout > 0 and self._stream_comm().seconds_since_rx() > self.LINK_TIMEOUT:
+                raise _StreamAbort("connection_lost") from None
+            return False
+        while True:
+            self._take_response(resp)
+            try:
+                resp = responses.get_nowait()
+            except queue.Empty:
+                return True
+
+    def _send_counted(self, line: str, line_index):
+        """Send one line as soon as GRBL's RX buffer has room for it."""
+        cmd_len = len(line) + 1  # +1 for newline
+        # Look at the answers before every line: an error or alarm is
+        # noticed at once, not only when the buffer is full
+        self._pump()
+        while self._stream_pending and (
+            sum(length for _, length in self._stream_pending) + cmd_len > self.RX_BUFFER_SIZE
+        ):
+            self._check_stop()
+            self._pump(timeout=0.25)
+        with self._stream_send_lock:
+            self._check_stop()
+            self._stream_comm().send_command(line)
+        self._stream_pending.append((line_index, cmd_len))
+
+    def _drain(self):
+        """Wait until GRBL answered every line sent so far."""
+        while self._stream_pending:
+            self._check_stop()
+            self._pump(timeout=0.25)
+
+    def _wait_idle(self):
+        """
+        Wait until the machine has finished moving.
+
+        "ok" only means GRBL took a line into its planner; the motion comes
+        later. Wait for two fresh status reports so an old "Idle" from
+        before the last line does not count.
+        """
+        seq = self._status_seq
+        while True:
+            self._check_stop()
+            self._pump(timeout=0.1)
+            if self._grbl_state == "Alarm":
+                raise _StreamAbort("alarm")
+            if self._status_seq >= seq + 2 and self._grbl_state == "Idle":
+                return
 
     def _stream_loop(self, operation_name: str):
         """
         Background thread: stream G-code using GRBL character-counting protocol.
-        
+
         GRBL has a 128-byte serial RX buffer. We track how many bytes we've sent
         and wait for 'ok' responses to free buffer space before sending more.
+
+        The job ends as "completed" (every line done, machine idle),
+        "stopped" (by the user) or "failed": a GRBL error or alarm, or a lost
+        connection. After an error the machine is halted, because the
+        rejected line may have been the retract before a travel move.
         """
-        
-        RX_BUFFER_SIZE = 127
-        buffer_fill = 0  # bytes currently in GRBL's RX buffer
-        sent_lengths = []  # lengths of commands sent but not yet acknowledged
-        
-        self._comm._stream_mode = True
-        # Drain any stale responses
-        while not self._comm._response_queue.empty():
-            try:
-                self._comm._response_queue.get_nowait()
-            except queue.Empty:
-                break
-        
-        self.state = ConnectedPrinterState.PRINTING
+        comm = self._comm
+        comm.begin_capture()
+        self._stream_pending = []
         self._stream_error_count = 0
+        self._stream_failure = None
+
+        self.state = ConnectedPrinterState.PRINTING
         self._send_stream_progress("started", operation_name)
-        
+
+        outcome = "completed"
         try:
             for i, line in enumerate(self._stream_lines):
-                if self._stream_stop.is_set():
-                    break
-                
                 # Handle pause
                 while self._stream_pause.is_set() and not self._stream_stop.is_set():
                     time.sleep(0.1)
-                
-                if self._stream_stop.is_set():
-                    break
-                
+                self._check_stop()
+
                 # M6 tool change and M0 program pause: neither goes to GRBL
                 # (it rejects M6); the user works on the machine and confirms
                 pause_status = self._pause_kind(line)
                 if pause_status:
-                    self._drain_buffer(sent_lengths, buffer_fill)
-                    buffer_fill = 0
-                    sent_lengths = []
+                    self._drain()
                     self._safe_pause_before_manual_intervention()
                     if not self._pause_for_intervention(pause_status, operation_name, i):
-                        break
+                        self._check_stop()
+                        raise _StreamAbort("stopped")
+                    self._stream_current_line = i + 1
                     continue
-                
-                cmd_len = len(line) + 1  # +1 for newline
-                
-                # Wait until there's room in the buffer
-                while (buffer_fill + cmd_len) > RX_BUFFER_SIZE:
-                    if self._stream_stop.is_set():
-                        break
-                    resp = self._wait_response(timeout=5.0)
-                    if resp is None:
-                        continue
-                    if resp[0] == "ok" and sent_lengths:
-                        buffer_fill -= sent_lengths.pop(0)
-                    elif resp[0] == "error":
-                        self._logger.error(f"GRBL error at line {i}: {resp[1]} {resp[2]}")
-                        self._stream_error_count += 1
-                        if sent_lengths:
-                            buffer_fill -= sent_lengths.pop(0)
-                        # Continue execution despite single-line errors
-                    elif resp[0] == "alarm":
-                        self._logger.error(f"ALARM during stream: {resp[2]}")
-                        self._stream_stop.set()
-                        break
-                
-                if self._stream_stop.is_set():
-                    break
-                
-                # Send the command
-                self._comm.send_command(line)
-                sent_lengths.append(cmd_len)
-                buffer_fill += cmd_len
+
+                self._send_counted(line, i)
                 self._stream_current_line = i + 1
-                
+
                 # Send progress every 10 lines or on last line
                 if (i + 1) % 10 == 0 or i == self._stream_total_lines - 1:
                     self._send_stream_progress("progress", operation_name, line_num=i + 1)
-            
-            # Drain remaining responses
-            self._drain_buffer(sent_lengths, buffer_fill)
-            
-        except Exception as e:
-            self._logger.error(f"Stream error: {e}")
-            import traceback
-            self._logger.debug(traceback.format_exc())
-        finally:
-            self._comm._stream_mode = False
-            self.state = ConnectedPrinterState.OPERATIONAL
-            
-            error_count = getattr(self, "_stream_error_count", 0)
-            if error_count > 0:
-                self._logger.warning(f"Stream finished with {error_count} GRBL errors")
-            
-            if self._stream_stop.is_set():
-                self._send_stream_progress("stopped", operation_name)
+
+            self._drain()
+            self._wait_idle()
+
+        except _StreamAbort as abort:
+            if abort.reason == "stopped":
+                outcome = "stopped"
             else:
-                self._send_stream_progress("completed", operation_name)
-    
+                outcome = "failed"
+                self._stream_failure = abort.info
+                if abort.reason == "grbl_error":
+                    self._halt_machine()
+        except Exception as e:
+            self._logger.exception("Stream error")
+            outcome = "failed"
+            lost = isinstance(e, OSError) or self._link_lost
+            self._stream_failure = {
+                "reason": "connection_lost" if lost else "internal_error",
+                "message": str(e),
+            }
+        finally:
+            comm.end_capture()
+            if self._comm is not None and not self._link_lost:
+                self.state = ConnectedPrinterState.OPERATIONAL
+            self._send_stream_progress(outcome, operation_name, line_num=self._stream_current_line)
+
     SETTLE_QUIET = 0.5  # seconds without responses before streaming resumes
 
     @staticmethod
@@ -717,7 +927,7 @@ class ConnectedGrblPrinter(ConnectedPrinter):
             if self._grbl_state == "Alarm":
                 return False
             try:
-                self._comm._response_queue.get(timeout=0.1)
+                self._stream_comm()._response_queue.get(timeout=0.1)
                 quiet_since = time.time()
                 continue
             except queue.Empty:
@@ -729,26 +939,6 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                 self._send_stream_progress("waiting_for_idle", "", line_num=self._stream_current_line)
                 reported = True
 
-    def _wait_response(self, timeout: float = 5.0):
-        """Wait for a response from the GRBL response queue."""
-        try:
-            return self._comm._response_queue.get(timeout=timeout)
-        except queue.Empty:
-            return None
-    
-    def _drain_buffer(self, sent_lengths, buffer_fill):
-        """Wait for all sent commands to be acknowledged."""
-        while sent_lengths:
-            if self._stream_stop.is_set():
-                break
-            resp = self._wait_response(timeout=10.0)
-            if resp is None:
-                continue
-            if resp[0] in ("ok", "error") and sent_lengths:
-                sent_lengths.pop(0)
-            elif resp[0] == "alarm":
-                break
-    
     def _send_stream_progress(self, status: str, operation_name: str, line_num: int = 0):
         """Send streaming progress to the frontend via plugin message."""
         elapsed = time.time() - self._stream_start_time if self._stream_start_time else 0
@@ -774,11 +964,28 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                     "percent": percent,
                     "elapsed": round(elapsed, 1),
                     "eta": round(eta, 1),
-                    "errors": getattr(self, "_stream_error_count", 0),
-                    "note": getattr(self, "_stream_notes", {}).get(line_num, ""),
+                    "errors": self._stream_error_count,
+                    "note": self._stream_notes.get(line_num, ""),
                     "command": self._stream_lines[line_num] if status in ("tool_change", "pause") and line_num < len(self._stream_lines) else "",
+                    **self._failure_details(status),
                 }
             )
+
+    def _failure_details(self, status: str) -> dict:
+        """What went wrong, for the "failed" message to the frontend."""
+        if status != "failed" or not self._stream_failure:
+            return {}
+        failure = self._stream_failure
+        details = {
+            "reason": failure.get("reason", ""),
+            "error_code": failure.get("code"),
+            "error_message": failure.get("message", ""),
+        }
+        line_index = failure.get("line_index")
+        if line_index is not None and line_index < len(self._stream_lines):
+            details["failed_line"] = line_index + 1
+            details["failed_command"] = self._stream_lines[line_index]
+        return details
     
     def pause_print(self, user=None, tags=None, *args, **kwargs):
         """Pause milling."""

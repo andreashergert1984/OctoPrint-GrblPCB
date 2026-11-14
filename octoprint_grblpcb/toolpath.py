@@ -143,22 +143,36 @@ def _order_rings(rings: list[list[tuple]], start=(0.0, 0.0)) -> list[list[tuple]
     """
     Visit closed rings nearest-first and start each at the vertex closest
     to where the tool is, to cut down travel moves.
+
+    All vertices live in one numpy array, so each step is a single vector
+    operation: boards with thousands of contours order in seconds instead
+    of minutes.
     """
+    import numpy as np
+
     remaining = [r[:-1] if r[0] == r[-1] else list(r) for r in rings]
+    remaining = [r for r in remaining if r]
+    if not remaining:
+        return []
+    points = np.array([p[:2] for ring in remaining for p in ring], dtype=float)
+    lengths = [len(ring) for ring in remaining]
+    offsets = np.concatenate(([0], np.cumsum(lengths)))
+    owner = np.repeat(np.arange(len(remaining)), lengths)
+    open_vertex = np.ones(len(points), dtype=bool)
+
     ordered = []
     pos = start
-    while remaining:
-        best = None
-        for ri, ring in enumerate(remaining):
-            for vi, (x, y) in enumerate(ring):
-                d = (x - pos[0]) ** 2 + (y - pos[1]) ** 2
-                if best is None or d < best[0]:
-                    best = (d, ri, vi)
-        _, ri, vi = best
-        ring = remaining.pop(ri)
+    for _ in range(len(remaining)):
+        dist = (points[:, 0] - pos[0]) ** 2 + (points[:, 1] - pos[1]) ** 2
+        dist[~open_vertex] = np.inf
+        nearest = int(np.argmin(dist))
+        ri = int(owner[nearest])
+        vi = nearest - int(offsets[ri])
+        ring = remaining[ri]
         ring = ring[vi:] + ring[:vi]
         ring.append(ring[0])
         ordered.append(ring)
+        open_vertex[offsets[ri]:offsets[ri + 1]] = False
         pos = ring[0]
     return ordered
 
@@ -513,7 +527,19 @@ def generate_drill_gcode(
                 mirror_point(x, y, mirror, (origin_x, origin_y), board_size), (origin_x, origin_y)))
             for x, y in drill.holes
         ]
-        for hx, hy in _optimize_drill_order(holes, pos):
+        # Single holes in the shortest order; the overlapping holes of a
+        # slot afterwards, in the order the parser gave them
+        in_slot = drill.slot_indices() if hasattr(drill, "slot_indices") else set()
+        single = [h for i, h in enumerate(holes) if i not in in_slot]
+        sequence = _optimize_drill_order(single, pos)
+        for first, length in getattr(drill, "slot_runs", []):
+            sequence.append(f"; Slot: {length} overlapping holes")
+            sequence.extend(holes[first:first + length])
+        for hole in sequence:
+            if isinstance(hole, str):
+                lines.append(hole)
+                continue
+            hx, hy = hole
             total_holes += 1
             lines.append(f"G0 X{hx:.4f} Y{hy:.4f}")
             lines.append(settings.z_move(settings.retract_height))
@@ -1116,12 +1142,23 @@ def compute_alignment_transform(
     )
 
 
+_WORD_X = re.compile(r"X([+-]?(?:\d+\.?\d*|\.\d+))", re.IGNORECASE)
+_WORD_Y = re.compile(r"Y([+-]?(?:\d+\.?\d*|\.\d+))", re.IGNORECASE)
+_MOTION_WORD = re.compile(r"G0*([0123])(?![\d.])", re.IGNORECASE)
+
+
 def apply_alignment_transform(gcode: str, transform: AlignmentTransform) -> str:
     """Apply a rigid-body alignment transform to all XY coordinates in G-code.
 
-    Rewrites every X and Y value on G0/G1 lines:
+    Rewrites the X and Y values of G0/G1 moves:
         x' = cos_θ · x − sin_θ · y + tx
         y' = sin_θ · x + cos_θ · y + ty
+
+    A rotation couples the axes: a move that names only X also changes Y.
+    The position is therefore tracked, and every transformed move gets
+    both words. Comments are left alone. Arcs (G2/G3) and relative moves
+    (G91) cannot be transformed this way and raise ValueError instead of
+    producing a wrong path.
     """
     a = transform.cos_theta
     b = transform.sin_theta
@@ -1132,33 +1169,122 @@ def apply_alignment_transform(gcode: str, transform: AlignmentTransform) -> str:
     if abs(b) < 1e-7 and abs(tx) < 1e-5 and abs(ty) < 1e-5 and abs(a - 1.0) < 1e-7:
         return gcode
 
-    x_pat = re.compile(r"X([+-]?\d+\.?\d*)")
-    y_pat = re.compile(r"Y([+-]?\d+\.?\d*)")
-
+    cur_x = cur_y = 0.0
     output = []
     for line in gcode.splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith(";"):
+        code, sep, comment = line.partition(";")
+        if not code.strip() or code.lstrip().startswith("("):
+            output.append(line)
+            continue
+        upper = code.upper()
+        if re.search(r"G91(?![\d.])", upper):
+            raise ValueError("relative moves (G91) cannot be aligned")
+
+        x_match = _WORD_X.search(code)
+        y_match = _WORD_Y.search(code)
+        if not x_match and not y_match:
+            output.append(line)
+            continue
+        motion = _MOTION_WORD.search(code)
+        if motion and motion.group(1) in "23":
+            raise ValueError("arcs (G2/G3) cannot be aligned")
+        if re.search(r"G(?:10|28|30|53|92)(?![\d])", upper):
+            # Offsets and machine coordinates are not positions on the board
             output.append(line)
             continue
 
-        # Only transform lines that have both X and Y (movement commands)
-        x_match = x_pat.search(stripped)
-        y_match = y_pat.search(stripped)
+        if x_match:
+            cur_x = float(x_match.group(1))
+        if y_match:
+            cur_y = float(y_match.group(1))
+        new_x = a * cur_x - b * cur_y + tx
+        new_y = b * cur_x + a * cur_y + ty
 
         if x_match and y_match:
-            old_x = float(x_match.group(1))
-            old_y = float(y_match.group(1))
-            new_x = a * old_x - b * old_y + tx
-            new_y = b * old_x + a * old_y + ty
-            line = x_pat.sub(f"X{new_x:.4f}", line)
-            line = y_pat.sub(f"Y{new_y:.4f}", line)
-        elif x_match and not y_match:
-            # X-only line: we still need to transform but Y is implicit
-            # (carried from previous position). Pass through unchanged —
-            # the caller should ensure full XY is present via subdivision.
-            pass
-
-        output.append(line)
+            code = _WORD_X.sub(f"X{new_x:.4f}", code, count=1)
+            code = _WORD_Y.sub(f"Y{new_y:.4f}", code, count=1)
+        elif x_match:
+            code = _WORD_X.sub(f"X{new_x:.4f} Y{new_y:.4f}", code, count=1)
+        else:
+            code = _WORD_Y.sub(f"X{new_x:.4f} Y{new_y:.4f}", code, count=1)
+        output.append(code + sep + comment)
 
     return "\n".join(output)
+
+
+# =============================================================================
+# Pre-flight: does the job fit the machine?
+# =============================================================================
+
+_WORD_Z = re.compile(r"Z([+-]?(?:\d+\.?\d*|\.\d+))", re.IGNORECASE)
+
+
+def gcode_extent(gcode: str) -> Optional[dict]:
+    """
+    Smallest and largest X, Y and Z a G-code program moves to (work
+    coordinates), as {"x": (min, max), ...}; None if it does not move.
+    Axes the program never names are left out.
+    """
+    extent: dict = {}
+    for line in gcode.splitlines():
+        code = line.partition(";")[0]
+        if not code.strip() or code.lstrip().startswith("("):
+            continue
+        if not _MOTION_WORD.search(code) or re.search(r"G(?:10|28|30|53|92)(?![\d])", code, re.IGNORECASE):
+            continue
+        for axis, pattern in (("x", _WORD_X), ("y", _WORD_Y), ("z", _WORD_Z)):
+            match = pattern.search(code)
+            if match:
+                value = float(match.group(1))
+                low, high = extent.get(axis, (value, value))
+                extent[axis] = (min(low, value), max(high, value))
+    return extent or None
+
+
+def travel_check(extent: dict, limits: dict, work_offset: dict, machine_pos: dict) -> list[dict]:
+    """
+    Compare the extent of a job with the travel of the machine.
+
+    ``limits`` comes from ConnectedGrblPrinter.travel_limits(). Two checks:
+
+    - "job_larger_than_travel": the job spans more than the axis can travel
+      at all. Independent of homing.
+    - "job_outside_travel": with homing enabled the machine coordinates are
+      known, so the job can be placed: GRBL's travel runs from the homed end
+      in one direction, 0 to -travel by default, 0 to +travel on builds that
+      set the origin at the other end. Which one applies is read from the
+      sign of the current machine position; if the machine stands exactly
+      at its origin the placement cannot be judged and is skipped.
+
+    Returns a list of warning dicts with ``code``, ``axis`` and ``by`` (mm).
+    """
+    tolerance = 0.01
+    warnings = []
+    for axis in ("x", "y", "z"):
+        if axis not in extent:
+            continue
+        low, high = extent[axis]
+        travel = limits["travel"].get(axis, 0.0)
+        if travel <= 0:
+            continue
+        if high - low > travel + tolerance:
+            warnings.append({
+                "code": "job_larger_than_travel", "axis": axis.upper(),
+                "by": round(high - low - travel, 2),
+            })
+            continue
+        if not limits.get("homing"):
+            continue
+        offset = work_offset.get(axis, 0.0)
+        m_low, m_high = low + offset, high + offset
+        position = machine_pos.get(axis, 0.0)
+        if position < -tolerance:
+            allowed = (-travel, 0.0)
+        elif position > tolerance:
+            allowed = (0.0, travel)
+        else:
+            continue
+        over = max(allowed[0] - m_low, m_high - allowed[1])
+        if over > tolerance:
+            warnings.append({"code": "job_outside_travel", "axis": axis.upper(), "by": round(over, 2)})
+    return warnings

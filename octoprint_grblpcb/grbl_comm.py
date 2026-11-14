@@ -124,6 +124,7 @@ class GrblComm:
     # Status report: <State|Field:values|...>, fields in any order
     STATUS_PATTERN = re.compile(r"<([^>]*)>")
 
+    SETTING_PATTERN = re.compile(r"^\$(\d+)=([^\s(]+)")
     ERROR_PATTERN = re.compile(r"error:(\d+)")
     ALARM_PATTERN = re.compile(r"ALARM:(\d+)")
     
@@ -135,6 +136,7 @@ class GrblComm:
         response_callback: Optional[Callable[[str], None]] = None,
         error_callback: Optional[Callable[[int, str], None]] = None,
         alarm_callback: Optional[Callable[[int, str], None]] = None,
+        disconnect_callback: Optional[Callable[[str], None]] = None,
     ):
         self._port = port
         self._baudrate = baudrate
@@ -144,7 +146,16 @@ class GrblComm:
         self._response_callback = response_callback
         self._error_callback = error_callback
         self._alarm_callback = alarm_callback
-        
+        self._disconnect_callback = disconnect_callback
+
+        # time.monotonic() of the last byte received; the sender uses it to
+        # notice a controller that stopped answering
+        self.last_rx = 0.0
+        # Welcome line of the firmware, e.g. "Grbl 1.1h ['$' for help]"
+        self.banner: Optional[str] = None
+        # GRBL settings as reported by "$$": {130: "200.000", ...}
+        self.settings: dict[int, str] = {}
+
         self._lock = threading.Lock()
         self._logger = logging.getLogger(__name__)
         
@@ -181,6 +192,7 @@ class GrblComm:
             # Flush input buffer
             self._serial.reset_input_buffer()
 
+            self.last_rx = time.monotonic()
             self._reader_stop.clear()
             self._reader_thread = threading.Thread(
                 target=self._read_loop, args=(self._serial,), daemon=True
@@ -219,128 +231,128 @@ class GrblComm:
             self._logger.debug(f"Sending: {command}")
             self._serial.write(f"{command}\n".encode("utf-8"))
     
+    def _write_realtime(self, byte: bytes):
+        """Send a single real-time byte; GRBL acts on it at once, without ok."""
+        with self._lock:
+            if self._serial is not None:
+                self._serial.write(byte)
+
     def request_status(self):
         """Send status request (?)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"?")
-    
+        self._write_realtime(b"?")
+
     def feed_hold(self):
         """Send feed hold (!)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"!")
-    
+        self._write_realtime(b"!")
+
     def cycle_resume(self):
         """Send cycle resume (~)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"~")
-    
+        self._write_realtime(b"~")
+
     def soft_reset(self):
         """Send soft reset (Ctrl-X)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x18")
-    
+        self._write_realtime(b"\x18")
+
     def jog_cancel(self):
         """Cancel jog (0x85)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x85")
+        self._write_realtime(b"\x85")
 
     # ----- Real-time override commands (GRBL 1.1) -----
 
     def feed_override_reset(self):
         """Reset feed override to 100% (0x90)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x90")
+        self._write_realtime(b"\x90")
 
     def feed_override_plus10(self):
         """Increase feed override +10% (0x91)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x91")
+        self._write_realtime(b"\x91")
 
     def feed_override_minus10(self):
         """Decrease feed override -10% (0x92)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x92")
+        self._write_realtime(b"\x92")
 
     def feed_override_plus1(self):
         """Increase feed override +1% (0x93)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x93")
+        self._write_realtime(b"\x93")
 
     def feed_override_minus1(self):
         """Decrease feed override -1% (0x94)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x94")
+        self._write_realtime(b"\x94")
 
     def rapid_override_100(self):
         """Set rapid override to 100% (0x95)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x95")
+        self._write_realtime(b"\x95")
 
     def rapid_override_50(self):
         """Set rapid override to 50% (0x96)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x96")
+        self._write_realtime(b"\x96")
 
     def rapid_override_25(self):
         """Set rapid override to 25% (0x97)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x97")
+        self._write_realtime(b"\x97")
 
     def spindle_override_reset(self):
         """Reset spindle override to 100% (0x99)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x99")
+        self._write_realtime(b"\x99")
 
     def spindle_override_plus10(self):
         """Increase spindle override +10% (0x9A)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x9A")
+        self._write_realtime(b"\x9A")
 
     def spindle_override_minus10(self):
         """Decrease spindle override -10% (0x9B)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x9B")
+        self._write_realtime(b"\x9B")
 
     def spindle_override_plus1(self):
         """Increase spindle override +1% (0x9C)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x9C")
+        self._write_realtime(b"\x9C")
 
     def spindle_override_minus1(self):
         """Decrease spindle override -1% (0x9D)."""
-        with self._lock:
-            if self._serial is not None:
-                self._serial.write(b"\x9D")
-    
+        self._write_realtime(b"\x9D")
+
+    # ----- Response capture for senders (job stream, probing) -----
+
+    def begin_capture(self):
+        """Queue ok/error/alarm/probe answers from now on; drop older ones."""
+        self._stream_mode = True
+        self.drain_responses()
+
+    def end_capture(self):
+        self._stream_mode = False
+
+    def drain_responses(self):
+        """Throw away answers still waiting in the queue."""
+        while True:
+            try:
+                self._response_queue.get_nowait()
+            except queue.Empty:
+                return
+
+    def seconds_since_rx(self) -> float:
+        """Seconds since GRBL last sent anything."""
+        return time.monotonic() - self.last_rx
+
     def _read_loop(self, port):
         """Read and dispatch GRBL responses until disconnected."""
         buffer = b""
         while not self._reader_stop.is_set():
             try:
                 # readline() would hand out partial lines on timeout
-                buffer += port.read(port.in_waiting or 1)
+                data = port.read(port.in_waiting or 1)
             except (serial.SerialException, OSError, TypeError) as e:
                 # TypeError: pyserial on a port closed by disconnect()
                 if not self._reader_stop.is_set():
                     self._logger.warning(f"Serial read failed: {e}")
+                    if self._disconnect_callback:
+                        try:
+                            self._disconnect_callback(str(e))
+                        except Exception:
+                            self._logger.exception("Error in disconnect callback")
                 break
+            if data:
+                self.last_rx = time.monotonic()
+            buffer += data
             while b"\n" in buffer:
                 raw, buffer = buffer.split(b"\n", 1)
                 line = raw.decode("utf-8", errors="replace").strip()
@@ -403,6 +415,13 @@ class GrblComm:
                     "success": prb_match.group(4) == "1",
                 }))
         
+        if line.startswith("Grbl "):
+            self.banner = line
+
+        setting = self.SETTING_PATTERN.match(line)
+        if setting:
+            self.settings[int(setting.group(1))] = setting.group(2)
+
         # Pass other responses through
         if self._response_callback:
             self._response_callback(line)

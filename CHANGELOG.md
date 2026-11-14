@@ -7,8 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] — Unreleased
 
+### Changed
+
+- A job now ends as completed, stopped or failed. A GRBL error stops the
+  job and halts the machine instead of sending the remaining lines (the
+  rejected line may have been the retract before a travel move). An alarm
+  or a lost connection is reported as failed, no longer as completed
+- "Completed" and the tool change prompt wait until GRBL reports Idle; `ok`
+  only means a line reached the planner
+- Stopping a job waits for the feed hold to complete before the soft
+  reset, so the position is kept (no ALARM:3)
+- API commands check OctoPrint permissions: Control for everything that
+  moves the machine, file permissions for project changes, Status for reads
+- Connecting fails with a clear message if no GRBL status report arrives
+  (wrong port or baud rate) and closes the port again
+
+- Pre-flight check against the machine travel (GRBL `$130` to `$132`,
+  read on connect): a job larger than the machine, or with homing enabled
+  a job that leaves the travel with the current work zero, raises a
+  warning before the start
+- Manual G-code from OctoPrint's terminal or control tab is no longer mixed
+  into a running job; it is refused with a line in the terminal log
+- Excellon `G85` slots are drilled as rows of overlapping holes (every
+  second hole first); routed paths (`M15`) still only raise a warning
+- Wide view: a button lets the workspace use the whole page width
+- Confirmations use OctoPrint's dialog; setting the X/Y zero asks first
+  when a height map exists; machine buttons are disabled while not
+  connected; the Autolevel tab explains the preparation
+- User interface: the workspace fits the board into view by itself after
+  an upload or when a project loads (it stayed empty until "Fit view" was
+  clicked); labels, the current workflow step and selected buttons are
+  readable (dark grey on colour before); jog keys are larger; a hint tells
+  how to connect while not connected; the empty operations list links to
+  the Board tab
+
 ### Fixed
 
+- The file input was never cleared (wrong element id), so choosing the
+  same files again did not upload them
+- A lost serial connection (cable pulled) is detected: the job fails, the
+  connection goes to "Offline after error" and the user is told
+- Autolevel and alignment probing stop when GRBL rejects a positioning
+  move, instead of probing (or plunging) at the previous position
+- Clear polarity (`%LPC*%`) in Gerber files erases earlier copper instead
+  of being added as copper
+- Alignment transform also rotates moves that name only X or only Y,
+  leaves comments alone and refuses arcs and relative moves
+- `project.json` is written atomically; a crash while saving no longer
+  destroys the project
+- Final job message carries the real line number and 100 %
+- Path ordering for isolation milling is about 40 times faster on boards
+  with many contours (1200 contours: 10 s to 0.25 s)
+- Operation indices from the API are validated (negative or non-integer
+  values were accepted)
+- Drill files with routed slots raise a warning instead of silently
+  drilling a single hole
 - Streaming was throttled to about 15 lines/s because GRBL responses were
   only read by the 4 Hz status poll; a reader thread now handles every
   response as it arrives (about 370 lines/s against the simulator)

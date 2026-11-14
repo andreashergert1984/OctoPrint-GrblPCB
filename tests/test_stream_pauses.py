@@ -50,7 +50,11 @@ def _make_setup(time_scale):
             except OSError:
                 return
             for byte in data:
-                if sim.realtime(byte):
+                try:
+                    is_realtime = sim.realtime(byte)
+                except OSError:
+                    return  # terminal closed
+                if is_realtime:
                     continue
                 if byte == 0x0A:
                     sim.received_bytes(len(buf) + 1)
@@ -76,7 +80,9 @@ def _make_setup(time_scale):
     connector = ConnectedGrblPrinter(None, listener=_Listener(), port=os.ttyname(slave))
     connector._plugin_manager = _PluginManager()
     connector._comm = GrblComm(
-        os.ttyname(slave), status_callback=connector._on_grbl_status
+        os.ttyname(slave),
+        status_callback=connector._on_grbl_status,
+        disconnect_callback=connector._on_connection_lost,
     )
     connector._comm.connect()
     threading.Thread(target=connector._poll_status_loop, daemon=True).start()
@@ -84,10 +90,15 @@ def _make_setup(time_scale):
     def cleanup():
         connector._stop_polling.set()
         stop.set()
-        connector._comm.disconnect()
-        os.close(master)
-        os.close(slave)
+        if connector._comm is not None:
+            connector._comm.disconnect()
+        for fd in (master, slave):
+            try:
+                os.close(fd)
+            except OSError:
+                pass  # a test closed it to simulate a pulled cable
 
+    connector._test_master_fd = master
     return connector, received, sim, cleanup
 
 
@@ -183,3 +194,109 @@ def test_tool_change_note_reaches_the_ui(setup):
     assert not any("M6" in line for line in received)
     connector.confirm_tool_change()
     assert _wait_status(connector, "completed")
+
+
+def _last(connector, status):
+    return [m for m in connector._plugin_manager.messages if m.get("status") == status][-1]
+
+
+def test_grbl_error_fails_the_job_and_halts_the_machine(setup):
+    connector, received = setup
+    # The rejected line could be a retract: nothing after it may run
+    tail = "\n".join(f"G1 X{i} F600" for i in range(2, 40))
+    assert connector.stream_gcode(f"G21\nG90\nG1 X1 F600\nG99\n{tail}\n", operation_name="test")
+    assert _wait_status(connector, "failed")
+    msg = _last(connector, "failed")
+    assert msg["reason"] == "grbl_error" and msg["error_code"] == 20
+    assert msg["failed_line"] == 4 and msg["failed_command"] == "G99"
+    assert not any(m.get("status") == "completed" for m in connector._plugin_manager.messages)
+    assert "G1 X39 F600" not in received
+    assert not connector.is_streaming() or _wait_not_streaming(connector)
+
+
+def _wait_not_streaming(connector, timeout=5.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline and connector.is_streaming():
+        time.sleep(0.02)
+    return not connector.is_streaming()
+
+
+def test_alarm_fails_the_job_instead_of_completing(setup):
+    connector, received = setup
+    # Probe upwards: no contact, ALARM:5
+    assert connector.stream_gcode("G21\nG91\nG38.2 Z1 F100\nG90\nG1 X5 F600\n", operation_name="test")
+    assert _wait_status(connector, "failed")
+    assert _last(connector, "failed")["reason"] == "alarm"
+    assert not any(m.get("status") == "completed" for m in connector._plugin_manager.messages)
+
+
+def test_completed_only_when_the_machine_is_idle():
+    connector, received, sim, cleanup = _make_setup(1.0)
+    try:
+        states = []
+        original = connector._send_stream_progress
+
+        def record(status, *args, **kwargs):
+            if status == "completed":
+                states.append(sim.state)
+            original(status, *args, **kwargs)
+
+        connector._send_stream_progress = record
+        # 10 mm at 1200 mm/min: half a second of motion after the last ok
+        assert connector.stream_gcode("G21\nG90\nG1 X10 F1200\n", operation_name="test")
+        assert _wait_status(connector, "completed", timeout=10)
+        assert states == ["Idle"]
+        msg = _last(connector, "completed")
+        assert msg["percent"] == 100 and msg["current_line"] == 3
+    finally:
+        cleanup()
+
+
+def test_stop_during_motion_keeps_the_position():
+    connector, received, sim, cleanup = _make_setup(1.0)
+    try:
+        assert connector.stream_gcode("G21\nG90\nG1 X100 F600\nG1 X0 F600\n", operation_name="test")
+        deadline = time.time() + 5
+        while sim.state != "Run" and time.time() < deadline:
+            time.sleep(0.02)
+        assert sim.state == "Run"
+        connector.stop_streaming()
+        assert _wait_status(connector, "stopped")
+        # Reset only after the feed hold completed: no ALARM:3
+        deadline = time.time() + 2
+        while sim.state != "Idle" and time.time() < deadline:
+            time.sleep(0.02)
+        assert sim.state == "Idle"
+        assert not any(m.get("type") == "alarm" for m in connector._plugin_manager.messages)
+        assert _last(connector, "stopped")["current_line"] > 0
+    finally:
+        cleanup()
+
+
+def test_lost_connection_fails_the_job():
+    connector, received, sim, cleanup = _make_setup(1.0)
+    try:
+        assert connector.stream_gcode("G21\nG90\nG1 X100 F600\nG1 X0 F600\n", operation_name="test")
+        assert _wait_status(connector, "progress") or _wait_status(connector, "started")
+        os.close(connector._test_master_fd)  # cable pulled
+        assert _wait_status(connector, "failed")
+        assert _last(connector, "failed")["reason"] == "connection_lost"
+        assert any(m.get("type") == "connection_lost" for m in connector._plugin_manager.messages)
+        assert connector._comm is None
+    finally:
+        cleanup()
+
+
+def test_connect_fails_when_nothing_answers(monkeypatch):
+    master, slave = os.openpty()
+    tty.setraw(slave)
+    connector = ConnectedGrblPrinter(None, listener=_Listener(), port=os.ttyname(slave))
+    monkeypatch.setattr(ConnectedGrblPrinter, "WAKE_UP_DELAY", 0.0)
+    monkeypatch.setattr(ConnectedGrblPrinter, "FIRST_STATUS_TIMEOUT", 0.3)
+    try:
+        with pytest.raises(ConnectionError):
+            connector.connect()
+        assert connector._comm is None  # port closed again
+    finally:
+        os.close(master)
+        os.close(slave)

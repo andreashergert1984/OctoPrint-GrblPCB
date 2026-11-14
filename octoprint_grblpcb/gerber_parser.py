@@ -116,16 +116,52 @@ def _extract_geometries(parsed) -> list:
 
     geometries = []
     buf = parsed._command_buffer
+    skipped = 0
 
     for cmd in buf:
         try:
             geom = _command_to_shapely(cmd)
-            if geom is not None and not geom.is_empty:
-                geometries.append(geom)
         except Exception as e:
+            skipped += 1
             _logger.debug(f"Could not convert command {type(cmd).__name__}: {e}")
+            continue
+        if geom is None or geom.is_empty:
+            continue
+        if _is_clear(cmd):
+            # Clear polarity (%LPC*%) erases what was drawn before it, e.g.
+            # clearances cut out of a filled zone. Ignoring it would leave
+            # copper where the board has none: shorts after milling.
+            geometries = _erase(geometries, geom)
+        else:
+            geometries.append(geom)
 
+    if skipped:
+        _logger.warning(
+            f"{skipped} Gerber object(s) could not be converted and are missing from the geometry"
+        )
     return geometries
+
+
+def _is_clear(cmd) -> bool:
+    """True for objects drawn with clear polarity."""
+    polarity = getattr(getattr(cmd, "transform", None), "polarity", None)
+    return getattr(polarity, "name", "") in ("Clear", "ClearRegion")
+
+
+def _erase(geometries: list, eraser) -> list:
+    """Remove the area of ``eraser`` from every geometry."""
+    if not eraser.is_valid:
+        eraser = eraser.buffer(0)
+    result = []
+    for geom in geometries:
+        if geom.intersects(eraser):
+            if not geom.is_valid:
+                geom = geom.buffer(0)
+            geom = geom.difference(eraser)
+            if geom.is_empty:
+                continue
+        result.append(geom)
+    return result
 
 
 def _command_to_shapely(cmd):
@@ -427,6 +463,9 @@ _UNIT_LINE = re.compile(
 # KiCad comments: ;FILE_FORMAT=3:3  and  ; FORMAT={3:3/ absolute / metric / ...}
 _FILE_FORMAT = re.compile(r"^;\s*(?:FILE_FORMAT=|FORMAT=\{)(\d+):(\d+)")
 
+# Slot G85, router up/down M15/M16/M17, routing moves G00-G03
+_ROUTING = re.compile(r"G85|^M1[567]\b|^G0?[0-3](?:X|Y|$)", re.IGNORECASE)
+
 # Integer and decimal digits when the file does not say (KiCad, gerbv)
 _DEFAULT_DIGITS = {"metric": (3, 3), "inch": (2, 4)}
 
@@ -449,12 +488,36 @@ def _excellon_number(text: str, digits: tuple, zeros: Optional[str]) -> float:
     return sign * int(number) / 10 ** dec_digits
 
 
+def _slot_holes(start: tuple, end: tuple, diameter: float) -> list[tuple]:
+    """
+    Hole centres that drill a slot from ``start`` to ``end``.
+
+    The holes are at most half a diameter apart, which leaves a scallop of
+    about 7 % of the diameter on the slot walls. Order: first every second
+    hole, then the ones in between. That way the first round drills into
+    full material on both sides and the drill is not pushed sideways into a
+    neighbouring hole.
+    """
+    length = math.hypot(end[0] - start[0], end[1] - start[1])
+    if length < 1e-6 or diameter <= 0:
+        return [start]
+    steps = max(1, math.ceil(length / (diameter / 2.0)))
+    if steps % 2:
+        steps += 1  # an even count puts both slot ends into the first round
+    points = [
+        (start[0] + (end[0] - start[0]) * i / steps, start[1] + (end[1] - start[1]) * i / steps)
+        for i in range(steps + 1)
+    ]
+    return points[0::2] + points[1::2]
+
+
 @dataclass
 class ExcellonTool:
     """A drill tool definition."""
     number: int
     diameter: float  # mm
     holes: list = field(default_factory=list)  # [(x, y), ...]
+    slot_runs: list = field(default_factory=list)  # [(first index, count), ...]
 
 
 def parse_excellon_file(filepath: str) -> tuple[PCBLayer, list[DrillInfo]]:
@@ -477,6 +540,8 @@ def parse_excellon_file(filepath: str) -> tuple[PCBLayer, list[DrillInfo]]:
     zeros: Optional[str] = None  # "LZ", "TZ" or unknown
     scale = 1.0
     x = y = 0.0
+    unsupported_slots = 0
+    drilled_slots = 0
 
     for line in lines:
         line = line.strip()
@@ -514,6 +579,37 @@ def parse_excellon_file(filepath: str) -> tuple[PCBLayer, list[DrillInfo]]:
             current_tool = int(m.group(1))
             continue
 
+        # Routed slots (G85, or M15/M16 with G00-G03 moves) are not drilled
+        # holes; say so instead of drilling a single hole at their start
+        if _ROUTING.search(line):
+            upper = line.upper()
+            if "G85" not in upper:
+                # M15 lowers the router: one routed path
+                unsupported_slots += upper.startswith("M15")
+                continue
+            # G85 is Excellon's drilled slot: a row of overlapping holes
+            # from the first to the second coordinate
+            start_text, end_text = upper.split("G85", 1)
+            number_format = digits or _DEFAULT_DIGITS[units]
+            ms, me = _COORD_LINE.match(start_text), _COORD_LINE.match(end_text)
+            if ms.group(1):
+                x = _excellon_number(ms.group(1), number_format, zeros) * scale
+            if ms.group(2):
+                y = _excellon_number(ms.group(2), number_format, zeros) * scale
+            end_x, end_y = x, y
+            if me.group(1):
+                end_x = _excellon_number(me.group(1), number_format, zeros) * scale
+            if me.group(2):
+                end_y = _excellon_number(me.group(2), number_format, zeros) * scale
+            if current_tool in tools:
+                tool = tools[current_tool]
+                slot = _slot_holes((x, y), (end_x, end_y), tool.diameter)
+                tool.slot_runs.append((len(tool.holes), len(slot)))
+                tool.holes.extend(slot)
+                drilled_slots += 1
+            x, y = end_x, end_y
+            continue
+
         # Coordinate lines
         m = _COORD_LINE.match(line)
         if m and (m.group(1) or m.group(2)) and current_tool is not None:
@@ -539,6 +635,7 @@ def parse_excellon_file(filepath: str) -> tuple[PCBLayer, list[DrillInfo]]:
                     diameter=tool.diameter,
                     holes=tool.holes,
                     count=len(tool.holes),
+                    slot_runs=tool.slot_runs,
                 )
             )
             for x, y in tool.holes:
@@ -560,6 +657,14 @@ def parse_excellon_file(filepath: str) -> tuple[PCBLayer, list[DrillInfo]]:
         layer.max_y = max(all_y)
         layer.width = layer.max_x - layer.min_x
         layer.height = layer.max_y - layer.min_y
+
+    layer.unsupported_slots = unsupported_slots
+    layer.drilled_slots = drilled_slots
+    if unsupported_slots:
+        _logger.warning(
+            f"{Path(filepath).name}: {unsupported_slots} routed slot(s) are not supported; "
+            "slots are drilled as a single hole at their start or left out"
+        )
 
     total_holes = sum(d.count for d in drills)
     total_tools = len(drills)

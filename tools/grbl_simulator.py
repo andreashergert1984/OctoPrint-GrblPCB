@@ -34,6 +34,7 @@ import tty
 VERSION_BANNER = "Grbl 1.1h ['$' for help]"
 PLANNER_BLOCKS = 15
 RX_BUFFER = 128  # bytes, as in GRBL 1.1 on an ATmega328
+HOLD_DECELERATION = 0.3  # seconds a feed hold needs until the axes stand still
 AXES = ("x", "y", "z")
 WCS_CODES = ("G54", "G55", "G56", "G57", "G58", "G59")
 WORD_RE = re.compile(r"([A-Z])\s*([+-]?\d*\.?\d+)")
@@ -93,6 +94,7 @@ class GrblSimulator:
         self.spindle = 0.0
         self.spindle_mode = "M5"
         self.probe = None
+        self._hold_done_at = 0.0
         self._drain_planner()
         self._planned_end = dict(self.mpos)
 
@@ -103,6 +105,11 @@ class GrblSimulator:
                 self._planner.task_done()
             except queue.Empty:
                 return
+
+    def _settle_hold(self):
+        """Hold:1 becomes Hold:0 when the deceleration is over."""
+        if self.state == "Hold:1" and time.time() >= self._hold_done_at:
+            self.state = "Hold:0"
 
     def wpos(self):
         off = self.offsets[self.wcs]
@@ -124,13 +131,17 @@ class GrblSimulator:
                 self.send(self._status())
             elif byte == 0x21:  # !
                 if self.state in ("Run", "Jog"):
-                    self.state = "Hold:0"
+                    # Hold:1 while decelerating, Hold:0 once the axes stand
+                    self.state = "Hold:1"
+                    self._hold_done_at = time.time() + HOLD_DECELERATION * self._time_scale
             elif byte == 0x7E:  # ~
                 if self.state.startswith("Hold"):
                     self.state = "Run"
             elif byte == 0x18:  # Ctrl-X
                 # Reset during motion loses steps: GRBL raises ALARM:3
-                in_motion = self.state in ("Run", "Jog", "Home") or self.state.startswith("Hold")
+                # ... but not after a completed feed hold (Hold:0)
+                self._settle_hold()
+                in_motion = self.state in ("Run", "Jog", "Home", "Hold:1")
                 self._reset_state()
                 if in_motion:
                     self.state = "Alarm"
@@ -439,6 +450,7 @@ class GrblSimulator:
 
     def _status(self):
         """Status report as GRBL 1.1 sends it with $10=1 (MPos, WCO only now and then)."""
+        self._settle_hold()
         m = self.mpos
         fields = [
             self.state,

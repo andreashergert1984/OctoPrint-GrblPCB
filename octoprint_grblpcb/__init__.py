@@ -46,6 +46,8 @@ from .toolpath import (
     back_side_alignment_holes,
     compute_alignment_transform,
     apply_alignment_transform,
+    gcode_extent,
+    travel_check,
 )
 from .autolevel import (
     HeightMap,
@@ -53,6 +55,14 @@ from .autolevel import (
     height_map_origin_check,
     height_map_side_check,
 )
+
+
+class _ProbeAborted(Exception):
+    """A probe run cannot go on, e.g. GRBL rejected a positioning move."""
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
 
 
 class GrblPcbPlugin(
@@ -472,8 +482,59 @@ class GrblPcbPlugin(
         "set_spindle", "spindle_on", "spindle_off", "jog",
     })
 
+    # Looking at the state of the machine and the project
+    _READ_COMMANDS = frozenset({
+        "status", "machine_check", "get_project", "list_projects",
+        "get_operations", "get_heightmap", "get_layer_geometry",
+        "get_toolpath_preview",
+    })
+
+    # Project commands that move the machine
+    _MACHINE_PROJECT_COMMANDS = frozenset({
+        "start_autolevel", "stop_autolevel", "probe_alignment",
+        "stop_alignment_probe", "send_to_cnc",
+    })
+
+    def _required_permission(self, command):
+        """
+        The OctoPrint permission a command needs, None for unknown commands.
+
+        Being logged in is not enough: a read-only account must not move
+        the mill or delete projects.
+        """
+        from octoprint.access.permissions import Permissions
+
+        if command in self._READ_COMMANDS:
+            return Permissions.STATUS
+        if command == "download_gcode":
+            return Permissions.FILES_DOWNLOAD
+        if command == "delete_project":
+            return Permissions.FILES_DELETE
+        if command in self._CNC_COMMANDS or command in self._MACHINE_PROJECT_COMMANDS:
+            return Permissions.CONTROL
+        if command in self._PROJECT_COMMANDS:
+            return Permissions.FILES_UPLOAD
+        return None
+
+    @staticmethod
+    def _user_can(permission) -> bool:
+        return bool(permission.can())
+
+    def _operation_index(self, data):
+        """Validated index into the project's operations, or None."""
+        index = data.get("operation_index", 0)
+        if isinstance(index, bool) or not isinstance(index, int):
+            return None
+        if self._project is None or not 0 <= index < len(self._project.operations):
+            return None
+        return index
+
     def on_api_command(self, command, data):
         import flask
+
+        permission = self._required_permission(command)
+        if permission is not None and not self._user_can(permission):
+            return flask.jsonify(error=gettext("You do not have the permission for this action.")), 403
 
         if command in self._MANUAL_GCODE_COMMANDS:
             # Mixed into a running job they would move the machine and
@@ -880,6 +941,10 @@ class GrblPcbPlugin(
         """Handle Gerber/Excellon file uploads."""
         import flask
         import shutil
+        from octoprint.access.permissions import Permissions
+
+        if not self._user_can(Permissions.FILES_UPLOAD):
+            return flask.jsonify(error=gettext("You do not have the permission for this action.")), 403
 
         with self._project_lock:
             return self._handle_upload_inner(flask, shutil)
@@ -1840,7 +1905,7 @@ class GrblPcbPlugin(
                 )
                 # Wait for the 3 movement commands to complete
                 for _ in range(3):
-                    self._wait_for_ok(comm, timeout=10.0)
+                    self._confirm_ok(comm, timeout=10.0)
 
                 # Probe
                 connector.commands(
@@ -1849,8 +1914,8 @@ class GrblPcbPlugin(
                     f"G38.2 Z{probe_depth} F{probe_feed}",
                 )
                 # Wait for G21 and G90 ok's
-                self._wait_for_ok(comm, timeout=2.0)
-                self._wait_for_ok(comm, timeout=2.0)
+                self._confirm_ok(comm, timeout=2.0)
+                self._confirm_ok(comm, timeout=2.0)
 
                 z_val, failure = self._await_probe_result(comm, connector._work_offset)
                 if failure:
@@ -1880,7 +1945,7 @@ class GrblPcbPlugin(
 
                 # Retract
                 connector.commands(f"G1 Z{travel_z} F{z_feed:.0f}")
-                self._wait_for_ok(comm, timeout=5.0)
+                self._confirm_ok(comm, timeout=5.0)
                 # Send progress update
                 if self._plugin_manager:
                     self._plugin_manager.send_plugin_message(
@@ -1894,6 +1959,17 @@ class GrblPcbPlugin(
                         },
                     )
 
+        except _ProbeAborted as aborted:
+            # Probing at a place the machine never reached would record a
+            # height for the wrong spot
+            self._logger.error(f"Autolevel aborted: {aborted.reason}")
+            self._probe_stop.set()
+            if self._plugin_manager:
+                failed_at = self._height_map.next_unprobed_index()
+                self._plugin_manager.send_plugin_message(
+                    "grblpcb",
+                    {"type": "autolevel_failed", "index": max(failed_at, 0), "total": total, "reason": aborted.reason},
+                )
         except Exception as e:
             self._logger.error(f"Error during probing: {e}")
             self._logger.debug(traceback.format_exc())
@@ -2028,9 +2104,14 @@ class GrblPcbPlugin(
                 continue
             if resp[0] == "ok":
                 return True
-            elif resp[0] == "error":
+            elif resp[0] in ("error", "alarm"):
                 return False
         return False
+
+    def _confirm_ok(self, comm, timeout=5.0):
+        """Like _wait_for_ok, but a missing ok ends the probe run."""
+        if not self._wait_for_ok(comm, timeout=timeout):
+            raise _ProbeAborted("move_rejected")
 
     def _discard_leveled_gcode(self):
         """Drop leveled G-code of all operations (height map changed)."""
@@ -2046,8 +2127,8 @@ class GrblPcbPlugin(
         if self._height_map is None or not self._height_map.completed:
             return flask.jsonify(error=gettext("Height map not complete")), 400
 
-        op_index = data.get("operation_index", 0)
-        if self._project is None or op_index >= len(self._project.operations):
+        op_index = self._operation_index(data)
+        if op_index is None:
             return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
@@ -2087,8 +2168,8 @@ class GrblPcbPlugin(
         if self._project is None:
             return flask.jsonify(error=gettext("No project")), 400
 
-        op_index = data.get("operation_index", 0)
-        if op_index >= len(self._project.operations):
+        op_index = self._operation_index(data)
+        if op_index is None:
             return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
@@ -2157,10 +2238,12 @@ class GrblPcbPlugin(
 
         if self._project is None:
             return flask.jsonify(error=gettext("No project")), 400
+        # Holes of drilled slots are not round: the probe finds no centre
         holes = [
             (x, y, drill.diameter)
             for drill in self._project.drills
-            for x, y in drill.holes
+            for i, (x, y) in enumerate(drill.holes)
+            if i not in drill.slot_indices()
         ]
         if len(holes) < 2:
             return flask.jsonify(error=gettext("Need at least 2 alignment holes")), 400
@@ -2251,6 +2334,7 @@ class GrblPcbPlugin(
 
         holes = self._project.alignment_holes
         total = len(holes)
+        abort_reason = None
 
         try:
             for idx, hole in enumerate(holes):
@@ -2276,11 +2360,11 @@ class GrblPcbPlugin(
                     f"G0 X{ex:.4f} Y{ey:.4f}",
                 )
                 for _ in range(2):
-                    self._wait_for_ok(comm, timeout=10.0)
+                    self._confirm_ok(comm, timeout=10.0)
 
                 # -- Plunge into hole --
                 connector.commands(f"G1 Z{hole_probe_z:.4f} F{z_feed:.0f}")
-                self._wait_for_ok(comm, timeout=10.0)
+                self._confirm_ok(comm, timeout=10.0)
 
                 # -- Probe X+ --
                 x_plus = self._probe_axis(
@@ -2292,7 +2376,7 @@ class GrblPcbPlugin(
 
                 # Return to center
                 connector.commands(f"G0 X{ex:.4f}")
-                self._wait_for_ok(comm, timeout=5.0)
+                self._confirm_ok(comm, timeout=5.0)
 
                 # -- Probe X- --
                 x_minus = self._probe_axis(
@@ -2306,7 +2390,7 @@ class GrblPcbPlugin(
 
                 # Move to measured center X
                 connector.commands(f"G0 X{center_x:.4f}")
-                self._wait_for_ok(comm, timeout=5.0)
+                self._confirm_ok(comm, timeout=5.0)
 
                 # -- Probe Y+ --
                 y_plus = self._probe_axis(
@@ -2318,7 +2402,7 @@ class GrblPcbPlugin(
 
                 # Return to center Y
                 connector.commands(f"G0 Y{ey:.4f}")
-                self._wait_for_ok(comm, timeout=5.0)
+                self._confirm_ok(comm, timeout=5.0)
 
                 # -- Probe Y- --
                 y_minus = self._probe_axis(
@@ -2343,7 +2427,7 @@ class GrblPcbPlugin(
 
                 # Retract
                 connector.commands(f"G1 Z{safe_z} F{z_feed:.0f}")
-                self._wait_for_ok(comm, timeout=5.0)
+                self._confirm_ok(comm, timeout=5.0)
 
                 # Send progress
                 if self._plugin_manager:
@@ -2358,6 +2442,11 @@ class GrblPcbPlugin(
                         },
                     )
 
+        except _ProbeAborted as aborted:
+            # Plunging where the machine never arrived would hit the board
+            self._logger.error(f"Alignment probing aborted: {aborted.reason}")
+            self._probe_stop.set()
+            abort_reason = aborted.reason
         except Exception as e:
             self._logger.error(f"Error during alignment probing: {e}")
             self._logger.debug(traceback.format_exc())
@@ -2384,6 +2473,7 @@ class GrblPcbPlugin(
                     "type": "alignment_complete",
                     "all_probed": all_probed,
                     "holes": holes,
+                    "abort_reason": abort_reason,
                 },
             )
 
@@ -2479,8 +2569,8 @@ class GrblPcbPlugin(
         if self._project.alignment_transform is None:
             return flask.jsonify(error=gettext("No alignment transform computed")), 400
 
-        op_index = data.get("operation_index", 0)
-        if op_index >= len(self._project.operations):
+        op_index = self._operation_index(data)
+        if op_index is None:
             return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
@@ -2533,8 +2623,8 @@ class GrblPcbPlugin(
         if self._project is None:
             return flask.jsonify(error=gettext("No project")), 400
 
-        op_index = data.get("operation_index", 0)
-        if op_index >= len(self._project.operations):
+        op_index = self._operation_index(data)
+        if op_index is None:
             return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
@@ -2555,8 +2645,8 @@ class GrblPcbPlugin(
         if self._project is None:
             return flask.jsonify(error=gettext("No project")), 400
 
-        op_index = data.get("operation_index", 0)
-        if op_index < 0 or op_index >= len(self._project.operations):
+        op_index = self._operation_index(data)
+        if op_index is None:
             return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         removed = self._project.operations.pop(op_index)
@@ -2606,8 +2696,8 @@ class GrblPcbPlugin(
         if blocked:
             return blocked
 
-        op_index = data.get("operation_index", 0)
-        if op_index < 0 or op_index >= len(self._project.operations):
+        op_index = self._operation_index(data)
+        if op_index is None:
             return flask.jsonify(error=gettext("Invalid operation index")), 400
 
         op = self._project.operations[op_index]
@@ -2623,6 +2713,12 @@ class GrblPcbPlugin(
             needs_z_accuracy = op_type in {"isolation", "drill", "outline", "cut"}
             if needs_z_accuracy and not getattr(connector, "_z_zeroed", False):
                 warnings.append({"code": "z_not_zeroed"})
+            limits = connector.travel_limits() if hasattr(connector, "travel_limits") else None
+            extent = gcode_extent(gcode)
+            if limits and extent:
+                warnings.extend(travel_check(
+                    extent, limits, connector._work_offset, connector._machine_position
+                ))
             if op.gcode_leveled and self._height_map is not None:
                 origin = height_map_origin_check(self._height_map, connector._work_offset)
                 if origin:

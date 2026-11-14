@@ -556,13 +556,12 @@ class TestApplyAlignment:
         assert lines[0] == "; header"
         assert lines[1] == ""
 
-    def test_x_only_line_passthrough(self):
-        """Lines with only X (no Y) pass through unchanged."""
+    def test_x_only_line_gets_both_axes(self):
+        """A move naming only X is transformed too; Y comes from the tracked position."""
         gcode = "G1 X10.0000"
         t = AlignmentTransform(cos_theta=1.0, sin_theta=0.0, tx=5.0, ty=5.0)
         result = apply_alignment_transform(gcode, t)
-        # X-only line is NOT transformed (needs both X and Y)
-        assert "X10.0000" in result
+        assert result == "G1 X15.0000 Y5.0000"
 
 
 # =========================================================================

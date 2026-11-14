@@ -1049,3 +1049,141 @@
     display: flex;
 }
 
+
+
+/* ========================================================================= */
+/* Readability and touch targets                                             */
+/* ========================================================================= */
+
+/* The sidebar text colour above also hit text on coloured backgrounds:
+   dark grey on blue, green and red was hard to read */
+.grblpcb-workspace-sidebar .label,
+.grblpcb-workspace-sidebar .label span,
+.grblpcb-workspace-sidebar .badge,
+.grblpcb-workspace-sidebar .grblpcb-steps li.current span,
+.grblpcb-workspace-sidebar .btn-primary span,
+.grblpcb-workspace-sidebar .btn-success span,
+.grblpcb-workspace-sidebar .btn-danger span,
+.grblpcb-workspace-sidebar .btn-warning span,
+.grblpcb-workspace-sidebar .btn-info span {
+    color: #fff;
+}
+
+.grblpcb-workspace-sidebar .label,
+.grblpcb-workspace-sidebar .badge {
+    text-shadow: none;
+    font-size: 11px;
+}
+
+.grblpcb-steps li {
+    font-size: 12px;
+    padding: 3px 7px;
+}
+
+.grblpcb-connect-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #555;
+}
+
+/* Jog keys: large enough to hit without looking, also on a tablet next to
+   the machine */
+.grblpcb-jog-grid-compact {
+    grid-template-columns: repeat(3, 40px);
+    gap: 4px;
+    max-width: none;
+}
+
+.grblpcb-jog-grid-compact .btn,
+.grblpcb-jog-z-col .btn {
+    min-width: 40px;
+    min-height: 36px;
+    padding: 6px 4px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.grblpcb-jog-z-col {
+    gap: 4px;
+}
+
+.grblpcb-jog-layout {
+    gap: 16px;
+}
+
+.grblpcb-step-presets .btn {
+    min-height: 30px;
+    min-width: 38px;
+}
+
+/* Selected jog step: was white on pale blue */
+.grblpcb-step-presets .btn.active {
+    background: #2f96b4;
+    border-color: #2a87a2;
+    color: #fff;
+    text-shadow: none;
+}
+
+/* The selected choice of a button row (work coordinate system, probe axis):
+   clearly marked, with readable text */
+.grblpcb-workspace-sidebar .btn-mini.active,
+.grblpcb-workspace-sidebar .btn-small.active {
+    background: #2f96b4;
+    border-color: #2a87a2;
+    color: #fff;
+    text-shadow: none;
+    opacity: 1;
+}
+
+.grblpcb-steps li {
+    padding: 2px 5px;
+}
+
+/* ========================================================================= */
+/* Wide view                                                                 */
+/* ========================================================================= */
+
+.grblpcb-wide-toggle {
+    position: absolute;
+    top: 8px;
+    left: 44px;
+    z-index: 5;
+}
+
+.grblpcb-wide-toggle.active {
+    background: #2f96b4;
+    border-color: #2a87a2;
+    color: #fff;
+    text-shadow: none;
+}
+
+body.grblpcb-wide #sidebar {
+    display: none;
+}
+
+body.grblpcb-wide .octoprint-container {
+    width: auto;
+    max-width: none;
+    margin-left: 16px;
+    margin-right: 16px;
+}
+
+body.grblpcb-wide .octoprint-container .tabbable {
+    width: 100%;
+    margin-left: 0;
+    float: none;
+}
+
+body.grblpcb-wide .grblpcb-workspace-sidebar {
+    flex-basis: 360px;
+}
+
+.grblpcb-guide-steps {
+    margin: 4px 0 6px 18px;
+    font-size: 11px;
+}
+
+.grblpcb-guide-steps li {
+    line-height: 1.4;
+}

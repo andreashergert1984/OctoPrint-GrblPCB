@@ -35,6 +35,11 @@ autolevel and streaming out, without an external CAM tool.
 | 2D/3D workspace view | simulator run, JS test for fit view |
 | German translation, translation guard test | tests |
 | Development container (`docker/`) | image build |
+| Job outcome: completed, stopped, failed (GRBL error, alarm, lost connection); stop keeps the position | simulator run, tests |
+| Pre-flight check against the machine travel (`$130` to `$132`) | tests (placement not exercised in the simulator, which stands at its origin) |
+| OctoPrint permissions for API commands and uploads | tests |
+| Clear polarity in Gerber files, drilled `G85` slots | tests |
+| Wide view, OctoPrint confirmation dialogs | simulator run in the browser |
 
 ## Open
 
