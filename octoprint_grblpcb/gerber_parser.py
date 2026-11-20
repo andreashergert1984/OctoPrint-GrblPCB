@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Gerber & Excellon Parser
 
@@ -11,7 +10,6 @@ import math
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from shapely.geometry import (
     LineString,
@@ -77,11 +75,12 @@ def parse_gerber_file(filepath: str) -> tuple[PCBLayer, list]:
         parsed.render_svg(buf)
         svg_bytes = buf.getvalue()
         layer.svg_preview = svg_bytes.decode("utf-8") if isinstance(svg_bytes, bytes) else str(svg_bytes)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - preview is optional, parser errors are unpredictable; logged
         _logger.warning(f"Could not render SVG preview: {e}")
 
     # Extract Shapely geometries from commands
     geometries = _extract_geometries(parsed)
+    layer.stroke_width = _max_stroke_width(parsed)
 
     # Recompute layer bounds from our extracted geometries (more accurate
     # than pygerber's get_info() which may miscalculate arc bounding boxes)
@@ -115,13 +114,12 @@ def _extract_geometries(parsed) -> list:
     """
 
     geometries = []
-    buf = parsed._command_buffer
     skipped = 0
 
-    for cmd in buf:
+    for cmd in _iter_objects(parsed._command_buffer):
         try:
             geom = _command_to_shapely(cmd)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - third-party geometry conversion on unknown files; logged
             skipped += 1
             _logger.debug(f"Could not convert command {type(cmd).__name__}: {e}")
             continue
@@ -140,6 +138,37 @@ def _extract_geometries(parsed) -> list:
             f"{skipped} Gerber object(s) could not be converted and are missing from the geometry"
         )
     return geometries
+
+
+def _max_stroke_width(parsed) -> float:
+    """
+    Widest line or arc stroke of the layer in mm (0 if it has none).
+
+    Edge.Cuts is drawn with strokes whose centre line is the board edge, so
+    the layer bounds are one half stroke wider than the board on each side.
+    """
+    widest = 0.0
+    for cmd in _iter_objects(parsed._command_buffer):
+        if type(cmd).__name__ in ("Line2", "Arc2", "CCArc2"):
+            try:
+                widest = max(widest, _aperture_radius(cmd.aperture) * 2)
+            except Exception as exc:  # noqa: BLE001 - unknown aperture types; skip this object
+                _logger.debug("Skipping object without usable aperture width: %s", exc)
+                continue
+    return widest
+
+
+def _iter_objects(commands):
+    """
+    Graphical objects in drawing order, with step-repeat (%SR%) and block
+    aperture (%AB%) buffers unpacked. Every object keeps the polarity it was
+    drawn with. Regions are objects themselves and not unpacked.
+    """
+    for cmd in commands:
+        if type(cmd).__name__ == "BufferCommand2":
+            yield from _iter_objects(cmd.command_buffer)
+        else:
+            yield cmd
 
 
 def _is_clear(cmd) -> bool:
@@ -170,38 +199,20 @@ def _command_to_shapely(cmd):
 
     if cls_name == "Flash2":
         pt = cmd.flash_point
-        x, y = _to_float(pt.x), _to_float(pt.y)
-
-        ap = cmd.aperture
-        ap_type = type(ap).__name__
-
-        # Macro aperture (e.g. RoundRect) — build shape from
-        # the macro's sub-primitives instead of using a simple circle.
-        if ap_type == "Macro2" and hasattr(ap, "command_buffer"):
-            shape = _macro_aperture_to_shapely(ap)
-            if shape is not None and not shape.is_empty:
-                from shapely.affinity import translate
-                return translate(shape, xoff=x, yoff=y)
-
-        # Rectangle aperture — create a proper rectangle
-        if ap_type == "Rectangle2" and hasattr(ap, "x_size") and hasattr(ap, "y_size"):
-            return _rectangle_aperture_flash(ap, x, y)
-
-        # Obround (oval/capsule) aperture
-        if ap_type == "Obround2" and hasattr(ap, "x_size") and hasattr(ap, "y_size"):
-            return _obround_aperture_flash(ap, x, y)
-
-        # Circle aperture (or unknown) — model as circle based on diameter.
-        radius = _aperture_radius(ap)
-        if radius > 0:
-            return Point(x, y).buffer(radius, quad_segs=32)
-        return Point(x, y).buffer(0.05, quad_segs=16)  # minimum pad
+        return _flash_shape(cmd.aperture, _to_float(pt.x), _to_float(pt.y))
 
     elif cls_name == "Line2":
         # Line trace between two points with aperture width
         sp, ep = cmd.start_point, cmd.end_point
         x1, y1 = _to_float(sp.x), _to_float(sp.y)
         x2, y2 = _to_float(ep.x), _to_float(ep.y)
+        if type(cmd.aperture).__name__ == "Rectangle2":
+            # A rectangular aperture is not rotated along the line: it keeps
+            # its orientation and sweeps, so the stroke is the hull of the
+            # rectangle at both ends
+            ends = [_rectangle_aperture_flash(cmd.aperture, x1, y1),
+                    _rectangle_aperture_flash(cmd.aperture, x2, y2)]
+            return unary_union(ends).convex_hull
         width = _aperture_radius(cmd.aperture) * 2
         if width <= 0:
             width = 0.1  # minimum trace width
@@ -228,13 +239,44 @@ def _command_to_shapely(cmd):
     elif cls_name == "Region2":
         # Region = filled polygon
         try:
-            points = _region_to_points(cmd)
-            if len(points) >= 3:
-                return Polygon(points)
-        except Exception as e:
+            return _region_polygon(cmd)
+        except Exception as e:  # noqa: BLE001 - third-party region conversion on unknown files; logged
             _logger.debug(f"Region conversion error: {e}")
 
     return None
+
+
+def _flash_shape(ap, x: float, y: float):
+    """Shape of aperture ``ap`` flashed at (x, y), including its hole."""
+    ap_type = type(ap).__name__
+    shape = None
+
+    # Macro aperture (e.g. RoundRect): build the shape from the macro's
+    # sub-primitives instead of using a simple circle.
+    if ap_type == "Macro2" and hasattr(ap, "command_buffer"):
+        macro = _macro_aperture_to_shapely(ap)
+        if macro is not None and not macro.is_empty:
+            from shapely.affinity import translate
+            shape = translate(macro, xoff=x, yoff=y)
+    elif ap_type == "Rectangle2" and hasattr(ap, "x_size") and hasattr(ap, "y_size"):
+        shape = _rectangle_aperture_flash(ap, x, y)
+    elif ap_type == "Obround2" and hasattr(ap, "x_size") and hasattr(ap, "y_size"):
+        shape = _obround_aperture_flash(ap, x, y)
+    if shape is None:
+        # Circle aperture (or unknown): a circle of the diameter
+        radius = _aperture_radius(ap)
+        if radius > 0:
+            shape = Point(x, y).buffer(radius, quad_segs=32)
+        else:
+            return Point(x, y).buffer(0.05, quad_segs=16)  # minimum pad
+
+    # Standard apertures may have a round hole (C,2.0X1.0)
+    hole = getattr(ap, "hole_diameter", None)
+    if hole is not None and ap_type != "Macro2":
+        hole_d = _to_float(hole)
+        if hole_d > 0:
+            shape = shape.difference(Point(x, y).buffer(hole_d / 2, quad_segs=32))
+    return shape
 
 
 def _rectangle_aperture_flash(aperture, x: float, y: float):
@@ -243,8 +285,8 @@ def _rectangle_aperture_flash(aperture, x: float, y: float):
     The rectangle is centred at (x, y) with dimensions x_size × y_size.
     An optional rotation attribute (degrees) is applied.
     """
-    from shapely.geometry import box
     from shapely.affinity import rotate, translate
+    from shapely.geometry import box
 
     w = _to_float(aperture.x_size)
     h = _to_float(aperture.y_size)
@@ -321,24 +363,20 @@ def _macro_aperture_to_shapely(aperture):
     (edge strips) sub-commands.  We convert each primitive and union
     them to produce the final pad shape at the origin.
     """
-    parts = []
+    shape = None
     for sub_cmd in aperture.command_buffer:
         cls = type(sub_cmd).__name__
+        part = None
 
         if cls == "Region2":
             try:
-                pts = _region_to_points(sub_cmd)
-                if len(pts) >= 3:
-                    parts.append(Polygon(pts))
-            except Exception as e:
+                part = _region_polygon(sub_cmd)
+            except Exception as e:  # noqa: BLE001 - third-party region conversion on unknown files; logged
                 _logger.debug(f"Macro aperture region conversion error: {e}")
 
         elif cls == "Flash2":
             pt = sub_cmd.flash_point
-            sx, sy = _to_float(pt.x), _to_float(pt.y)
-            r = _aperture_radius(sub_cmd.aperture)
-            if r > 0:
-                parts.append(Point(sx, sy).buffer(r, quad_segs=32))
+            part = _flash_shape(sub_cmd.aperture, _to_float(pt.x), _to_float(pt.y))
 
         elif cls == "Line2":
             sp, ep = sub_cmd.start_point, sub_cmd.end_point
@@ -347,7 +385,7 @@ def _macro_aperture_to_shapely(aperture):
             w = _aperture_radius(sub_cmd.aperture) * 2
             if w > 0 and (abs(x1 - x2) > 1e-7 or abs(y1 - y2) > 1e-7):
                 line = LineString([(x1, y1), (x2, y2)])
-                parts.append(line.buffer(w / 2, cap_style="flat"))
+                part = line.buffer(w / 2, cap_style="flat")
 
         elif cls in ("Arc2", "CCArc2"):
             clockwise = (cls == "Arc2")
@@ -359,11 +397,20 @@ def _macro_aperture_to_shapely(aperture):
             if w > 0:
                 arc_pts = _arc_to_points(x1, y1, x2, y2, ccx, ccy, clockwise=clockwise)
                 if len(arc_pts) >= 2:
-                    parts.append(LineString(arc_pts).buffer(w / 2, cap_style="flat"))
+                    part = LineString(arc_pts).buffer(w / 2, cap_style="flat")
 
-    if not parts:
+        if part is None or part.is_empty:
+            continue
+        if _is_clear(sub_cmd):
+            # Exposure off: the primitive removes what the macro drew so far
+            if shape is not None:
+                shape = shape.difference(part)
+        else:
+            shape = part if shape is None else shape.union(part)
+
+    if shape is None or shape.is_empty:
         return None
-    return unary_union(parts)
+    return shape
 
 
 def _arc_to_points(x1, y1, x2, y2, cx, cy, clockwise=True, segments=64) -> list:
@@ -412,32 +459,81 @@ def _arc_to_points(x1, y1, x2, y2, cx, cy, clockwise=True, segments=64) -> list:
     return points
 
 
-def _region_to_points(region_cmd) -> list:
-    """Extract boundary points from a Region2 command."""
-    points = []
-    if hasattr(region_cmd, "command_buffer"):
-        for sub_cmd in region_cmd.command_buffer:
-            cls = type(sub_cmd).__name__
-            if cls == "Line2":
-                sp = sub_cmd.start_point
-                points.append((_to_float(sp.x), _to_float(sp.y)))
-            elif cls in ("Arc2", "CCArc2"):
-                clockwise = (cls == "Arc2")
-                sp = sub_cmd.start_point
-                ep = sub_cmd.end_point
-                cp = sub_cmd.center_point
-                arc_pts = _arc_to_points(
-                    _to_float(sp.x), _to_float(sp.y),
-                    _to_float(ep.x), _to_float(ep.y),
-                    _to_float(cp.x), _to_float(cp.y),
-                    clockwise=clockwise,
-                )
-                points.extend(arc_pts[:-1])  # avoid duplicate
+def _region_contours(region_cmd) -> list[list[tuple]]:
+    """
+    Closed contours of a Region2 command.
 
-        # Close the polygon
-        if points and points[0] != points[-1]:
-            points.append(points[0])
-    return points
+    One G36 region can hold several contours; each D02 move starts the next
+    one. The pygerber children carry no move command, so a contour ends
+    wherever the next segment does not start at the end of the previous one.
+    """
+    contours: list[list[tuple]] = []
+    points: list[tuple] = []
+    last_end = None
+    for sub_cmd in getattr(region_cmd, "command_buffer", []):
+        cls = type(sub_cmd).__name__
+        if cls not in ("Line2", "Arc2", "CCArc2"):
+            continue
+        sp, ep = sub_cmd.start_point, sub_cmd.end_point
+        start = (_to_float(sp.x), _to_float(sp.y))
+        end = (_to_float(ep.x), _to_float(ep.y))
+        if last_end is not None and (
+            abs(start[0] - last_end[0]) > 1e-9 or abs(start[1] - last_end[1]) > 1e-9
+        ):
+            contours.append(points)
+            points = []
+        if cls == "Line2":
+            points.append(start)
+        else:
+            cp = sub_cmd.center_point
+            arc_pts = _arc_to_points(
+                start[0], start[1], end[0], end[1],
+                _to_float(cp.x), _to_float(cp.y),
+                clockwise=(cls == "Arc2"),
+            )
+            points.extend(arc_pts[:-1])  # the end is the next start
+        last_end = end
+    if points:
+        contours.append(points)
+
+    closed = []
+    for contour in contours:
+        if len(contour) >= 3:
+            if contour[0] != contour[-1]:
+                contour = contour + [contour[0]]
+            closed.append(contour)
+    return closed
+
+
+def _region_polygon(region_cmd):
+    """
+    Polygon of a Region2 command.
+
+    Every contour is dark and overlapping contours merge (Gerber spec). A
+    contour lying completely inside another one is read as a hole (lenient
+    reading of nested contours; the spec forbids them), nested once more it
+    is dark again.
+    """
+    polys = []
+    for contour in _region_contours(region_cmd):
+        poly = Polygon(contour)
+        if not poly.is_valid:
+            poly = poly.buffer(0)
+        if not poly.is_empty:
+            polys.append(poly)
+    if not polys:
+        return None
+    dark, holes = [], []
+    for i, poly in enumerate(polys):
+        depth = sum(
+            1 for j, other in enumerate(polys)
+            if j != i and other.area > poly.area * (1 + 1e-9) and other.contains(poly)
+        )
+        (holes if depth % 2 else dark).append(poly)
+    result = unary_union(dark)
+    if holes:
+        result = result.difference(unary_union(holes))
+    return result
 
 
 # =============================================================================
@@ -470,7 +566,7 @@ _ROUTING = re.compile(r"G85|^M1[567]\b|^G0?[0-3](?:X|Y|$)", re.IGNORECASE)
 _DEFAULT_DIGITS = {"metric": (3, 3), "inch": (2, 4)}
 
 
-def _excellon_number(text: str, digits: tuple, zeros: Optional[str]) -> float:
+def _excellon_number(text: str, digits: tuple, zeros: str | None) -> float:
     """
     Convert an Excellon coordinate to a float in file units.
 
@@ -534,14 +630,26 @@ def parse_excellon_file(filepath: str) -> tuple[PCBLayer, list[DrillInfo]]:
 
     lines = content.splitlines()
     tools: dict[int, ExcellonTool] = {}
-    current_tool: Optional[int] = None
+    current_tool: int | None = None
     units = "metric"  # assume metric by default
-    digits: Optional[tuple] = None  # from the file, else the unit default
-    zeros: Optional[str] = None  # "LZ", "TZ" or unknown
+    digits: tuple | None = None  # from the file, else the unit default
+    zeros: str | None = None  # "LZ", "TZ" or unknown
     scale = 1.0
     x = y = 0.0
+    incremental = False  # G91 / ICI: coordinates are offsets to the last position
+    router_down = False  # between M15 and M16/M17: routed path, not holes
     unsupported_slots = 0
     drilled_slots = 0
+
+    def move_to(text_x, text_y, number_format):
+        """Update (x, y) from coordinate words, absolute or incremental."""
+        nonlocal x, y
+        if text_x:
+            value = _excellon_number(text_x, number_format, zeros) * scale
+            x = x + value if incremental else value
+        if text_y:
+            value = _excellon_number(text_y, number_format, zeros) * scale
+            y = y + value if incremental else value
 
     for line in lines:
         line = line.strip()
@@ -565,12 +673,23 @@ def parse_excellon_file(filepath: str) -> tuple[PCBLayer, list[DrillInfo]]:
                 digits = (len(m.group(3)), len(m.group(4)))
             continue
 
-        # Tool definitions (in header)
+        # Incremental / absolute coordinate mode
+        upper_line = line.upper()
+        if re.match(r"^(?:G91|ICI,ON)\b", upper_line):
+            incremental = True
+            continue
+        if re.match(r"^(?:G90|ICI,OFF)\b", upper_line):
+            incremental = False
+            continue
+
+        # Tool definitions. In the body (T1C0.8) the definition also selects
+        # the tool for the coordinates that follow.
         m = _TOOL_DEF.match(line)
         if m:
             num = int(m.group(1))
             dia = float(m.group(2)) * scale
             tools[num] = ExcellonTool(number=num, diameter=dia)
+            current_tool = num
             continue
 
         # Tool selection (in body)
@@ -584,23 +703,28 @@ def parse_excellon_file(filepath: str) -> tuple[PCBLayer, list[DrillInfo]]:
         if _ROUTING.search(line):
             upper = line.upper()
             if "G85" not in upper:
-                # M15 lowers the router: one routed path
-                unsupported_slots += upper.startswith("M15")
+                # M15 lowers the router: one routed path until M16/M17
+                if upper.startswith("M15"):
+                    unsupported_slots += 1
+                    router_down = True
+                elif upper.startswith(("M16", "M17")):
+                    router_down = False
+                else:
+                    # G00-G03 move: the position moves on (I/J/A are not read)
+                    mm = _COORD_LINE.match(upper[3:])
+                    if mm and (mm.group(1) or mm.group(2)):
+                        move_to(mm.group(1), mm.group(2), digits or _DEFAULT_DIGITS[units])
                 continue
             # G85 is Excellon's drilled slot: a row of overlapping holes
             # from the first to the second coordinate
             start_text, end_text = upper.split("G85", 1)
             number_format = digits or _DEFAULT_DIGITS[units]
             ms, me = _COORD_LINE.match(start_text), _COORD_LINE.match(end_text)
-            if ms.group(1):
-                x = _excellon_number(ms.group(1), number_format, zeros) * scale
-            if ms.group(2):
-                y = _excellon_number(ms.group(2), number_format, zeros) * scale
+            move_to(ms.group(1), ms.group(2), number_format)
+            start = (x, y)
+            move_to(me.group(1), me.group(2), number_format)
             end_x, end_y = x, y
-            if me.group(1):
-                end_x = _excellon_number(me.group(1), number_format, zeros) * scale
-            if me.group(2):
-                end_y = _excellon_number(me.group(2), number_format, zeros) * scale
+            x, y = start
             if current_tool in tools:
                 tool = tools[current_tool]
                 slot = _slot_holes((x, y), (end_x, end_y), tool.diameter)
@@ -610,14 +734,15 @@ def parse_excellon_file(filepath: str) -> tuple[PCBLayer, list[DrillInfo]]:
             x, y = end_x, end_y
             continue
 
-        # Coordinate lines
+        # Coordinate lines (modal moves of a routed path are no holes)
         m = _COORD_LINE.match(line)
+        if router_down:
+            if m and (m.group(1) or m.group(2)):
+                move_to(m.group(1), m.group(2), digits or _DEFAULT_DIGITS[units])
+            continue
         if m and (m.group(1) or m.group(2)) and current_tool is not None:
             number_format = digits or _DEFAULT_DIGITS[units]
-            if m.group(1):
-                x = _excellon_number(m.group(1), number_format, zeros) * scale
-            if m.group(2):
-                y = _excellon_number(m.group(2), number_format, zeros) * scale
+            move_to(m.group(1), m.group(2), number_format)
 
             if current_tool in tools:
                 tools[current_tool].holes.append((x, y))

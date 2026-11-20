@@ -1,4 +1,5 @@
 """Minimal G-code reader for tests: replays moves with modal state."""
+import itertools
 import math
 import re
 
@@ -47,8 +48,8 @@ def cutting_paths(gcode):
 
 def signed_area(path):
     """> 0: counter-clockwise."""
-    return sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(path, path[1:])) / 2
+    return sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in itertools.pairwise(path)) / 2
 
 
 def length(path):
-    return sum(math.hypot(x1 - x0, y1 - y0) for (x0, y0), (x1, y1) in zip(path, path[1:]))
+    return sum(math.hypot(x1 - x0, y1 - y0) for (x0, y0), (x1, y1) in itertools.pairwise(path))

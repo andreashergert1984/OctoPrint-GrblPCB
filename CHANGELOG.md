@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] — Unreleased
 
+### Fixed (review of 2026-11-20)
+
+- Machine safety: a soft reset or OctoPrint's Cancel during a job ends the
+  job (the stream used to continue after GRBL had reset); after a tool
+  change or program pause the job restores `G21 G90`, the work coordinate
+  system, feed and spindle before it continues; the job runs in the work
+  coordinate system that is active and zeroed (it used to switch back to
+  the generated `G54`); jog, zero, probe and project changes are refused
+  while autolevel or alignment probing runs; stopping probing halts the
+  machine; alignment probing always lifts the tool out of the hole; an
+  unexpected error halts the machine; a job only starts when GRBL is Idle;
+  the RX buffer counts bytes, not characters
+- OctoPrint integration: OctoPrint's Pause/Resume/Cancel act on the job;
+  the connector no longer claims the unimplemented `job_on_hold`
+- Isolation: narrow gaps are planned one by one (one very narrow gap used to
+  leave all other narrow gaps uncut); the narrow-gap pass keeps clear of
+  neighbouring copper; gaps that stay uncut are reported with their position
+- Milling direction: real climb milling for a clockwise spindle (`M3`);
+  the code milled conventionally while saying climb
+- Gerber: step-and-repeat and block apertures, regions with several
+  contours, macro primitives with exposure off, apertures with holes and
+  lines drawn with rectangular apertures are imported correctly
+- Excellon: route mode no longer creates holes, incremental coordinates and
+  tool definitions in the body are read
+- The work origin is the centre line of the outline; without an outline the
+  board is the union of both copper layers
+- Double-sided boards: bottom copper and bottom mask are always generated
+  mirrored; old unmirrored bottom operations are marked outdated and cannot
+  be sent; only drilling and the outline offer "mirror for the back side";
+  the alignment fit computes the offset for the final rotation
+- Autolevel: arcs update the tracked position and are split along the
+  height map; the mask exposure covers the bottom edge
+- Removing a layer asks first and removes the operations made from it (all
+  operations when the board extent changes); removing the drill layer
+  removes the holes
+- Probing: "Probe Z and zero" probes, sets Z = 0 at the contact and lifts
+  the tool; a manual Z probe reaches at least 5 mm below the safe height and
+  the current zero (5 mm from the safe height did not reach the board after
+  a tool change); "Go to zero" moves in absolute millimetres
+- User interface: drill holes are drawn; the layer checkboxes work and hide
+  their layer; layers are listed in a fixed order; X/Y/Z column headers;
+  failed commands are shown instead of only logged; job messages are
+  coloured by severity; Send is disabled with the reason in its tooltip;
+  "Confirm tool change" only shows in a pause; homing is possible from
+  alarm; a new probe grid asks before discarding measured heights; probing
+  asks first when Z is not zeroed; alignment holes show their position;
+  generation settings no longer scroll inside the panel; the view stays
+  fitted when the panel changes size; in wide view a button shows the
+  connection panel
+- Development: compatible with OctoPrint 2.0.x and the current `dev`
+  branch; ruff settings pinned to Python 3.11
+
 ### Changed
 
 - A job now ends as completed, stopped or failed. A GRBL error stops the

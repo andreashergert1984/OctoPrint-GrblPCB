@@ -1,13 +1,12 @@
-# -*- coding: utf-8 -*-
 """Tests for gerber_parser module — aperture shape handling."""
 
 import math
 from unittest.mock import MagicMock
 
 from octoprint_grblpcb.gerber_parser import (
-    _rectangle_aperture_flash,
-    _obround_aperture_flash,
     _aperture_radius,
+    _obround_aperture_flash,
+    _rectangle_aperture_flash,
 )
 
 

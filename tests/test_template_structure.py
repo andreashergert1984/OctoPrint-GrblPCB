@@ -15,8 +15,8 @@ TAG = re.compile(r"<(/?)([a-zA-Z][a-zA-Z0-9]*)\b(?:[^>\"']|\"[^\"]*\"|'[^']*')*?
 
 
 def _unbalanced(text):
-    text = re.sub(r"\{#.*?#\}", "", text, flags=re.S)
-    text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+    text = re.sub(r"\{#.*?#\}", "", text, flags=re.DOTALL)
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
     stack, problems = [], []
     for m in TAG.finditer(text):
         closing, tag, self_closing = m.group(1), m.group(2).lower(), m.group(3)
@@ -80,9 +80,9 @@ _ALLOWED_TOKENS = {"mm", "RPM", "mm/min", "mm/m", "mm/s", "2D", "3D", "X", "Y", 
 
 
 def _fixed_text_nodes(text):
-    text = re.sub(r"\{%\s*trans\b.*?\{%\s*endtrans\s*%\}", " ", text, flags=re.S)
-    text = re.sub(r"\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}", " ", text, flags=re.S)
-    text = re.sub(r"<!--.*?-->", " ", text, flags=re.S)
+    text = re.sub(r"\{%\s*trans\b.*?\{%\s*endtrans\s*%\}", " ", text, flags=re.DOTALL)
+    text = re.sub(r"\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\}", " ", text, flags=re.DOTALL)
+    text = re.sub(r"<!--.*?-->", " ", text, flags=re.DOTALL)
     # Replace whole tags (attributes may contain '>') so only text nodes remain
     text = re.sub(r"<(?:[^>\"']|\"[^\"]*\"|'[^']*')*>", "<>", text)
     text = re.sub(r"&[a-z]+;", " ", text)

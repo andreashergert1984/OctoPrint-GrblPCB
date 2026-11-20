@@ -39,11 +39,11 @@ def _make_setup(time_scale):
     sim = grbl_simulator.GrblSimulator(lambda data: os.write(master, data), time_scale=time_scale)
     stop = threading.Event()
     lines = queue.Queue()
+    buf = bytearray()
 
     def reader():
         # Like GRBL: bytes land in the RX buffer at once, the parser takes
         # lines when the planner has room
-        buf = bytearray()
         while not stop.is_set():
             try:
                 data = os.read(master, 1024)
@@ -75,6 +75,16 @@ def _make_setup(time_scale):
             except OSError:
                 return  # terminal closed during cleanup
 
+    def flush_rx():
+        # Like GRBL, Ctrl-X throws away what is still in the RX buffer
+        buf.clear()
+        while True:
+            try:
+                lines.get_nowait()
+            except queue.Empty:
+                return
+
+    sim.on_reset = flush_rx
     threading.Thread(target=reader, daemon=True).start()
     threading.Thread(target=parser, daemon=True).start()
     connector = ConnectedGrblPrinter(None, listener=_Listener(), port=os.ttyname(slave))
@@ -128,7 +138,7 @@ def test_stream_pauses_safely_and_resumes(setup, command, status):
     # Before waiting: absolute mode, tool up, spindle off; the pause
     # command itself never goes to GRBL (GRBL rejects M6)
     before = received[received.index("G1 X1 F600") + 1:]
-    assert before[:3] == ["G90", "G1 Z5.000 F120", "M5"]
+    assert before[:3] == ["G21 G90", "G1 Z5.000 F120", "M5"]
     assert not any(line.startswith(command.split()[0]) for line in received)
     assert "G1 X2 F600" not in received
 
@@ -189,7 +199,7 @@ def test_tool_change_note_reaches_the_ui(setup):
     gcode = "G21\nG1 Z5 F100\nM5\nT2 M6 ; drill 1.00 mm\nM3 S1000\nG1 X1 F600\n"
     assert connector.stream_gcode(gcode, operation_name="test")
     assert _wait_status(connector, "tool_change")
-    msg = [m for m in connector._plugin_manager.messages if m.get("status") == "tool_change"][0]
+    msg = next(m for m in connector._plugin_manager.messages if m.get("status") == "tool_change")
     assert msg["command"] == "T2 M6" and msg["note"] == "drill 1.00 mm"
     assert not any("M6" in line for line in received)
     connector.confirm_tool_change()
@@ -222,7 +232,7 @@ def _wait_not_streaming(connector, timeout=5.0):
 
 
 def test_alarm_fails_the_job_instead_of_completing(setup):
-    connector, received = setup
+    connector, _received = setup
     # Probe upwards: no contact, ALARM:5
     assert connector.stream_gcode("G21\nG91\nG38.2 Z1 F100\nG90\nG1 X5 F600\n", operation_name="test")
     assert _wait_status(connector, "failed")
@@ -231,7 +241,7 @@ def test_alarm_fails_the_job_instead_of_completing(setup):
 
 
 def test_completed_only_when_the_machine_is_idle():
-    connector, received, sim, cleanup = _make_setup(1.0)
+    connector, _received, sim, cleanup = _make_setup(1.0)
     try:
         states = []
         original = connector._send_stream_progress
@@ -253,7 +263,7 @@ def test_completed_only_when_the_machine_is_idle():
 
 
 def test_stop_during_motion_keeps_the_position():
-    connector, received, sim, cleanup = _make_setup(1.0)
+    connector, _received, sim, cleanup = _make_setup(1.0)
     try:
         assert connector.stream_gcode("G21\nG90\nG1 X100 F600\nG1 X0 F600\n", operation_name="test")
         deadline = time.time() + 5
@@ -274,7 +284,7 @@ def test_stop_during_motion_keeps_the_position():
 
 
 def test_lost_connection_fails_the_job():
-    connector, received, sim, cleanup = _make_setup(1.0)
+    connector, _received, _sim, cleanup = _make_setup(1.0)
     try:
         assert connector.stream_gcode("G21\nG90\nG1 X100 F600\nG1 X0 F600\n", operation_name="test")
         assert _wait_status(connector, "progress") or _wait_status(connector, "started")

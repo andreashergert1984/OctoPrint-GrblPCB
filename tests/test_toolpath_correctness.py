@@ -3,9 +3,9 @@ import math
 import re
 
 import pytest
+from gcode_reader import cutting_paths, moves, signed_area
 from shapely.geometry import MultiPolygon, Point, Polygon, box
 
-from gcode_reader import cutting_paths, moves, signed_area
 from octoprint_grblpcb.pcb_project import DrillInfo
 from octoprint_grblpcb.toolpath import (
     ToolpathSettings,
@@ -49,14 +49,15 @@ def test_isolation_is_climb_milling_on_both_sides():
     copper = MultiPolygon([box(10, 10, 20, 15)])
     for kwargs in ({}, {"mirror": "X", "board_size": (50.0, 30.0)}):
         paths = cutting_paths(generate_isolation_gcode(copper, s, **kwargs))
-        assert paths and all(signed_area(p) > 0 for p in paths), kwargs
+        # M3 (clockwise spindle): finished copper on the right, rings run clockwise
+        assert paths and all(signed_area(p) < 0 for p in paths), kwargs
 
 
-def test_copper_hole_is_milled_clockwise():
+def test_copper_hole_is_milled_counter_clockwise():
     s = ToolpathSettings(tool_diameter=0.1, tool_angle=60, cut_depth=0.1)
     ring = Polygon(box(0, 0, 20, 20).exterior.coords, holes=[box(5, 5, 15, 15).exterior.coords])
     areas = sorted(signed_area(p) for p in cutting_paths(generate_isolation_gcode(MultiPolygon([ring]), s)))
-    assert areas[0] < 0 < areas[-1]  # hole clockwise, outside counter-clockwise
+    assert areas[0] < 0 < areas[-1]  # outside clockwise, hole counter-clockwise
 
 
 def test_mirrored_isolation_lands_on_mirrored_position():
@@ -140,5 +141,5 @@ def test_cutout_is_milled_before_the_outer_contour():
     assert (min(xs), max(xs)) == pytest.approx((41.0, 59.0), abs=0.01)
     xs = [x for x, _ in outer]
     assert (min(xs), max(xs)) == pytest.approx((-1.0, 101.0), abs=0.01)
-    assert signed_area(inner) < 0 < signed_area(outer)  # climb on both
+    assert signed_area(outer) < 0 < signed_area(inner)  # climb: board on the right of both
     assert Point(50, 25).within(Polygon(inner))

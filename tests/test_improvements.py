@@ -9,8 +9,7 @@ from flask import Flask
 from flask_babel import Babel
 from shapely.geometry import Point, box
 
-from octoprint_grblpcb import GrblPcbPlugin
-from octoprint_grblpcb import gerber_parser
+from octoprint_grblpcb import GrblPcbPlugin, gerber_parser
 from octoprint_grblpcb.gerber_parser import parse_excellon_file, parse_gerber_file
 from octoprint_grblpcb.pcb_project import PCBProject
 from octoprint_grblpcb.toolpath import (
@@ -190,7 +189,7 @@ def test_project_save_keeps_the_old_file_when_writing_fails(tmp_path, monkeypatc
 
 # ---- travel pre-flight ------------------------------------------------------
 
-from octoprint_grblpcb.toolpath import gcode_extent, travel_check  # noqa: E402
+from octoprint_grblpcb.toolpath import gcode_extent, travel_check
 
 _LIMITS = {"travel": {"x": 200.0, "y": 200.0, "z": 50.0}, "homing": True, "soft_limits": True}
 

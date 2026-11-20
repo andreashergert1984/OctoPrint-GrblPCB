@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 GRBL Communication Module
 
@@ -13,10 +12,9 @@ import queue
 import re
 import threading
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import serial
-
 
 # GRBL Error codes (GRBL 1.1)
 GRBL_ERRORS = {
@@ -104,7 +102,7 @@ def _additional_port_patterns() -> list[str]:
     try:
         from octoprint.settings import settings
         return settings().get(["plugins", "serial_connector", "additionalPorts"]) or []
-    except Exception:
+    except Exception:  # noqa: BLE001 - any settings failure means: not initialised, use no extra ports
         # Settings are not initialised (e.g. in unit tests)
         return []
 
@@ -124,6 +122,8 @@ class GrblComm:
     # Status report: <State|Field:values|...>, fields in any order
     STATUS_PATTERN = re.compile(r"<([^>]*)>")
 
+    # "$G" answer: [GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]
+    PARSER_STATE_PATTERN = re.compile(r"^\[GC:.*?\b(G5[4-9])\b")
     SETTING_PATTERN = re.compile(r"^\$(\d+)=([^\s(]+)")
     ERROR_PATTERN = re.compile(r"error:(\d+)")
     ALARM_PATTERN = re.compile(r"ALARM:(\d+)")
@@ -132,27 +132,37 @@ class GrblComm:
         self,
         port: str,
         baudrate: int = 115200,
-        status_callback: Optional[Callable[[dict], None]] = None,
-        response_callback: Optional[Callable[[str], None]] = None,
-        error_callback: Optional[Callable[[int, str], None]] = None,
-        alarm_callback: Optional[Callable[[int, str], None]] = None,
-        disconnect_callback: Optional[Callable[[str], None]] = None,
+        status_callback: Callable[[dict], None] | None = None,
+        response_callback: Callable[[str], None] | None = None,
+        error_callback: Callable[[int, str], None] | None = None,
+        alarm_callback: Callable[[int, str], None] | None = None,
+        disconnect_callback: Callable[[str], None] | None = None,
+        reset_callback: Callable[[str], None] | None = None,
     ):
         self._port = port
         self._baudrate = baudrate
-        self._serial: Optional[serial.Serial] = None
+        self._serial: serial.Serial | None = None
         
         self._status_callback = status_callback
         self._response_callback = response_callback
         self._error_callback = error_callback
         self._alarm_callback = alarm_callback
         self._disconnect_callback = disconnect_callback
+        self._reset_callback = reset_callback
+        # Number of welcome banners seen: GRBL was reset that many times
+        self.reset_count = 0
+        # Work coordinate system of the last "[GC:...]" parser state report
+        self.parser_wcs: str | None = None
+        self.parser_state_seq = 0
+        # Last "[PRB:...]" report and how many came in
+        self.last_probe: dict | None = None
+        self.probe_seq = 0
 
         # time.monotonic() of the last byte received; the sender uses it to
         # notice a controller that stopped answering
         self.last_rx = 0.0
         # Welcome line of the firmware, e.g. "Grbl 1.1h ['$' for help]"
-        self.banner: Optional[str] = None
+        self.banner: str | None = None
         # GRBL settings as reported by "$$": {130: "200.000", ...}
         self.settings: dict[int, str] = {}
 
@@ -169,7 +179,7 @@ class GrblComm:
 
         # Background reader: handles every response as soon as it arrives, so
         # the streaming loop is never throttled by a polling interval
-        self._reader_thread: Optional[threading.Thread] = None
+        self._reader_thread: threading.Thread | None = None
         self._reader_stop = threading.Event()
     
     def connect(self):
@@ -229,7 +239,7 @@ class GrblComm:
             command = command.strip()
             
             self._logger.debug(f"Sending: {command}")
-            self._serial.write(f"{command}\n".encode("utf-8"))
+            self._serial.write(f"{command}\n".encode())
     
     def _write_realtime(self, byte: bytes):
         """Send a single real-time byte; GRBL acts on it at once, without ok."""
@@ -407,16 +417,34 @@ class GrblComm:
         # Check for probe result [PRB:x,y,z:success]
         prb_match = re.match(r"\[PRB:([+-]?\d+\.?\d*),([+-]?\d+\.?\d*),([+-]?\d+\.?\d*):(\d)\]", line)
         if prb_match:
+            probe = {
+                "x": float(prb_match.group(1)),
+                "y": float(prb_match.group(2)),
+                "z": float(prb_match.group(3)),
+                "success": prb_match.group(4) == "1",
+            }
+            self.last_probe = probe
+            self.probe_seq += 1
             if self._stream_mode:
-                self._response_queue.put(("probe", {
-                    "x": float(prb_match.group(1)),
-                    "y": float(prb_match.group(2)),
-                    "z": float(prb_match.group(3)),
-                    "success": prb_match.group(4) == "1",
-                }))
+                self._response_queue.put(("probe", probe))
         
         if line.startswith("Grbl "):
+            # The welcome line is sent after every reset (Ctrl-X, a button on
+            # the board, a power dip): everything GRBL had queued is gone
             self.banner = line
+            self.reset_count += 1
+            if self._stream_mode:
+                self._response_queue.put(("reset",))
+            if self._reset_callback:
+                try:
+                    self._reset_callback(line)
+                except Exception:
+                    self._logger.exception("Error in reset callback")
+
+        gc_match = self.PARSER_STATE_PATTERN.match(line)
+        if gc_match:
+            self.parser_wcs = gc_match.group(1)
+            self.parser_state_seq += 1
 
         setting = self.SETTING_PATTERN.match(line)
         if setting:

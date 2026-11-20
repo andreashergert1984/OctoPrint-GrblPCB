@@ -116,7 +116,7 @@ drilling (feed, peck depth, board thickness, breakthrough), outline (tool, tabs)
 2. **Create a new project** in the GrblPCB tab
 3. **Import layers** — drag-and-drop Gerber (copper, outline) and Excellon (drill) files
 4. **Rotate** the board if needed (90° increments or custom)
-5. **Set work origin** — jog to the corner of your copper-clad board, probe Z, zero all axes
+5. **Set work origin**: jog to the corner of your copper-clad board, click **X/Y=0**, then **Probe Z and zero**
 6. **Autolevel** — define a probe grid, run the probing cycle
 7. **Generate toolpaths** — isolation routing, drilling, outline cutting
 8. **Stream to CNC** — select an operation and click Send; real-time progress is shown
@@ -124,12 +124,15 @@ drilling (feed, peck depth, board thickness, breakthrough), outline (tool, tabs)
 
 ### Double-Sided Alignment
 
-1. Add at least 2 alignment holes (drill reference points)
-2. Drill the alignment holes on the front side
-3. Flip the board and secure it
-4. Probe each alignment hole on the back side
-5. Compute alignment transform — the plugin calculates rotation + offset
-6. All subsequent coordinates are automatically corrected
+1. Mill and drill the front side. Bottom copper is generated mirrored for
+   the back side automatically; drilling and the outline get their back-side
+   version with the mirror button of the operation
+2. Click "Auto-Select Alignment Holes" (the two drill holes farthest
+   apart); the list shows where each hole is on the flipped board
+3. Flip the board, clamp it and connect the probe
+4. Click "Probe Alignment Holes": the plugin probes the walls of each hole and
+   computes rotation and offset; an RMS above 0.05 mm is reported as a poor fit
+5. Apply the alignment to the mirrored operations, then send them
 
 ## Testing Without Hardware
 

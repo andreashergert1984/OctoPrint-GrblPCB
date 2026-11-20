@@ -5,10 +5,14 @@ toolpaths must register with the drilled holes after flipping the board.
 import pathlib
 
 import pytest
+from gcode_reader import cutting_paths, signed_area
 from shapely.geometry import Point, Polygon
 
-from gcode_reader import cutting_paths, signed_area
-from octoprint_grblpcb.gerber_parser import merge_geometries, parse_excellon_file, parse_gerber_file
+from octoprint_grblpcb.gerber_parser import (
+    merge_geometries,
+    parse_excellon_file,
+    parse_gerber_file,
+)
 from octoprint_grblpcb.toolpath import (
     ToolpathSettings,
     back_side_alignment_holes,
@@ -18,14 +22,14 @@ from octoprint_grblpcb.toolpath import (
 )
 
 FIXTURE = pathlib.Path(__file__).parent / "fixtures" / "two_layer"
-SETTINGS = dict(tool_diameter=0.1, tool_angle=60, cut_depth=0.1)
+SETTINGS = {"tool_diameter": 0.1, "tool_angle": 60, "cut_depth": 0.1}
 
 
 @pytest.fixture(scope="module")
 def board():
     top = merge_geometries(parse_gerber_file(str(FIXTURE / "TwoLayer-F_Cu.gbr"))[1])
     bottom = merge_geometries(parse_gerber_file(str(FIXTURE / "TwoLayer-B_Cu.gbr"))[1])
-    edge_layer, edge = parse_gerber_file(str(FIXTURE / "TwoLayer-Edge_Cuts.gbr"))
+    _edge_layer, edge = parse_gerber_file(str(FIXTURE / "TwoLayer-Edge_Cuts.gbr"))
     _layer, drills = parse_excellon_file(str(FIXTURE / "TwoLayer.drl"))
     # Board origin and size as the plugin takes them: bounds of the outline layer
     minx, miny, maxx, maxy = merge_geometries(edge).bounds
@@ -96,8 +100,8 @@ def test_both_sides_are_climb_milled(board):
         g = generate_isolation_gcode(copper, ToolpathSettings(**SETTINGS), origin_x=ox, origin_y=oy,
                                      mirror=mirror, board_size=(w, h))
         outer = [p for p in cutting_paths(g) if p[0] == p[-1] and signed_area(p) != 0]
-        # every copper island is surrounded counter-clockwise
-        assert sum(1 for p in outer if signed_area(p) > 0) >= len(copper.geoms)
+        # every copper island is surrounded clockwise (copper on the right)
+        assert sum(1 for p in outer if signed_area(p) < 0) >= len(copper.geoms)
 
 
 def test_alignment_holes_are_the_mirrored_corner_holes(board):

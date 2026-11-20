@@ -1,6 +1,6 @@
 # Development Plan
 
-Status of OctoPrint-GrblPCB as of November 2026. Replaces the original
+Status of OctoPrint-GrblPCB as of 2026-11-20 (OctoPrint 2.0.x and `dev` 2.1.0.dev368). Replaces the original
 `DEVELOPMENT_PLAN.md` that lived next to the OctoPrint checkout.
 
 ## Goal
@@ -24,7 +24,7 @@ autolevel and streaming out, without an external CAM tool.
 | Homing, unlock, jog, work coordinate systems, zeroing | simulator run |
 | Manual commands locked while a job runs, allowed in a pause | simulator run, tests |
 | Gerber RS-274X and Excellon import (LZ/TZ, file formats) | real KiCad files, tests |
-| Isolation routing: climb milling, overlapping passes, depth passes, narrow-gap pass, warning for gaps below the tool tip | simulator run, geometric tests |
+| Isolation routing: climb milling (M3), overlapping passes, depth passes, narrow-gap pass per gap, warning for gaps below the tool tip and for gaps left uncut | simulator run, geometric tests |
 | Drilling with peck cycles, breakthrough, tool changes per drill size | simulator run (3 tool changes), tests |
 | Outline cut on the Edge.Cuts centre line, cutouts, tabs, breakthrough | geometric tests |
 | Solder mask UV exposure toolpaths | simulator run, G-code inspected |

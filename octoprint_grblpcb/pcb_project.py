@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 PCB Project Model
 
@@ -12,8 +11,6 @@ import os
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
-
 
 _logger = logging.getLogger(__name__)
 
@@ -90,6 +87,9 @@ class PCBLayer:
     unsupported_slots: int = 0
     # Drill files: G85 slots turned into rows of overlapping holes
     drilled_slots: int = 0
+    # Gerber layers: widest line/arc stroke in mm. Edge.Cuts strokes run along
+    # the board edge, so the bounds are half a stroke wider on each side.
+    stroke_width: float = 0.0
     # SVG preview (base64 or path)
     svg_preview: str = ""
 
@@ -107,6 +107,7 @@ class PCBLayer:
             "parsed": self.parsed,
             "unsupported_slots": self.unsupported_slots,
             "drilled_slots": self.drilled_slots,
+            "stroke_width": self.stroke_width,
         }
 
     @classmethod
@@ -156,7 +157,7 @@ class MillingOperation:
     mirrored: bool = False  # bottom-side copy made by mirror_gcode
     # How the G-code was generated ({"command", "data"}); lets mirror_gcode
     # regenerate the back side from the geometry
-    generation: Optional[dict] = None
+    generation: dict | None = None
     tool_diameter: float = 0.1  # mm
     tool_angle: float = 60.0  # degrees (for V-bits)
     cut_depth: float = -0.1  # mm
@@ -166,6 +167,11 @@ class MillingOperation:
     pass_overlap: float = 0.0  # mm extra offset per pass
     estimated_time: float = 0.0  # seconds
     completed: bool = False
+
+    @property
+    def mirrorable(self) -> bool:
+        """Only drilling and the outline exist on both sides of the board."""
+        return self.layer_type in ("drill", "outline")
 
     @property
     def gcode_to_send(self) -> str:
@@ -195,7 +201,10 @@ class MillingOperation:
             "has_aligned_gcode": bool(self.gcode_aligned),
             "has_leveled_gcode": bool(self.gcode_leveled),
             "mirrored": self.mirrored,
-            "can_mirror": self.generation is not None and not self.mirrored,
+            "can_mirror": self.generation is not None and not self.mirrored and self.mirrorable,
+            # A bottom-layer operation from an old project, made before
+            # bottom layers were mirrored automatically: must be regenerated
+            "outdated": self.layer_type.startswith("bottom_") and not self.mirrored,
             "gcode_lines": self.gcode.count("\n") + 1 if self.gcode else 0,
         }
         if include_gcode:
@@ -249,15 +258,15 @@ class PCBProject:
     # Double-sided settings
     flip_axis: str = "X"  # mirror axis for double-sided
     alignment_holes: list = field(default_factory=list)  # [{expected_x, expected_y, diameter, measured_x, measured_y, probed}]
-    alignment_transform: Optional[dict] = None  # computed rigid-body transform
+    alignment_transform: dict | None = None  # computed rigid-body transform
     # When the alignment holes were probed: the board was flipped before
-    alignment_probed_at: Optional[float] = None
+    alignment_probed_at: float | None = None
 
     # Accumulated rotation (degrees CCW) applied to gerber data
     rotation: float = 0.0
 
     # Autolevel data
-    height_map: Optional[dict] = None  # stored probe data
+    height_map: dict | None = None  # stored probe data
 
     def add_layer(self, layer: PCBLayer):
         """Add or replace a layer."""
@@ -274,20 +283,27 @@ class PCBProject:
 
         outline = self.layers.get(LayerType.OUTLINE)
         if outline and outline.parsed:
-            self.board_width = outline.width
-            self.board_height = outline.height
-            self.board_min_x = outline.min_x
-            self.board_min_y = outline.min_y
+            # The outline is a stroke along the board edge: the board is the
+            # centre line, half a stroke inside the layer bounds
+            inset = min(outline.stroke_width / 2, outline.width / 2, outline.height / 2)
+            self.board_width = outline.width - 2 * inset
+            self.board_height = outline.height - 2 * inset
+            self.board_min_x = outline.min_x + inset
+            self.board_min_y = outline.min_y + inset
             return
 
-        # Fall back to copper layer extents
+        # Fall back to the union of the copper layer extents
+        max_x = max_y = float('-inf')
         for lt in (LayerType.TOP_COPPER, LayerType.BOTTOM_COPPER):
             layer = self.layers.get(lt)
             if layer and layer.parsed:
-                self.board_width = max(self.board_width, layer.width)
-                self.board_height = max(self.board_height, layer.height)
                 self.board_min_x = min(self.board_min_x, layer.min_x)
                 self.board_min_y = min(self.board_min_y, layer.min_y)
+                max_x = max(max_x, layer.min_x + layer.width)
+                max_y = max(max_y, layer.min_y + layer.height)
+        if max_x > float('-inf'):
+            self.board_width = max_x - self.board_min_x
+            self.board_height = max_y - self.board_min_y
 
         # Ensure board_min values are finite (no layers case)
         if self.board_min_x == float('inf'):
@@ -380,7 +396,7 @@ class PCBProject:
         )
 
         # Restore layers
-        for lt_str, layer_data in data.get("layers", {}).items():
+        for layer_data in data.get("layers", {}).values():
             layer = PCBLayer.from_dict(layer_data)
             project.layers[layer.layer_type] = layer
 
@@ -426,11 +442,11 @@ class PCBProject:
         )
         return project
 
-    def summary(self, project_dir: str = None) -> dict:
+    def summary(self, project_dir: str | None = None) -> dict:
         """Return a lightweight summary for project listings (no gcode)."""
         layer_names = [
             lt.value if isinstance(lt, LayerType) else lt
-            for lt in self.layers.keys()
+            for lt in self.layers
         ]
         created = None
         if project_dir:
@@ -450,7 +466,7 @@ class PCBProject:
         }
 
 
-def guess_layer_type(filename: str) -> Optional[LayerType]:
+def guess_layer_type(filename: str) -> LayerType | None:
     """Guess the layer type from filename/extension."""
     name_lower = filename.lower()
 
@@ -480,7 +496,7 @@ def list_projects(base_dir: str) -> list:
             try:
                 project = PCBProject.load(project_dir, include_gcode=False)
                 projects.append(project.summary(project_dir=project_dir))
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - one corrupt project must not hide the others; logged
                 _logger.warning(f"Could not load project from {project_dir}: {e}")
     return projects
 

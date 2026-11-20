@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 OctoPrint-GrblPCB
 
@@ -15,45 +14,46 @@ Features:
 
 import os
 import queue
+import re
 import threading
 import time
 import traceback
 
 import octoprint.plugin
-from octoprint.events import Events
 from flask_babel import gettext
-import re
+from octoprint.events import Events
 
-from .pcb_project import (
-    PCBProject,
-    LayerType,
-    BoardSide,
-    ProjectState,
-    MillingOperation,
-    guess_layer_type,
-    list_projects,
-    delete_project,
-)
-from .gerber_parser import parse_gerber_file, parse_excellon_file, merge_geometries
-from .toolpath import (
-    ToolpathSettings,
-    generate_isolation_gcode,
-    generate_drill_gcode,
-    generate_outline_gcode,
-    generate_mask_expose_gcode,
-    find_unisolatable_gaps,
-    AlignmentTransform,
-    back_side_alignment_holes,
-    compute_alignment_transform,
-    apply_alignment_transform,
-    gcode_extent,
-    travel_check,
-)
 from .autolevel import (
     HeightMap,
     apply_autolevel,
     height_map_origin_check,
     height_map_side_check,
+)
+from .gerber_parser import merge_geometries, parse_excellon_file, parse_gerber_file
+from .pcb_project import (
+    BoardSide,
+    LayerType,
+    MillingOperation,
+    PCBProject,
+    ProjectState,
+    delete_project,
+    guess_layer_type,
+    list_projects,
+)
+from .toolpath import (
+    AlignmentTransform,
+    ToolpathSettings,
+    apply_alignment_transform,
+    back_side_alignment_holes,
+    compute_alignment_transform,
+    find_unisolatable_gaps,
+    gcode_extent,
+    generate_drill_gcode,
+    generate_isolation_gcode,
+    generate_mask_expose_gcode,
+    generate_outline_gcode,
+    plan_narrow_gap_passes,
+    travel_check,
 )
 
 
@@ -91,6 +91,16 @@ class GrblPcbPlugin(
         self._height_map: HeightMap = None
         self._probe_thread: threading.Thread = None
         self._probe_stop = threading.Event()
+        # Set only by the stop buttons: the run ends quietly, not as a failure
+        self._probe_user_stop = threading.Event()
+        # Set by the Reset button: GRBL is reset and nothing may move after it
+        self._probe_reset = threading.Event()
+        # Work coordinate system the running probe run works in
+        self._probe_wcs = "G54"
+        # Cleared while a stop button halts the machine; the probe thread
+        # waits for it before it retracts
+        self._halt_finished = threading.Event()
+        self._halt_finished.set()
         self._upload_dir = None
         # Lock protecting _project, _geometries, _height_map from concurrent
         # access between Flask request threads and background probe threads.
@@ -110,6 +120,7 @@ class GrblPcbPlugin(
         ConnectedGrblPrinter._file_manager = self._file_manager
         ConnectedGrblPrinter._plugin_manager = self._plugin_manager
         ConnectedGrblPrinter._plugin_settings = self._settings
+        ConnectedGrblPrinter._probe_active_check = staticmethod(self._is_probe_active)
         
         # Create upload/project directory
         self._upload_dir = os.path.join(
@@ -189,7 +200,7 @@ class GrblPcbPlugin(
                             layer.max_y = parsed_layer.max_y
                             layer.width = parsed_layer.width
                             layer.height = parsed_layer.height
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 - third-party gerber parse of user file; logged
                         self._logger.warning(
                             f"Could not re-parse {layer.filepath}: {e}"
                         )
@@ -213,7 +224,7 @@ class GrblPcbPlugin(
                 f"{len(self._geometries)} layer geometries loaded"
                 f", rotation={self._project.rotation}°"
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - restore at startup must never crash OctoPrint; logged
             self._logger.warning(f"Could not load last project: {e}")
 
     def _get_project_upload_dir(self):
@@ -233,76 +244,76 @@ class GrblPcbPlugin(
     # -------------------------------------------------------------------------
 
     def get_settings_defaults(self):
-        return dict(
+        return {
             # PCB milling defaults
-            default_feed_rate=500,  # mm/min
-            default_jog_feed=1000,  # mm/min for jogging
-            default_spindle_speed=10000,  # RPM
-            safe_z_height=5.0,  # mm - safe height for rapid moves
-            travel_z_height=2.0,  # mm - Z for rapid travel between cuts
-            probe_depth=-5.0,  # mm - maximum probe depth
-            probe_feed=25,  # mm/min - probing feed rate
+            "default_feed_rate": 500,  # mm/min
+            "default_jog_feed": 1000,  # mm/min for jogging
+            "default_spindle_speed": 10000,  # RPM
+            "safe_z_height": 5.0,  # mm - safe height for rapid moves
+            "travel_z_height": 2.0,  # mm - Z for rapid travel between cuts
+            "probe_depth": -5.0,  # mm - maximum probe depth
+            "probe_feed": 25,  # mm/min - probing feed rate
             
             # Tool settings
-            tool_diameter=0.1,  # mm - default V-bit tip diameter
-            tool_angle=60,  # degrees - V-bit angle
-            cut_depth=0.1,  # mm - isolation cut depth
-            plunge_rate=100,  # mm/min - plunge feed rate
-            z_max_feed=120,  # mm/min (2 mm/s) - max Z travel speed (replaces G0 Z with G1 Z)
+            "tool_diameter": 0.1,  # mm - default V-bit tip diameter
+            "tool_angle": 60,  # degrees - V-bit angle
+            "cut_depth": 0.1,  # mm - isolation cut depth
+            "plunge_rate": 100,  # mm/min - plunge feed rate
+            "z_max_feed": 120,  # mm/min (2 mm/s) - max Z travel speed (replaces G0 Z with G1 Z)
             
             # Isolation milling
-            isolation_passes=1,
-            isolation_overlap=40.0,  # % of the trench width neighbouring passes share
-            isolation_max_width=0.0,  # mm total clearance width (0 = use fixed passes)
-            isolation_clear_gaps=False,  # auto-detect and clear all gaps
-            depth_per_pass=0.0,  # mm per Z-depth pass (0 = full depth in one pass)
+            "isolation_passes": 1,
+            "isolation_overlap": 40.0,  # % of the trench width neighbouring passes share
+            "isolation_max_width": 0.0,  # mm total clearance width (0 = use fixed passes)
+            "isolation_clear_gaps": False,  # auto-detect and clear all gaps
+            "depth_per_pass": 0.0,  # mm per Z-depth pass (0 = full depth in one pass)
             
             # Drilling
-            drill_feed=100,  # mm/min
-            peck_depth=0.5,  # mm per peck
-            board_thickness=1.6,  # mm
-            breakthrough_depth=0.2,  # mm below the board for drilling and outline
+            "drill_feed": 100,  # mm/min
+            "peck_depth": 0.5,  # mm per peck
+            "board_thickness": 1.6,  # mm
+            "breakthrough_depth": 0.2,  # mm below the board for drilling and outline
             
             # Outline
-            outline_depth_per_pass=0.5,  # mm step down per outline pass
-            outline_tab_width=2.0,  # mm
-            outline_tab_height=0.5,  # mm
-            outline_num_tabs=4,
+            "outline_depth_per_pass": 0.5,  # mm step down per outline pass
+            "outline_tab_width": 2.0,  # mm
+            "outline_tab_height": 0.5,  # mm
+            "outline_num_tabs": 4,
             
             # UV Mask Exposure
-            uv_led_offset_x=0.0,  # mm
-            uv_led_offset_y=0.0,  # mm
-            uv_spot_size=0.5,  # mm
-            uv_expose_speed=200,  # mm/min
-            uv_expose_z=5.0,  # mm
-            uv_power=255,  # 0-255
+            "uv_led_offset_x": 0.0,  # mm
+            "uv_led_offset_y": 0.0,  # mm
+            "uv_spot_size": 0.5,  # mm
+            "uv_expose_speed": 200,  # mm/min
+            "uv_expose_z": 5.0,  # mm
+            "uv_power": 255,  # 0-255
             
             # Autolevel
-            autolevel_grid_x=5,
-            autolevel_grid_y=5,
-            autolevel_margin=1.0,  # mm
-            autolevel_max_segment=1.0,  # mm
+            "autolevel_grid_x": 5,
+            "autolevel_grid_y": 5,
+            "autolevel_margin": 1.0,  # mm
+            "autolevel_max_segment": 1.0,  # mm
             
             # Double-sided
-            flip_axis="X",
+            "flip_axis": "X",
             
             # Work coordinate system
-            wcs_default="G54",  # Default work coordinate system
+            "wcs_default": "G54",  # Default work coordinate system
             
             # Spindle control
-            spindle_min_rpm=0,
-            spindle_max_rpm=24000,
-            spindle_delay=2.0,  # seconds - delay after spindle start
+            "spindle_min_rpm": 0,
+            "spindle_max_rpm": 24000,
+            "spindle_delay": 2.0,  # seconds - delay after spindle start
             
             # Safety settings
-            soft_limits=True,
-            hard_limits=True,
+            "soft_limits": True,
+            "hard_limits": True,
             
             # UI settings
-            show_machine_position=True,
-            show_work_position=True,
-            ui_help_mode="compact",
-        )
+            "show_machine_position": True,
+            "show_work_position": True,
+            "ui_help_mode": "compact",
+        }
 
     def get_settings_version(self):
         return 2
@@ -310,9 +321,11 @@ class GrblPcbPlugin(
     def on_settings_migrate(self, target, current):
         # Version 2: isolation_overlap is a percentage of the trench width;
         # before it was a step in mm (often 0), which cannot be converted
-        if current is None or current < 2:
-            if self._settings.get(["isolation_overlap"]) is not None:
-                self._settings.set_float(["isolation_overlap"], 40.0)
+        if (
+            (current is None or current < 2)
+            and self._settings.get(["isolation_overlap"]) is not None
+        ):
+            self._settings.set_float(["isolation_overlap"], 40.0)
 
     def on_settings_save(self, data):
         octoprint.plugin.SettingsPlugin.on_settings_save(self, data)
@@ -349,9 +362,9 @@ class GrblPcbPlugin(
         ]
 
     def get_template_vars(self):
-        return dict(
-            wcs_options=["G54", "G55", "G56", "G57", "G58", "G59"],
-        )
+        return {
+            "wcs_options": ["G54", "G55", "G56", "G57", "G58", "G59"],
+        }
 
     def is_template_autoescaped(self):
         return True
@@ -361,10 +374,10 @@ class GrblPcbPlugin(
     # -------------------------------------------------------------------------
 
     def get_assets(self):
-        return dict(
-            js=["js/labels.js", "js/workspace_renderer.js", "js/grblpcb.js"],
-            css=["css/grblpcb.css"],
-        )
+        return {
+            "js": ["js/labels.js", "js/workspace_renderer.js", "js/grblpcb.js"],
+            "css": ["css/grblpcb.css"],
+        }
 
     # -------------------------------------------------------------------------
     # SimpleApiPlugin
@@ -375,66 +388,66 @@ class GrblPcbPlugin(
         return True
 
     def get_api_commands(self):
-        return dict(
+        return {
             # CNC control
-            probe=["axis"],
-            home=[],
-            unlock=[],
-            reset=[],
-            hold=[],
-            resume=[],
-            set_wcs=["wcs"],
-            zero_axis=["axis"],
-            goto_zero=[],
-            status=[],
-            set_spindle=["speed"],
-            spindle_on=[],
-            spindle_off=[],
-            jog=["axis", "distance", "feed"],
+            "probe": ["axis"],
+            "home": [],
+            "unlock": [],
+            "reset": [],
+            "hold": [],
+            "resume": [],
+            "set_wcs": ["wcs"],
+            "zero_axis": ["axis"],
+            "goto_zero": [],
+            "status": [],
+            "set_spindle": ["speed"],
+            "spindle_on": [],
+            "spindle_off": [],
+            "jog": ["axis", "distance", "feed"],
             # PCB project
-            new_project=[],
-            get_project=[],
-            list_projects=[],
-            load_project=["project_id"],
-            delete_project=["project_id"],
-            import_layer=["filename", "layer_type"],
-            remove_layer=["layer_type"],
-            rotate_project=["angle"],
+            "new_project": [],
+            "get_project": [],
+            "list_projects": [],
+            "load_project": ["project_id"],
+            "delete_project": ["project_id"],
+            "import_layer": ["filename", "layer_type"],
+            "remove_layer": ["layer_type"],
+            "rotate_project": ["angle"],
             # Toolpath generation
-            generate_isolation=[],
-            generate_drill=[],
-            generate_outline=[],
-            generate_mask_expose=[],
-            get_layer_geometry=[],
+            "generate_isolation": [],
+            "generate_drill": [],
+            "generate_outline": [],
+            "generate_mask_expose": [],
+            "get_layer_geometry": [],
             # Autolevel
-            setup_autolevel=[],
-            start_autolevel=[],
-            stop_autolevel=[],
-            get_heightmap=[],
-            apply_autolevel=["operation_index"],
+            "setup_autolevel": [],
+            "start_autolevel": [],
+            "stop_autolevel": [],
+            "get_heightmap": [],
+            "apply_autolevel": ["operation_index"],
             # Double-sided
-            set_board_side=["side"],
-            mirror_gcode=["operation_index"],
-            set_alignment_holes=["holes"],
-            auto_alignment_holes=[],
-            probe_alignment=[],
-            stop_alignment_probe=[],
-            compute_alignment=[],
-            apply_alignment=["operation_index"],
-            clear_alignment=[],
+            "set_board_side": ["side"],
+            "mirror_gcode": ["operation_index"],
+            "set_alignment_holes": ["holes"],
+            "auto_alignment_holes": [],
+            "probe_alignment": [],
+            "stop_alignment_probe": [],
+            "compute_alignment": [],
+            "apply_alignment": ["operation_index"],
+            "clear_alignment": [],
             # Operations
-            get_operations=[],
-            download_gcode=["operation_index"],
-            delete_operation=["operation_index"],
-            reorder_operations=["new_order"],
-            get_toolpath_preview=[],
+            "get_operations": [],
+            "download_gcode": ["operation_index"],
+            "delete_operation": ["operation_index"],
+            "reorder_operations": ["new_order"],
+            "get_toolpath_preview": [],
             # G-code execution
-            send_to_cnc=["operation_index"],
-            stop_execution=[],
-            confirm_tool_change=[],
+            "send_to_cnc": ["operation_index"],
+            "stop_execution": [],
+            "confirm_tool_change": [],
             # Real-time overrides
-            send_override=["override_type", "action"],
-        )
+            "send_override": ["override_type", "action"],
+        }
 
     def _get_grbl_connector(self):
         """Get the active GRBL connector if connected."""
@@ -456,6 +469,8 @@ class GrblPcbPlugin(
         "set_wcs", "zero_axis", "goto_zero", "status", "machine_check",
         "set_spindle", "spindle_on", "spindle_off", "jog",
         "send_override", "stop_execution", "confirm_tool_change",
+        # Never wait for the project lock: stopping must act at once
+        "stop_autolevel", "stop_alignment_probe",
     })
 
     # Project commands touch shared state — require _project_lock
@@ -464,11 +479,11 @@ class GrblPcbPlugin(
         "delete_project", "import_layer", "remove_layer", "rotate_project",
         "generate_isolation", "generate_drill", "generate_outline",
         "generate_mask_expose", "get_layer_geometry",
-        "setup_autolevel", "start_autolevel", "stop_autolevel",
+        "setup_autolevel", "start_autolevel",
         "get_heightmap", "apply_autolevel",
         "set_board_side", "mirror_gcode",
         "set_alignment_holes", "auto_alignment_holes",
-        "probe_alignment", "stop_alignment_probe",
+        "probe_alignment",
         "compute_alignment", "apply_alignment", "clear_alignment",
         "get_operations", "download_gcode", "delete_operation",
         "reorder_operations", "get_toolpath_preview",
@@ -480,6 +495,12 @@ class GrblPcbPlugin(
     _MANUAL_GCODE_COMMANDS = frozenset({
         "probe", "home", "unlock", "set_wcs", "zero_axis", "goto_zero",
         "set_spindle", "spindle_on", "spindle_off", "jog",
+    })
+
+    # Replace the project (and its height map) the probe run writes into
+    _REPLACES_PROJECT_COMMANDS = frozenset({
+        "new_project", "load_project", "rotate_project", "delete_project",
+        "import_layer", "remove_layer", "setup_autolevel",
     })
 
     # Looking at the state of the machine and the project
@@ -536,6 +557,10 @@ class GrblPcbPlugin(
         if permission is not None and not self._user_can(permission):
             return flask.jsonify(error=gettext("You do not have the permission for this action.")), 403
 
+        if (command in self._MANUAL_GCODE_COMMANDS or command in self._REPLACES_PROJECT_COMMANDS) \
+                and self._is_probe_active():
+            return self._probe_running_response()
+
         if command in self._MANUAL_GCODE_COMMANDS:
             # Mixed into a running job they would move the machine and
             # break the character counting of the stream
@@ -576,6 +601,23 @@ class GrblPcbPlugin(
 
     def _is_probe_active(self):
         return self._probe_thread is not None and self._probe_thread.is_alive()
+
+    def _probe_running_response(self):
+        import flask
+        return flask.jsonify(error=gettext(
+            "Not possible while probing is running. Wait until it is done or stop it."
+        )), 409
+
+    def _idle_block(self, connector):
+        """409 response unless GRBL is idle: a job or probing must not start on a moving machine."""
+        import flask
+
+        state = getattr(connector, "_grbl_state", "Idle")
+        if state != "Idle":
+            return flask.jsonify(error=gettext(
+                "GRBL is busy (state: %(state)s). Wait until the machine is idle, then try again."
+            ) % {"state": state}), 409
+        return None
 
     def _alarm_block(self, connector):
         """409 response if GRBL is in alarm: jobs and probing would fail line by line."""
@@ -627,6 +669,19 @@ class GrblPcbPlugin(
             return err
         depth = self._settings.get_float(["probe_depth"])
         feed = self._settings.get_int(["probe_feed"])
+        safe_z = self._settings.get_float(["safe_z_height"]) or 2.0
+        if axis == "Z":
+            # A manual Z probe usually starts at the safe height (after
+            # "probe and zero" or a tool change retract), and a new tool may
+            # be shorter: the travel must reach well below the old zero.
+            # G38.2 stops at contact, so a longer travel costs nothing.
+            # Started higher than that: reach 5 mm below the current zero
+            work_z = (getattr(connector, "_work_position", None) or {}).get("z", 0.0)
+            depth = -max(abs(depth), safe_z + 5.0, work_z + 5.0)
+        if data.get("zero") and axis == "Z":
+            clearance = safe_z
+            connector.probe(axis, depth, feed, zero=True, clearance=clearance)
+            return flask.jsonify(result="probing")
         connector.probe(axis, depth, feed)
         return flask.jsonify(result="probing")
 
@@ -651,7 +706,17 @@ class GrblPcbPlugin(
         connector, err = self._require_grbl_connection()
         if err:
             return err
-        connector.emergency_stop()
+        # A reset ends a running probe run as well, and not as a failure;
+        # the probe thread must not move the machine after it
+        self._halt_finished.clear()
+        try:
+            if self._is_probe_active():
+                self._probe_reset.set()
+                self._probe_user_stop.set()
+                self._probe_stop.set()
+            connector.emergency_stop()
+        finally:
+            self._halt_finished.set()
         return flask.jsonify(result="reset")
 
     def _handle_hold(self, data):
@@ -699,7 +764,7 @@ class GrblPcbPlugin(
             return err
         safe_z = self._settings.get_float(["safe_z_height"])
         z_feed = self._settings.get_float(["z_max_feed"])
-        connector.commands(f"G1 Z{safe_z} F{z_feed:.0f}", "G0 X0 Y0", f"G1 Z0 F{z_feed:.0f}")
+        connector.commands("G21 G90", f"G1 Z{safe_z} F{z_feed:.0f}", "G0 X0 Y0", f"G1 Z0 F{z_feed:.0f}")
         return flask.jsonify(result="going to zero")
 
     def _handle_status(self, data):
@@ -886,15 +951,49 @@ class GrblPcbPlugin(
         if err:
             return err
         if lt in self._project.layers:
+            before = self._board_box()
             del self._project.layers[lt]
             self._geometries.pop(lt, None)
             self._geometries_unrotated.pop(lt, None)
+            if lt == LayerType.DRILL:
+                self._project.drills = []
+                self._drills_unrotated = []
+            self._project._update_board_dimensions()
+            self._drop_stale_operations(lt, before)
         self._save_project()
         return flask.jsonify(result="ok", project=self._project.to_dict())
 
+    def _halt_probing(self):
+        """
+        Stop a probe run and the machine: feed hold, then reset.
+
+        Setting the flag alone left the machine to finish its move and the
+        probe thread to run into timeouts.
+        """
+        self._halt_finished.clear()
+        started = False
+        try:
+            self._probe_user_stop.set()
+            self._probe_stop.set()
+            connector = self._get_grbl_connector()
+            halt = getattr(connector, "_halt_machine", None)
+            if callable(halt) and self._is_probe_active():
+                # In the background: the request must not wait for the hold
+                def run():
+                    try:
+                        halt()
+                    finally:
+                        self._halt_finished.set()
+
+                threading.Thread(target=run, daemon=True).start()
+                started = True
+        finally:
+            if not started:
+                self._halt_finished.set()
+
     def _handle_stop_autolevel(self, data):
         import flask
-        self._probe_stop.set()
+        self._halt_probing()
         return flask.jsonify(result="stopping")
 
     def _handle_get_heightmap(self, data):
@@ -920,7 +1019,7 @@ class GrblPcbPlugin(
 
     def _handle_stop_alignment_probe(self, data):
         import flask
-        self._probe_stop.set()
+        self._halt_probing()
         return flask.jsonify(result="ok")
 
     def _handle_get_operations(self, data):
@@ -939,12 +1038,16 @@ class GrblPcbPlugin(
     @octoprint.plugin.BlueprintPlugin.route("/upload", methods=["POST"])
     def handle_upload(self):
         """Handle Gerber/Excellon file uploads."""
-        import flask
         import shutil
+
+        import flask
         from octoprint.access.permissions import Permissions
 
         if not self._user_can(Permissions.FILES_UPLOAD):
             return flask.jsonify(error=gettext("You do not have the permission for this action.")), 403
+
+        if self._is_probe_active():
+            return self._probe_running_response()
 
         with self._project_lock:
             return self._handle_upload_inner(flask, shutil)
@@ -1025,9 +1128,35 @@ class GrblPcbPlugin(
     # PCB Workflow Handlers
     # -------------------------------------------------------------------------
 
+    def _board_box(self) -> tuple:
+        p = self._project
+        return (p.board_min_x, p.board_min_y, p.board_width, p.board_height)
+
+    def _drop_stale_operations(self, layer_type: LayerType, board_box_before: tuple):
+        """Remove operations that no longer match the layers.
+
+        Operations made from a replaced or removed layer are stale. G-code
+        coordinates are relative to the board origin, so when the board
+        extent changes every operation is stale.
+        """
+        ops = self._project.operations
+        if not ops:
+            return
+        if self._board_box() != board_box_before:
+            kept = []
+        else:
+            kept = [op for op in ops if op.layer_type != layer_type.value]
+        if len(kept) != len(ops):
+            self._logger.info(
+                f"Removing {len(ops) - len(kept)} operation(s) made from the "
+                f"previous layer data"
+            )
+            self._project.operations = kept
+
     def _parse_and_add_layer(self, filepath: str, layer_type: LayerType):
         """Parse a file and add it to the project."""
         import copy
+        before = self._board_box()
         try:
             if layer_type == LayerType.DRILL:
                 layer, drills = parse_excellon_file(filepath)
@@ -1057,6 +1186,7 @@ class GrblPcbPlugin(
             # the newly added layer is rotated together with the others.
             if self._project.rotation and self._project.rotation != 0:
                 self._apply_rotation_to_geometries(self._project.rotation)
+            self._drop_stale_operations(layer_type, before)
         except Exception as e:
             self._logger.error(f"Error parsing {filepath}: {e}")
             self._logger.debug(traceback.format_exc())
@@ -1086,7 +1216,7 @@ class GrblPcbPlugin(
             self._parse_and_add_layer(filepath, layer_type)
             self._save_project()
             return flask.jsonify(result="ok", project=self._project.to_dict())
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - API handler returns 500 with message; logged
             self._logger.error(f"Import layer failed: {e}")
             return flask.jsonify(error=str(e)), 500
 
@@ -1128,7 +1258,7 @@ class GrblPcbPlugin(
                             layer.max_y = parsed_layer.max_y
                             layer.width = parsed_layer.width
                             layer.height = parsed_layer.height
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 - third-party gerber parse of user file; logged
                         self._logger.warning(
                             f"Could not re-parse {layer.filepath}: {e}"
                         )
@@ -1156,7 +1286,7 @@ class GrblPcbPlugin(
             # Touch project.json so this becomes the "last used" project
             self._save_project()
             return flask.jsonify(result="ok", project=self._project.to_dict())
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - API handler returns 500 with message; logged
             self._logger.error(f"Error loading project {project_id}: {e}")
             return flask.jsonify(error=str(e)), 500
 
@@ -1202,10 +1332,11 @@ class GrblPcbPlugin(
         Always computes from the stored unrotated originals to avoid
         floating-point drift from repeated incremental rotations.
         """
-        from shapely import affinity
-        from shapely.ops import unary_union
         import copy
         import math
+
+        from shapely import affinity
+        from shapely.ops import unary_union
 
         # Start from unrotated originals
         source = self._geometries_unrotated if self._geometries_unrotated else self._geometries
@@ -1261,7 +1392,7 @@ class GrblPcbPlugin(
                 all_rotated.append(geoms)
 
         rotated_union = unary_union(all_rotated)
-        rmin_x, rmin_y, rmax_x, rmax_y = rotated_union.bounds
+        rmin_x, rmin_y, _rmax_x, _rmax_y = rotated_union.bounds
 
         # --- Translate so min corner is at (0,0) - stay in quadrant 1 ---
         dx = -rmin_x
@@ -1421,9 +1552,18 @@ class GrblPcbPlugin(
                     setattr(s, key, type(getattr(s, key))(data[key]))
         return s
 
-    def _mirror_args(self, data):
-        """Generator arguments for the back side if data asks for it."""
-        if not data.get("mirror"):
+    @staticmethod
+    def _is_bottom_layer(layer_type) -> bool:
+        return str(getattr(layer_type, "value", layer_type) or "").startswith("bottom_")
+
+    def _mirror_args(self, data, layer_type=None):
+        """
+        Generator arguments for the back side if data asks for it.
+
+        A bottom layer is seen from the top in the Gerber file; milled after
+        flipping the board it always needs the mirrored geometry.
+        """
+        if not data.get("mirror") and not self._is_bottom_layer(layer_type):
             return {}
         return {
             "mirror": self._project.flip_axis,
@@ -1462,7 +1602,7 @@ class GrblPcbPlugin(
 
         # Merge geometries and generate toolpath
         copper = merge_geometries(geometries)
-        mirror_args = self._mirror_args(data)
+        mirror_args = self._mirror_args(data, layer_type)
         gcode = generate_isolation_gcode(
             copper,
             settings,
@@ -1502,6 +1642,16 @@ class GrblPcbPlugin(
                 "min_gap": round(gaps[0][0], 3),
                 "x": round(gaps[0][1][0] - self._project.board_min_x, 2),
                 "y": round(gaps[0][1][1] - self._project.board_min_y, 2),
+                "tool": settings.tool_diameter,
+            })
+        # Narrow gaps the planner leaves uncut, one warning per gap
+        _classes, uncut_gaps = plan_narrow_gap_passes(copper, settings)
+        for gap, (gx, gy) in uncut_gaps:
+            warnings.append({
+                "code": "gap_uncut",
+                "gap": round(gap, 3),
+                "x": round(gx - self._project.board_min_x, 2),
+                "y": round(gy - self._project.board_min_y, 2),
                 "tool": settings.tool_diameter,
             })
         return flask.jsonify(
@@ -1558,7 +1708,14 @@ class GrblPcbPlugin(
             if polys:
                 result[lt.value] = polys
 
-        return flask.jsonify(result="ok", geometries=result)
+        # Drill holes as circles: [x, y, diameter] relative to the board origin
+        holes = []
+        if not layer_type_str or layer_type_str == LayerType.DRILL.value:
+            for drill in self._project.drills or []:
+                for hx, hy in drill.holes:
+                    holes.append([round(hx - ox, 4), round(hy - oy, 4), drill.diameter])
+
+        return flask.jsonify(result="ok", geometries=result, holes=holes)
 
     def _handle_generate_drill(self, data):
         """Generate drilling G-code."""
@@ -1713,7 +1870,7 @@ class GrblPcbPlugin(
 
         settings = self._get_toolpath_settings(data)
 
-        mirror_args = self._mirror_args(data)
+        mirror_args = self._mirror_args(data, layer_type)
         gcode = generate_mask_expose_gcode(
             mask_merged,
             board_bounds,
@@ -1803,7 +1960,7 @@ class GrblPcbPlugin(
         if self._is_streaming_active(connector):
             return flask.jsonify(error=gettext("Cannot start probing while streaming is active")), 409
 
-        blocked = self._alarm_block(connector)
+        blocked = self._alarm_block(connector) or self._idle_block(connector)
         if blocked:
             return blocked
 
@@ -1820,6 +1977,9 @@ class GrblPcbPlugin(
 
         # Start probing in background thread
         self._probe_stop.clear()
+        self._probe_user_stop.clear()
+        self._probe_reset.clear()
+        self._probe_wcs = getattr(connector, "_current_wcs", None) or "G54"
         self._probe_thread = threading.Thread(
             target=self._autolevel_probe_loop,
             args=(connector,),
@@ -1830,6 +1990,43 @@ class GrblPcbPlugin(
         return flask.jsonify(result="ok", message=gettext("Probing started"))
 
     PROBE_TIMEOUT = 30.0
+
+    def _probe_commands(self, connector, *commands):
+        """
+        Send the commands of a probe run.
+
+        Manual commands are locked out while probing; these are the run's
+        own, which is why they go out as ``internal``. After a stop button
+        nothing more is sent.
+        """
+        if self._probe_user_stop.is_set():
+            raise _ProbeAborted("stopped")
+        connector.commands(*commands, internal=True)
+
+    def _retract_after_probing(self, connector, comm, safe_z, z_feed, wait=True):
+        """
+        Lift the bit to safe Z when a probe run ends, however it ended.
+
+        Not in alarm (GRBL would refuse the move anyway). After the Reset
+        button nothing moves at all. After a stop button the retract waits
+        for the halt; the reset left GRBL in G54, so the run's work
+        coordinate system and absolute mm mode are selected again first.
+        """
+        stopped = self._probe_user_stop.is_set()
+        if stopped:
+            self._halt_finished.wait(timeout=8.0)
+        if self._probe_reset.is_set():
+            return
+        if getattr(connector, "_grbl_state", "") == "Alarm":
+            return
+        try:
+            if stopped:
+                connector.commands(f"G21 G90 {self._probe_wcs}", internal=True)
+            connector.commands(f"G1 Z{safe_z} F{z_feed:.0f}", internal=True)
+            if wait and comm is not None:
+                self._wait_for_ok(comm, timeout=10.0)
+        except Exception as e:  # noqa: BLE001 - best-effort retract, must not abort cleanup; logged
+            self._logger.warning(f"Retract after probing failed: {e}")
 
     def _await_probe_result(self, comm, work_offset):
         """
@@ -1861,6 +2058,8 @@ class GrblPcbPlugin(
                 return None, "grbl_error"
             elif resp[0] == "alarm":
                 return None, "alarm"
+            elif resp[0] == "reset":
+                return None, "reset"
         return None, "timeout"
 
     def _autolevel_probe_loop(self, connector):
@@ -1898,7 +2097,7 @@ class GrblPcbPlugin(
                     continue
 
                 # Move to point — use minimal Z clearance to reduce Z travel
-                connector.commands(
+                self._probe_commands(connector, 
                     f"G1 Z{inter_point_z} F{z_feed:.0f}",
                     f"G0 X{point.x:.4f} Y{point.y:.4f}",
                     f"G1 Z{travel_z} F{z_feed:.0f}",
@@ -1908,7 +2107,7 @@ class GrblPcbPlugin(
                     self._confirm_ok(comm, timeout=10.0)
 
                 # Probe
-                connector.commands(
+                self._probe_commands(connector, 
                     "G21",
                     "G90",
                     f"G38.2 Z{probe_depth} F{probe_feed}",
@@ -1944,7 +2143,7 @@ class GrblPcbPlugin(
                         self._save_project()
 
                 # Retract
-                connector.commands(f"G1 Z{travel_z} F{z_feed:.0f}")
+                self._probe_commands(connector, f"G1 Z{travel_z} F{z_feed:.0f}")
                 self._confirm_ok(comm, timeout=5.0)
                 # Send progress update
                 if self._plugin_manager:
@@ -1962,15 +2161,18 @@ class GrblPcbPlugin(
         except _ProbeAborted as aborted:
             # Probing at a place the machine never reached would record a
             # height for the wrong spot
-            self._logger.error(f"Autolevel aborted: {aborted.reason}")
             self._probe_stop.set()
-            if self._plugin_manager:
+            if self._probe_user_stop.is_set():
+                self._logger.info("Probing stopped by user")
+            else:
+                self._logger.error(f"Autolevel aborted: {aborted.reason}")
+            if self._plugin_manager and not self._probe_user_stop.is_set():
                 failed_at = self._height_map.next_unprobed_index()
                 self._plugin_manager.send_plugin_message(
                     "grblpcb",
                     {"type": "autolevel_failed", "index": max(failed_at, 0), "total": total, "reason": aborted.reason},
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - probing thread loop must not die silently; logged
             self._logger.error(f"Error during probing: {e}")
             self._logger.debug(traceback.format_exc())
 
@@ -1995,7 +2197,7 @@ class GrblPcbPlugin(
                     f"(X{first_pt.x:.3f} Y{first_pt.y:.3f}, "
                     f"original Z={first_pt.z:.4f})"
                 )
-                connector.commands(
+                self._probe_commands(connector, 
                     f"G1 Z{inter_point_z} F{z_feed:.0f}",
                     f"G0 X{first_pt.x:.4f} Y{first_pt.y:.4f}",
                     f"G1 Z{travel_z} F{z_feed:.0f}",
@@ -2003,7 +2205,7 @@ class GrblPcbPlugin(
                 for _ in range(3):
                     self._wait_for_ok(comm, timeout=10.0)
 
-                connector.commands(
+                self._probe_commands(connector, 
                     "G21", "G90",
                     f"G38.2 Z{probe_depth} F{probe_feed}",
                 )
@@ -2053,9 +2255,9 @@ class GrblPcbPlugin(
                         "Drift check: no probe result received (timeout)"
                     )
                 # Retract after drift check
-                connector.commands(f"G1 Z{travel_z} F{z_feed:.0f}")
+                self._probe_commands(connector, f"G1 Z{travel_z} F{z_feed:.0f}")
                 self._wait_for_ok(comm, timeout=5.0)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - drift check best effort, cleanup follows; logged
                 self._logger.warning(f"Z-drift check failed: {e}")
                 import traceback as tb
                 self._logger.debug(tb.format_exc())
@@ -2064,7 +2266,7 @@ class GrblPcbPlugin(
         try:
             if comm is not None and hasattr(comm, '_stream_mode'):
                 comm._stream_mode = False
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - cleanup must always finish; logged
             self._logger.debug(f"Error resetting stream mode: {e}")
 
         if self._height_map.is_complete():
@@ -2088,11 +2290,12 @@ class GrblPcbPlugin(
                     "grblpcb", msg,
                 )
 
-        # Return to safe position
-        connector.commands(
-            f"G1 Z{safe_z} F{z_feed:.0f}",
-            "G0 X0 Y0",
-        )
+        # Return to safe position; after a stop button or in alarm only
+        # the Z retract (if any): the machine must not travel on
+        stopped = self._probe_user_stop.is_set()
+        self._retract_after_probing(connector, comm, safe_z, z_feed, wait=False)
+        if not stopped and getattr(connector, "_grbl_state", "") != "Alarm":
+            connector.commands("G0 X0 Y0", internal=True)
 
     def _wait_for_ok(self, comm, timeout=5.0):
         """Wait for an 'ok' response from GRBL."""
@@ -2104,7 +2307,7 @@ class GrblPcbPlugin(
                 continue
             if resp[0] == "ok":
                 return True
-            elif resp[0] in ("error", "alarm"):
+            elif resp[0] in ("error", "alarm", "reset"):
                 return False
         return False
 
@@ -2175,6 +2378,12 @@ class GrblPcbPlugin(
         op = self._project.operations[op_index]
         if op.mirrored:
             return flask.jsonify(error=gettext("This operation is already the back-side version")), 400
+        if not op.mirrorable:
+            # Copper and mask layers belong to one side: the bottom ones are
+            # mirrored when generated, the top ones are never mirrored
+            return flask.jsonify(error=gettext(
+                "Only drilling and the outline are mirrored for the back side. Bottom copper is generated for the back side directly."
+            )), 400
         if not op.generation:
             return flask.jsonify(error=gettext(
                 "Generate this operation again, then it can be mirrored for the back side."
@@ -2288,12 +2497,15 @@ class GrblPcbPlugin(
         if self._is_streaming_active(connector):
             return flask.jsonify(error=gettext("Cannot start probing while streaming is active")), 409
 
-        blocked = self._alarm_block(connector)
+        blocked = self._alarm_block(connector) or self._idle_block(connector)
         if blocked:
             return blocked
 
         # Start probing in background thread
         self._probe_stop.clear()
+        self._probe_user_stop.clear()
+        self._probe_reset.clear()
+        self._probe_wcs = getattr(connector, "_current_wcs", None) or "G54"
         self._probe_thread = threading.Thread(
             target=self._alignment_probe_loop,
             args=(connector,),
@@ -2355,7 +2567,7 @@ class GrblPcbPlugin(
                 )
 
                 # -- Move to hole position at safe Z --
-                connector.commands(
+                self._probe_commands(connector, 
                     f"G1 Z{safe_z} F{z_feed:.0f}",
                     f"G0 X{ex:.4f} Y{ey:.4f}",
                 )
@@ -2363,7 +2575,7 @@ class GrblPcbPlugin(
                     self._confirm_ok(comm, timeout=10.0)
 
                 # -- Plunge into hole --
-                connector.commands(f"G1 Z{hole_probe_z:.4f} F{z_feed:.0f}")
+                self._probe_commands(connector, f"G1 Z{hole_probe_z:.4f} F{z_feed:.0f}")
                 self._confirm_ok(comm, timeout=10.0)
 
                 # -- Probe X+ --
@@ -2372,10 +2584,11 @@ class GrblPcbPlugin(
                 )
                 if x_plus is None:
                     self._logger.warning(f"X+ probe failed at hole {idx}")
+                    self._retract_after_probing(connector, comm, safe_z, z_feed)
                     continue
 
                 # Return to center
-                connector.commands(f"G0 X{ex:.4f}")
+                self._probe_commands(connector, f"G0 X{ex:.4f}")
                 self._confirm_ok(comm, timeout=5.0)
 
                 # -- Probe X- --
@@ -2384,12 +2597,13 @@ class GrblPcbPlugin(
                 )
                 if x_minus is None:
                     self._logger.warning(f"X- probe failed at hole {idx}")
+                    self._retract_after_probing(connector, comm, safe_z, z_feed)
                     continue
 
                 center_x = (x_plus + x_minus) / 2.0
 
                 # Move to measured center X
-                connector.commands(f"G0 X{center_x:.4f}")
+                self._probe_commands(connector, f"G0 X{center_x:.4f}")
                 self._confirm_ok(comm, timeout=5.0)
 
                 # -- Probe Y+ --
@@ -2398,10 +2612,11 @@ class GrblPcbPlugin(
                 )
                 if y_plus is None:
                     self._logger.warning(f"Y+ probe failed at hole {idx}")
+                    self._retract_after_probing(connector, comm, safe_z, z_feed)
                     continue
 
                 # Return to center Y
-                connector.commands(f"G0 Y{ey:.4f}")
+                self._probe_commands(connector, f"G0 Y{ey:.4f}")
                 self._confirm_ok(comm, timeout=5.0)
 
                 # -- Probe Y- --
@@ -2410,6 +2625,7 @@ class GrblPcbPlugin(
                 )
                 if y_minus is None:
                     self._logger.warning(f"Y- probe failed at hole {idx}")
+                    self._retract_after_probing(connector, comm, safe_z, z_feed)
                     continue
 
                 center_y = (y_plus + y_minus) / 2.0
@@ -2426,7 +2642,7 @@ class GrblPcbPlugin(
                 )
 
                 # Retract
-                connector.commands(f"G1 Z{safe_z} F{z_feed:.0f}")
+                self._probe_commands(connector, f"G1 Z{safe_z} F{z_feed:.0f}")
                 self._confirm_ok(comm, timeout=5.0)
 
                 # Send progress
@@ -2444,17 +2660,23 @@ class GrblPcbPlugin(
 
         except _ProbeAborted as aborted:
             # Plunging where the machine never arrived would hit the board
-            self._logger.error(f"Alignment probing aborted: {aborted.reason}")
             self._probe_stop.set()
-            abort_reason = aborted.reason
-        except Exception as e:
+            if self._probe_user_stop.is_set():
+                self._logger.info("Alignment probing stopped by user")
+            else:
+                self._logger.error(f"Alignment probing aborted: {aborted.reason}")
+                abort_reason = aborted.reason
+        except Exception as e:  # noqa: BLE001 - probing thread loop must not die silently; logged
             self._logger.error(f"Error during alignment probing: {e}")
             self._logger.debug(traceback.format_exc())
         finally:
+            # The bit may sit inside a hole (failure, stop, exception):
+            # never leave it there
+            self._retract_after_probing(connector, comm, safe_z, z_feed)
             try:
                 if comm is not None and hasattr(comm, '_stream_mode'):
                     comm._stream_mode = False
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - cleanup must always finish; logged
                 self._logger.debug(f"Error resetting stream mode: {e}")
 
         # All holes measured: the board is flipped from here on
@@ -2484,7 +2706,7 @@ class GrblPcbPlugin(
 
         G38.3: finding no wall must not raise an alarm and lock the machine.
         """
-        connector.commands(
+        self._probe_commands(connector, 
             "G21", "G90",
             f"G38.3 {axis}{target:.4f} F{feed}",
         )
@@ -2517,6 +2739,10 @@ class GrblPcbPlugin(
                 return None
             elif resp[0] == "alarm":
                 self._logger.error(f"Alarm during probe: {resp[2]}")
+                self._probe_stop.set()
+                return None
+            elif resp[0] == "reset":
+                self._logger.error("GRBL was reset during probing")
                 self._probe_stop.set()
                 return None
 
@@ -2692,7 +2918,7 @@ class GrblPcbPlugin(
         if self._is_probe_active():
             return flask.jsonify(error=gettext("Cannot start streaming while probing is active")), 409
 
-        blocked = self._alarm_block(connector)
+        blocked = self._alarm_block(connector) or self._idle_block(connector)
         if blocked:
             return blocked
 
@@ -2704,6 +2930,15 @@ class GrblPcbPlugin(
         gcode = op.gcode_to_send
         if not gcode:
             return flask.jsonify(error=gettext("No G-code to execute")), 400
+
+        # Never milled as is: a bottom layer without mirroring (old saved
+        # project) would cut the copper pattern as a mirror image
+        if self._is_bottom_layer(op.layer_type) and not op.mirrored \
+                and (op.operation_type or "").lower() in {"isolation", "mask_expose", "mask"}:
+            return flask.jsonify(
+                error=gettext("This bottom-layer operation is not mirrored. Generate it again (it is mirrored automatically)."),
+                code="bottom_layer_not_mirrored",
+            ), 409
 
         # Pre-flight checks; the frontend shows the warnings by code and
         # resends with force=True once the user confirms
@@ -2806,7 +3041,7 @@ class GrblPcbPlugin(
             spindle_on = False
             for line in gcode.splitlines():
                 line = line.strip()
-                if not line or line.startswith(";") or line.startswith("("):
+                if not line or line.startswith((";", "(")):
                     continue
 
                 # Track spindle/laser state (M3/M4 = on, M5 = off)

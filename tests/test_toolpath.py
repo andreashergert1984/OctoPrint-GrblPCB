@@ -1,17 +1,16 @@
-# -*- coding: utf-8 -*-
 """Tests for toolpath generation, mirroring, and alignment (toolpath.py)."""
 import math
 
 import pytest
-from shapely.geometry import MultiPolygon, Polygon, LineString
+from shapely.geometry import LineString, MultiPolygon, Polygon
 
 from octoprint_grblpcb.toolpath import (
     AlignmentTransform,
     ToolpathSettings,
     _buffer_individual_paths,
+    _extract_line_segments,
     _find_min_processable_gap,
     _generate_tab_positions,
-    _extract_line_segments,
     _optimize_drill_order,
     apply_alignment_transform,
     compute_alignment_transform,
@@ -20,7 +19,6 @@ from octoprint_grblpcb.toolpath import (
     generate_mask_expose_gcode,
     generate_outline_gcode,
 )
-
 
 # =========================================================================
 # ToolpathSettings
@@ -573,15 +571,15 @@ class TestMaskExpose:
     """Tests for generate_mask_expose_gcode()."""
 
     def _default_settings(self, **overrides):
-        kw = dict(
-            uv_offset_x=0.0,
-            uv_offset_y=0.0,
-            uv_spot_size=1.0,
-            uv_expose_speed=200.0,
-            uv_expose_z=5.0,
-            uv_power=255,
-            safe_z=5.0,
-        )
+        kw = {
+            "uv_offset_x": 0.0,
+            "uv_offset_y": 0.0,
+            "uv_spot_size": 1.0,
+            "uv_expose_speed": 200.0,
+            "uv_expose_z": 5.0,
+            "uv_power": 255,
+            "safe_z": 5.0,
+        }
         kw.update(overrides)
         return ToolpathSettings(**kw)
 
@@ -643,7 +641,7 @@ class TestMaskExpose:
         )
         assert gcode
         # After origin subtraction, coords should be in 0..4, 0..3 range
-        lines = [line for line in gcode.splitlines() if line.startswith("G0 X") or line.startswith("G1 X")]
+        lines = [line for line in gcode.splitlines() if line.startswith(("G0 X", "G1 X"))]
         for line in lines:
             # Extract X value
             import re

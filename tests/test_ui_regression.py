@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Regression tests for GrblPCB UI template wiring."""
 
 from pathlib import Path

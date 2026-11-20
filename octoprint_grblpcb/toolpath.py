@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Toolpath Generation
 
@@ -9,11 +8,11 @@ Generates G-code toolpaths from parsed Gerber/Excellon geometries:
 - Double-sided alignment: compute and apply coordinate transforms
 """
 
+import itertools
 import logging
 import math
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 from shapely import affinity
 from shapely.geometry import (
@@ -113,11 +112,15 @@ class ToolpathSettings:
         return cmd
 
 
-# Milling direction: climb milling with a clockwise spindle (M3) keeps the
-# material that stays (copper, board) on the left of the direction of travel.
-# shapely's orient(sign=1) gives exteriors counter-clockwise and holes
-# clockwise, which is exactly that for every ring of a "material" polygon.
-CLIMB_NOTE = "; Direction: climb milling (M3), the remaining material on the left"
+# Milling direction: with a clockwise spindle (M3) the cutter edge moves
+# against the feed on the side of the finished wall, so climb milling keeps
+# the material that stays (copper, board) on the RIGHT of the direction of
+# travel. shapely's orient(sign=-1) gives exteriors clockwise and holes
+# counter-clockwise, which is exactly that for every ring of a "material"
+# polygon: rings around copper and the outer board contour run clockwise,
+# holes and cutouts counter-clockwise.
+CLIMB_SIGN = -1.0
+CLIMB_NOTE = "; Direction: climb milling (M3), the remaining material on the right"
 
 
 def _rings(geometry) -> list[list[tuple]]:
@@ -131,7 +134,7 @@ def _rings(geometry) -> list[list[tuple]]:
     for poly in polys:
         if poly.is_empty:
             continue
-        poly = orient(poly, sign=1.0)
+        poly = orient(poly, sign=CLIMB_SIGN)
         for ring in [poly.exterior, *poly.interiors]:
             coords = list(ring.coords)
             if len(coords) >= 4:
@@ -229,7 +232,7 @@ def generate_isolation_gcode(
     settings: ToolpathSettings,
     origin_x: float = 0.0,
     origin_y: float = 0.0,
-    mirror: Optional[str] = None,
+    mirror: str | None = None,
     board_size: tuple = (0.0, 0.0),
 ) -> str:
     """
@@ -278,6 +281,7 @@ def generate_isolation_gcode(
         depth_steps = [settings.cut_depth]
 
     gaps = find_unisolatable_gaps(copper_geometry, settings.tool_diameter)
+    narrow_classes, uncut_gaps = plan_narrow_gap_passes(copper_geometry, settings)
 
     lines = []
     lines.append("; === Isolation Milling G-code ===")
@@ -300,6 +304,12 @@ def generate_isolation_gcode(
         lines.append(
             f"; WARNING: gap {gap:.3f} mm < tool tip {settings.tool_diameter} mm at "
             f"X{gx - origin_x:.2f} Y{gy - origin_y:.2f}: not isolated, copper stays connected"
+        )
+    for gap, (gx, gy) in uncut_gaps:
+        lines.append(
+            f"; WARNING: gap {gap:.3f} mm is too narrow for a groove that cuts through the "
+            f"copper without touching the neighbour at X{gx - origin_x:.2f} Y{gy - origin_y:.2f}: "
+            "not isolated, copper stays connected"
         )
     lines.append("")
 
@@ -333,31 +343,25 @@ def generate_isolation_gcode(
         lines.append("")
 
     # Narrow-gap pre-pass: gaps between tool tip and trench width collapse
-    # in the union buffer below. Cut them shallower, at an offset where the
-    # V groove is exactly as wide as the narrowest such gap (no undercut).
-    half_angle = math.radians(settings.tool_angle / 2)
-    min_gap = _find_min_processable_gap(copper_geometry, settings.tool_diameter, ew)
-    if min_gap > 0:
-        tight_offset = min_gap / 2
-        tight_depth = (tight_offset - settings.tool_diameter / 2) / math.tan(half_angle)
-        if tight_depth >= 0.035:  # deep enough to cut through ~35 µm copper
-            tight_paths = _order_rings(
-                _buffer_individual_paths(copper_geometry, tight_offset), pos
-            )
-            if tight_paths:
-                lines.append(
-                    f"; --- Narrow-gap pre-pass (offset {tight_offset:.3f} mm, "
-                    f"depth {tight_depth:.3f} mm) ---"
-                )
-                lines.append(f"; Gap width {min_gap:.3f} mm < effective width {ew:.3f} mm")
-                for ring in tight_paths:
-                    emit_ring(ring, [tight_depth], " (narrow-gap)")
-                pos = tight_paths[-1][0]
-        else:
-            _logger.info(
-                f"Narrow gaps found (min {min_gap:.3f} mm) but depth "
-                f"{tight_depth:.4f} mm is too shallow: skipping pre-pass"
-            )
+    # in the union buffer below. Each gap class is cut shallower, at an
+    # offset where the V groove is exactly as wide as the narrowest gap of
+    # the class (no undercut); see plan_narrow_gap_passes.
+    for offset, depth, members, covers in narrow_classes:
+        tight_paths, open_paths = _narrow_gap_paths(copper_geometry, members, offset)
+        if not tight_paths and not open_paths:
+            continue
+        lines.append(
+            f"; --- Narrow-gap pre-pass (offset {offset:.3f} mm, depth {depth:.3f} mm) ---"
+        )
+        lines.append(
+            f"; Gaps {covers[0]:.3f} to {covers[1]:.3f} mm < effective width {ew:.3f} mm"
+        )
+        for ring in _order_rings(tight_paths, pos):
+            emit_ring(ring, [depth], " (narrow-gap)")
+            pos = ring[0]
+        for path in _order_open_paths(open_paths, pos):
+            emit_ring(path, [depth], " (narrow-gap)")
+            pos = path[-1]
 
     num_passes = max_dynamic_passes if dynamic_mode else settings.passes
     actual_passes = 0
@@ -395,54 +399,154 @@ def generate_isolation_gcode(
     return "\n".join(lines)
 
 
-def _find_min_processable_gap(
-    copper: MultiPolygon, tool_diameter: float, effective_width: float
-) -> float:
-    """
-    Find the minimum gap between adjacent copper features that a V-bit
-    can still isolate (gap >= tool_diameter but < effective_width).
+MIN_GROOVE_DEPTH = 0.035  # mm, deep enough to cut through ~35 um copper
 
-    Returns 0 if no such narrow gaps exist.
-    """
-    polys = list(copper.geoms) if not copper.is_empty else []
-    if len(polys) < 2:
-        return 0.0
 
+def _polygons(geometry) -> list:
+    """The polygons of a (Multi)Polygon as a list."""
+    if geometry is None or geometry.is_empty:
+        return []
+    if isinstance(geometry, Polygon):
+        return [geometry]
+    return [g for g in getattr(geometry, "geoms", []) if isinstance(g, Polygon)]
+
+
+def _narrow_gaps(copper, tool_diameter: float, effective_width: float) -> list[tuple]:
+    """
+    Gaps between neighbouring copper polygons that a V-bit can still
+    isolate (tool_diameter <= gap < effective_width).
+
+    Returns ``[(gap, i, j, (x, y)), ...]`` sorted by gap; i and j index the
+    polygons of ``copper``.
+    """
+    from shapely.ops import nearest_points
     from shapely.strtree import STRtree
 
-    # Use spatial index for efficient neighbour search
+    polys = _polygons(copper)
+    if len(polys) < 2:
+        return []
     tree = STRtree(polys)
-    min_gap = float("inf")
-
+    found = []
     for i, poly in enumerate(polys):
-        # Query candidates whose bounding box is within effective_width
-        candidates = tree.query(poly.buffer(effective_width))
-        for j in candidates:
+        for j in tree.query(poly.buffer(effective_width)):
             if j <= i:
                 continue
             dist = poly.distance(polys[j])
             if tool_diameter <= dist < effective_width:
-                min_gap = min(min_gap, dist)
+                a, b = nearest_points(poly, polys[j])
+                found.append((dist, i, int(j), ((a.x + b.x) / 2, (a.y + b.y) / 2)))
+    return sorted(found)
 
-    return min_gap if min_gap < float("inf") else 0.0
+
+def _find_min_processable_gap(
+    copper: MultiPolygon, tool_diameter: float, effective_width: float
+) -> float:
+    """Narrowest gap a V-bit can still isolate (0 if there is none)."""
+    gaps = _narrow_gaps(copper, tool_diameter, effective_width)
+    return gaps[0][0] if gaps else 0.0
 
 
-def _buffer_individual_paths(
-    copper: MultiPolygon, offset: float
-) -> list[list[tuple]]:
-    """
-    Buffer each copper polygon individually and extract toolpath rings.
-
-    Unlike `_buffer_copper_paths` this does **not** union the results,
-    so thin slits between adjacent buffered features are preserved as
-    separate exterior rings. This is essential for narrow-gap isolation
-    where the union-based approach collapses near-zero-width slits.
-    """
-    polys = list(copper.geoms) if isinstance(copper, MultiPolygon) else [copper]
+def _buffer_individual_paths(copper: MultiPolygon, offset: float) -> list[list[tuple]]:
+    """Rings of every copper polygon buffered on its own (no union of the buffers)."""
     paths: list[list[tuple]] = []
-    for poly in polys:
+    for poly in _polygons(copper):
         paths.extend(_rings(poly.buffer(offset, join_style=2, quad_segs=16)))
     return paths
+
+
+def plan_narrow_gap_passes(copper, settings: ToolpathSettings) -> tuple[list, list]:
+    """
+    Plan the shallow pre-passes for gaps narrower than the trench width.
+
+    Each gap is decided on its own, not from the single narrowest one. A
+    groove centred ``o`` from a copper edge spans ``[0, 2 o]``; it stays out
+    of the neighbour if the gap is at least ``2 o`` and the grooves of both
+    edges meet if the gap is at most ``4 o``. So the narrowest open gap g
+    starts a class with ``o = g / 2`` that serves all gaps up to ``2 g``;
+    the next gap beyond that starts the next class.
+
+    A gap whose own groove would be too shallow to cut through the copper
+    (``o`` below the offset that gives MIN_GROOVE_DEPTH) cannot be cut
+    without damaging the neighbour. It is reported in the second result.
+
+    Returns ``(classes, uncut)``: classes are
+    ``(offset, depth, polygon indices, (smallest gap, largest gap))``,
+    uncut are ``(gap, (x, y))``.
+    """
+    ew = settings.effective_width
+    tip = settings.tool_diameter
+    tan_half = math.tan(math.radians(settings.tool_angle / 2))
+    classes: list[list] = []
+    uncut: list[tuple] = []
+    for gap, i, j, location in _narrow_gaps(copper, tip, ew):
+        member = next(
+            (c for c in classes if 2 * c[0] <= gap + 1e-9 and gap <= 4 * c[0] + 1e-9), None
+        )
+        if member is None:
+            offset = gap / 2
+            depth = (offset - tip / 2) / tan_half if tan_half > 1e-9 else 0.0
+            if depth < MIN_GROOVE_DEPTH:
+                uncut.append((gap, location))
+                continue
+            member = [offset, depth, set(), (gap, gap)]
+            classes.append(member)
+        member[2].update((i, j))
+        member[3] = (member[3][0], max(member[3][1], gap))
+    return [tuple(c) for c in classes], uncut
+
+
+def _narrow_gap_paths(copper, members: set, offset: float) -> tuple[list, list]:
+    """
+    Pre-pass paths around the polygons ``members``, ``offset`` from their edge.
+
+    Every polygon is buffered on its own: merging the buffers would close the
+    narrow slits. Parts of a path that come closer than ``offset`` to any
+    copper would let the groove (half width ``offset``) cut into that copper;
+    they are dropped. That happens next to still narrower gaps, which have
+    their own pass, or sub-tip gaps, which cannot be cut at all.
+
+    Returns ``(closed rings, open paths)``.
+    """
+    from shapely.ops import linemerge
+
+    polys = _polygons(copper)
+    zone = None
+    closed: list[list[tuple]] = []
+    opened: list[list[tuple]] = []
+    for index in sorted(members):
+        for ring in _rings(polys[index].buffer(offset, join_style=2, quad_segs=16)):
+            if zone is None:
+                zone = copper.buffer(offset - 1e-4)
+            line = LineString(ring)
+            if not line.intersects(zone):
+                closed.append(ring)
+                continue
+            kept = line.difference(zone)
+            pieces = list(kept.geoms) if hasattr(kept, "geoms") else [kept]
+            pieces = [p for p in pieces if isinstance(p, LineString) and not p.is_empty]
+            if len(pieces) > 1:
+                merged = linemerge(pieces, directed=True)
+                pieces = list(merged.geoms) if hasattr(merged, "geoms") else [merged]
+            for piece in pieces:
+                if piece.length >= 0.05:
+                    opened.append(list(piece.coords))
+    return closed, opened
+
+
+def _order_open_paths(paths: list[list[tuple]], start=(0.0, 0.0)) -> list[list[tuple]]:
+    """Visit open paths nearest-start-first; the direction of each is kept."""
+    remaining = list(paths)
+    ordered = []
+    pos = start
+    while remaining:
+        nearest = min(
+            range(len(remaining)),
+            key=lambda i: (remaining[i][0][0] - pos[0]) ** 2 + (remaining[i][0][1] - pos[1]) ** 2,
+        )
+        path = remaining.pop(nearest)
+        ordered.append(path)
+        pos = path[-1]
+    return ordered
 
 
 def _buffer_copper_paths(
@@ -478,7 +582,7 @@ def generate_drill_gcode(
     settings: ToolpathSettings,
     origin_x: float = 0.0,
     origin_y: float = 0.0,
-    mirror: Optional[str] = None,
+    mirror: str | None = None,
     board_size: tuple = (0.0, 0.0),
 ) -> str:
     """
@@ -602,7 +706,7 @@ def _optimize_drill_order(holes: list[tuple], start=None) -> list[tuple]:
 # =============================================================================
 
 
-def board_shape_from_outline(outline_geometry) -> Optional[Polygon]:
+def board_shape_from_outline(outline_geometry) -> Polygon | None:
     """
     Board shape (with cutouts as holes) from the outline layer.
 
@@ -656,7 +760,7 @@ def _split_at_tabs(coords: list[tuple], tabs: list[tuple]) -> list[tuple]:
 
     out = []
     walked = 0.0
-    for (x0, y0), (x1, y1) in zip(coords, coords[1:]):
+    for (x0, y0), (x1, y1) in itertools.pairwise(coords):
         seg = math.hypot(x1 - x0, y1 - y0)
         if seg == 0:
             continue
@@ -677,7 +781,7 @@ def generate_outline_gcode(
     board_thickness: float = 1.6,
     origin_x: float = 0.0,
     origin_y: float = 0.0,
-    mirror: Optional[str] = None,
+    mirror: str | None = None,
     board_size: tuple = (0.0, 0.0),
 ) -> str:
     """
@@ -702,7 +806,7 @@ def generate_outline_gcode(
     tool_area = board.buffer(radius, join_style=2) if radius > 0 else board
     if isinstance(tool_area, MultiPolygon):
         tool_area = max(tool_area.geoms, key=lambda p: p.area)
-    tool_area = orient(tool_area, sign=1.0)
+    tool_area = orient(tool_area, sign=CLIMB_SIGN)
     outer = [(x - origin_x, y - origin_y) for x, y in tool_area.exterior.coords]
     cutouts = [[(x - origin_x, y - origin_y) for x, y in r.coords] for r in tool_area.interiors]
 
@@ -779,7 +883,7 @@ def _generate_tab_positions(
     Returns list of (start_distance, end_distance) tuples.
     """
     total_length = sum(
-        math.hypot(x1 - x0, y1 - y0) for (x0, y0), (x1, y1) in zip(coords, coords[1:])
+        math.hypot(x1 - x0, y1 - y0) for (x0, y0), (x1, y1) in itertools.pairwise(coords)
     )
     if num_tabs <= 0 or total_length <= 0:
         return []
@@ -803,7 +907,7 @@ def generate_mask_expose_gcode(
     settings: ToolpathSettings,
     origin_x: float = 0.0,
     origin_y: float = 0.0,
-    mirror: Optional[str] = None,
+    mirror: str | None = None,
     board_size: tuple = (0.0, 0.0),
 ) -> str:
     """
@@ -904,7 +1008,7 @@ def generate_mask_expose_gcode(
 
     # Raster scan bounds (in design coordinates)
     ka = keep_area.bounds  # (minx, miny, maxx, maxy)
-    scan_y_start = ka[1] + spot / 2
+    scan_y_start = ka[1]  # keep_area is already eroded by spot / 2
     scan_y_end = ka[3]
     scan_x_min = ka[0] - 1  # extend for clean intersection
     scan_x_max = ka[2] + 1
@@ -1117,6 +1221,17 @@ def compute_alignment_transform(
     else:
         a, b = 1.0, 0.0
 
+    # The translation of the scaled solution does not belong to the pure
+    # rotation: with a scale error it would be off by (scale - 1) * R * p.
+    # For a fixed rotation the least-squares translation maps centroid to
+    # centroid.
+    cx = sum(p[0] for p in expected) / n
+    cy = sum(p[1] for p in expected) / n
+    mcx = sum(p[0] for p in measured) / n
+    mcy = sum(p[1] for p in measured) / n
+    tx = mcx - (a * cx - b * cy)
+    ty = mcy - (b * cx + a * cy)
+
     theta_deg = math.degrees(math.atan2(b, a))
 
     # Compute RMS error
@@ -1219,7 +1334,7 @@ def apply_alignment_transform(gcode: str, transform: AlignmentTransform) -> str:
 _WORD_Z = re.compile(r"Z([+-]?(?:\d+\.?\d*|\.\d+))", re.IGNORECASE)
 
 
-def gcode_extent(gcode: str) -> Optional[dict]:
+def gcode_extent(gcode: str) -> dict | None:
     """
     Smallest and largest X, Y and Z a G-code program moves to (work
     coordinates), as {"x": (min, max), ...}; None if it does not move.

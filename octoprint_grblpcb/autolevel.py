@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Autoleveling Module
 
@@ -13,7 +12,6 @@ import logging
 import math
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
@@ -59,11 +57,11 @@ class HeightMap:
 
     # Work offset (WCO, machine coordinates of the work zero) while probing.
     # The heights only apply to the board as it was clamped then.
-    work_offset: Optional[dict] = None
-    probed_at: Optional[float] = None  # time.time() when probing started
+    work_offset: dict | None = None
+    probed_at: float | None = None  # time.time() when probing started
 
     # Interpolator (not serialized)
-    _interpolator: Optional[RegularGridInterpolator] = field(
+    _interpolator: RegularGridInterpolator | None = field(
         default=None, repr=False
     )
 
@@ -164,8 +162,8 @@ class HeightMap:
             return
 
         # Reconstruct grid in sorted order
-        x_vals = sorted(set(p.x for p in self.points))
-        y_vals = sorted(set(p.y for p in self.points))
+        x_vals = sorted({p.x for p in self.points})
+        y_vals = sorted({p.y for p in self.points})
 
         if len(x_vals) < 2 or len(y_vals) < 2:
             _logger.warning("Need at least 2x2 grid for interpolation")
@@ -247,7 +245,7 @@ class HeightMap:
 ORIGIN_TOLERANCE_MM = 0.05
 
 
-def height_map_origin_check(height_map: HeightMap, current_offset: dict) -> Optional[dict]:
+def height_map_origin_check(height_map: HeightMap, current_offset: dict) -> dict | None:
     """
     Check that the height map belongs to the current work zero.
 
@@ -266,8 +264,8 @@ def height_map_origin_check(height_map: HeightMap, current_offset: dict) -> Opti
 
 
 def height_map_side_check(
-    height_map: HeightMap, mirrored: bool, alignment_probed_at: Optional[float]
-) -> Optional[dict]:
+    height_map: HeightMap, mirrored: bool, alignment_probed_at: float | None
+) -> dict | None:
     """
     Check that the height map was measured on the side being milled.
 
@@ -342,6 +340,7 @@ def generate_probe_gcode(
 
 # Regex for G-code line parsing
 _IS_MOVE = re.compile(r"^\s*G0?[01](?:\s|[XYZF])", re.IGNORECASE)
+_IS_ARC = re.compile(r"^\s*G0?([23])(?![\d.])", re.IGNORECASE)
 
 
 def apply_autolevel(gcode: str, height_map: HeightMap, max_segment: float = 1.0) -> str:
@@ -382,6 +381,15 @@ def apply_autolevel(gcode: str, height_map: HeightMap, max_segment: float = 1.0)
             output_lines.append(line)
             continue
 
+        # Arcs: below the surface they become short G1 segments that follow
+        # the height map; either way the tracked position is the arc end point
+        if _IS_ARC.match(stripped):
+            arc_lines, (current_x, current_y, current_z) = _autolevel_arc(
+                stripped, current_x, current_y, current_z, height_map, max_segment
+            )
+            output_lines.extend(arc_lines if arc_lines else [line])
+            continue
+
         # Only modify G0/G1 moves
         if not _IS_MOVE.match(stripped):
             output_lines.append(line)
@@ -391,7 +399,7 @@ def apply_autolevel(gcode: str, height_map: HeightMap, max_segment: float = 1.0)
         new_x, new_y, new_z = _parse_xyz(stripped, current_x, current_y, current_z)
 
         # Check if this is a cutting move (Z < 0)
-        is_g1 = stripped.startswith("G1") or (stripped.startswith("G01"))
+        is_g1 = stripped.startswith(("G1", "G01"))
         is_g0 = stripped.startswith("G0") and not stripped.startswith("G01")
 
         if is_g0:
@@ -439,6 +447,72 @@ def apply_autolevel(gcode: str, height_map: HeightMap, max_segment: float = 1.0)
     return "\n".join(output_lines)
 
 
+def _autolevel_arc(
+    line: str, x0: float, y0: float, z0: float, height_map, max_segment: float
+) -> tuple[list[str], tuple[float, float, float]]:
+    """
+    Level one G2/G3 arc (XY plane, centre given as I/J or radius as R).
+
+    Returns ``(replacement lines, new position)``. The replacement is empty
+    when the line is to be kept as it is (the arc stays above the surface, or
+    it cannot be interpreted); the position is the arc end point in every case.
+    """
+    x1, y1, z1 = _parse_xyz(line, x0, y0, z0)
+    clockwise = _IS_ARC.match(line).group(1) == "2"
+    end = (x1, y1, z1)
+
+    def word(letter):
+        m = re.search(rf"{letter}([+-]?\d+\.?\d*)", line, re.IGNORECASE)
+        return float(m.group(1)) if m else None
+
+    if z0 > 0 and z1 > 0:
+        return [], end  # above the surface: no correction needed
+    i_off, j_off, radius = word("I"), word("J"), word("R")
+    if i_off is not None or j_off is not None:
+        cx, cy = x0 + (i_off or 0.0), y0 + (j_off or 0.0)
+    elif radius is not None:
+        chord = math.hypot(x1 - x0, y1 - y0)
+        if chord < 1e-9 or abs(radius) < chord / 2 - 1e-9:
+            return [], end
+        h = math.sqrt(max(radius * radius - (chord / 2) ** 2, 0.0))
+        mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+        ux, uy = (x1 - x0) / chord, (y1 - y0) / chord
+        # Centre on the left of the chord for a short CCW / long CW arc
+        sign = 1.0 if (not clockwise) == (radius > 0) else -1.0
+        cx, cy = mx - uy * h * sign, my + ux * h * sign
+    else:
+        return [], end
+
+    r = math.hypot(x0 - cx, y0 - cy)
+    if r < 1e-9:
+        return [], end
+    a0 = math.atan2(y0 - cy, x0 - cx)
+    a1 = math.atan2(y1 - cy, x1 - cx)
+    sweep = a1 - a0
+    if clockwise:
+        if sweep >= -1e-12:
+            sweep -= 2 * math.pi
+    elif sweep <= 1e-12:
+        sweep += 2 * math.pi
+
+    steps = max(2, math.ceil(abs(sweep) * r / max_segment))
+    feed = _extract_feed(line)
+    out = []
+    for n in range(1, steps + 1):
+        t = n / steps
+        if n == steps:
+            px, py = x1, y1
+        else:
+            ang = a0 + sweep * t
+            px, py = cx + r * math.cos(ang), cy + r * math.sin(ang)
+        pz = z0 + (z1 - z0) * t
+        seg = f"G1 X{px:.4f} Y{py:.4f} Z{pz + height_map.get_z(px, py):.4f}"
+        if feed and n == 1:
+            seg += f" F{feed}"
+        out.append(seg)
+    return out, end
+
+
 def _parse_xyz(
     line: str, default_x: float, default_y: float, default_z: float
 ) -> tuple[float, float, float]:
@@ -458,7 +532,7 @@ def _parse_xyz(
     return x, y, z
 
 
-def _extract_feed(line: str) -> Optional[str]:
+def _extract_feed(line: str) -> str | None:
     """Extract feed rate from G-code line."""
     m = re.search(r"F([+-]?\d+\.?\d*)", line)
     return m.group(1) if m else None

@@ -3,9 +3,9 @@ import logging
 import queue
 
 import pytest
-from shapely.geometry import box
 from flask import Flask
 from flask_babel import Babel
+from shapely.geometry import box
 
 from octoprint_grblpcb import GrblPcbPlugin
 from octoprint_grblpcb.pcb_project import DrillInfo, MillingOperation, PCBProject
@@ -176,9 +176,9 @@ def test_mirror_regenerates_from_geometry(app):
     p.operations = []
     p.board_min_x, p.board_min_y, p.board_width, p.board_height = 0.0, 0.0, 50.0, 30.0
     p.flip_axis = "X"
-    plugin._geometries = {LayerType.BOTTOM_COPPER: [box(9, 9, 11, 11)]}
+    p.drills = [DrillInfo(tool_number=1, diameter=0.8, holes=[(10.0, 10.0), (40.0, 20.0)], count=2)]
     with app.app_context():
-        plugin._handle_generate_isolation({"layer_type": "bottom_copper"})
+        plugin._handle_generate_drill({})
         body = plugin._handle_mirror_gcode({"operation_index": 0}).get_json()
     assert len(p.operations) == 2
     front, back = p.operations
@@ -190,11 +190,20 @@ def test_mirror_regenerates_from_geometry(app):
         plugin._handle_mirror_gcode({"operation_index": 0})
     assert len(p.operations) == 2
 
+    # Top copper belongs to the front: it is never mirrored
+    plugin._geometries = {LayerType.TOP_COPPER: [box(9, 9, 11, 11)]}
+    with app.app_context():
+        plugin._handle_generate_isolation({"layer_type": "top_copper"})
+        top_index = next(i for i, op in enumerate(p.operations) if op.layer_type == "top_copper")
+        assert p.operations[top_index].to_dict()["can_mirror"] is False
+        _response, status = plugin._handle_mirror_gcode({"operation_index": top_index})
+    assert status == 400
+
 
 def test_old_operation_without_generation_cannot_be_mirrored(app):
     plugin = _plugin()
     plugin._project.operations[0].mirrored = False
     plugin._project.operations[0].generation = None
     with app.app_context():
-        response, status = plugin._handle_mirror_gcode({"operation_index": 0})
+        _response, status = plugin._handle_mirror_gcode({"operation_index": 0})
     assert status == 400

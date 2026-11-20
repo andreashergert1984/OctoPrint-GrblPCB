@@ -454,9 +454,15 @@
     border-collapse: collapse;
 }
 
-.grblpcb-pos-mini td {
+.grblpcb-pos-mini td,
+.grblpcb-pos-mini th {
     padding: 1px 3px;
     text-align: right;
+}
+
+.grblpcb-pos-mini th {
+    color: #6f7f90;
+    font-weight: bold;
 }
 
 .grblpcb-pos-label {
@@ -726,8 +732,8 @@
     background: #f7f9fb;
     border: 1px solid #dfe7ef;
     border-radius: 4px;
-    max-height: 400px;
-    overflow-y: auto;
+    /* the side panel scrolls as a whole; no second scroll area inside it */
+    overflow-x: hidden;
 }
 
 .grblpcb-param-group {
@@ -755,6 +761,7 @@
 
 .grblpcb-param-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 4px;
     margin-bottom: 3px;
@@ -767,6 +774,13 @@
     min-width: 55px;
     margin-bottom: 0;
     white-space: nowrap;
+}
+
+/* Same column for the first field of every row, so the inputs line up */
+.grblpcb-param-row > label:first-child {
+    flex: 0 0 84px;
+    white-space: normal;
+    line-height: 1.15;
 }
 
 .grblpcb-param-row .input-mini {
@@ -797,6 +811,18 @@
     border: 1px solid rgba(0,255,0,0.3);
     border-radius: 4px;
     margin-top: 6px;
+}
+
+.grblpcb-execution-panel.grblpcb-exec-warning {
+    background: #fcf8e3;
+    border-color: #fbeed5;
+    color: #8a6d3b;
+}
+
+.grblpcb-execution-panel.grblpcb-exec-error {
+    background: #f2dede;
+    border-color: #eed3d7;
+    color: #b94a48;
 }
 
 .grblpcb-execution-panel .progress {

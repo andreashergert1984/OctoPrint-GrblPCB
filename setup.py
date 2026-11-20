@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 import os
 
 from setuptools import setup
 
 try:
-    from octoprint_setuptools import get_babel_commandclasses, CleanCommand
+    from octoprint_setuptools import CleanCommand, get_babel_commandclasses
 
     plugin_identifier = "grblpcb"
     plugin_package = "octoprint_grblpcb"

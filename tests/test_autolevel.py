@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for autoleveling: height map, interpolation, G-code Z-correction."""
 
 import logging
@@ -17,7 +16,6 @@ from octoprint_grblpcb.autolevel import (
     apply_autolevel,
     height_map_side_check,
 )
-
 
 # =========================================================================
 # ProbePoint

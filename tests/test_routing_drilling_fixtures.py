@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Integration tests for routing and drilling sample files."""
 
 from pathlib import Path
@@ -13,7 +12,6 @@ from octoprint_grblpcb.toolpath import (
     generate_drill_gcode,
     generate_isolation_gcode,
 )
-
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 

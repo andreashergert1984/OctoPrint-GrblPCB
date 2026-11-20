@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Tests for the PCB project model (pcb_project.py)."""
 import os
 
@@ -14,7 +13,6 @@ from octoprint_grblpcb.pcb_project import (
     guess_layer_type,
     list_projects,
 )
-
 
 # =========================================================================
 # guess_layer_type

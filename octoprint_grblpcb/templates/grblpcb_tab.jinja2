@@ -21,7 +21,7 @@
         <button class="btn btn-warning btn-small" data-bind="click: unlock, enable: manualAllowed">
             <i class="fas fa-unlock"></i> {{ _("Unlock ($X)") }}
         </button>
-        <button class="btn btn-primary btn-small" data-bind="click: homeAll, enable: manualAllowed">
+        <button class="btn btn-primary btn-small" data-bind="click: homeAll, enable: canHome">
             <i class="fas fa-home"></i> {{ _("Home All") }}
         </button>
     </div>
@@ -46,6 +46,11 @@
                     </span>
                 </div>
                 <table class="grblpcb-pos-mini">
+                    <thead>
+                    <tr>
+                        <th></th><th>X</th><th>Y</th><th>Z</th>
+                    </tr>
+                    </thead>
                     <tr>
                         <td class="grblpcb-pos-label">{{ _("Work") }}</td>
                         <td data-bind="text: workPosX"></td>
@@ -65,6 +70,9 @@
                     <span class="grblpcb-state-badge text-muted">{{ _("Not connected") }}</span>
                 </div>
                 <div class="grblpcb-connect-hint">{{ _("To connect: in the Connection panel choose the connection type \"GRBL CNC Connection\" and the port of the mill, then click Connect. The type \"Serial Connection\" is for 3D printers and does not work with GRBL.") }}</div>
+                <button class="btn btn-mini grblpcb-mt-4" data-bind="visible: wideView, click: toggleWideView">
+                    <i class="fas fa-columns"></i> {{ _("Show the Connection panel") }}
+                </button>
                 <!-- /ko -->
             </div>
 
@@ -129,7 +137,7 @@
                 <div class="grblpcb-compact-section">
                     <h4><i class="fas fa-cog"></i> {{ _("Machine") }}</h4>
                     <div class="grblpcb-btn-wrap">
-                        <button class="btn btn-small btn-primary" data-bind="click: homeAll, enable: manualIdle">
+                        <button class="btn btn-small btn-primary" data-bind="click: homeAll, enable: canHome">
                             <i class="fas fa-home"></i> {{ _("Home") }}
                         </button>
                         <button class="btn btn-small btn-warning" data-bind="click: unlock, enable: manualAllowed">
@@ -182,10 +190,11 @@
                         <!-- /ko -->
                     </div>
                     <div class="grblpcb-btn-wrap grblpcb-mt-4">
-                        <button class="btn btn-mini" data-bind="click: zeroX, enable: manualIdle" title="{{ _('Set current X position as 0 in the active work coordinate system.') }}">0X</button>
-                        <button class="btn btn-mini" data-bind="click: zeroY, enable: manualIdle" title="{{ _('Set current Y position as 0 in the active work coordinate system.') }}">0Y</button>
-                        <button class="btn btn-mini" data-bind="click: zeroZ, enable: manualIdle" title="{{ _('Set current Z position as 0 in the active work coordinate system.') }}">0Z</button>
-                        <button class="btn btn-mini btn-primary" data-bind="click: zeroAll, enable: manualIdle" title="{{ _('Set X, Y and Z to zero in the current work coordinate system.') }}">{{ _("0 All") }}</button>
+                        <button class="btn btn-mini" data-bind="click: zeroX, enable: manualIdle" title="{{ _('Set current X position as 0 in the active work coordinate system.') }}">X=0</button>
+                        <button class="btn btn-mini" data-bind="click: zeroY, enable: manualIdle" title="{{ _('Set current Y position as 0 in the active work coordinate system.') }}">Y=0</button>
+                        <button class="btn btn-mini" data-bind="click: zeroZ, enable: manualIdle" title="{{ _('Set current Z position as 0 in the active work coordinate system.') }}">Z=0</button>
+                        <button class="btn btn-mini btn-primary" data-bind="click: zeroXY, enable: manualIdle" title="{{ _('Set the current X and Y position as the board origin. Set Z separately by probing.') }}">X/Y=0</button>
+                        <button class="btn btn-mini" data-bind="click: zeroAll, enable: manualIdle" title="{{ _('Set X, Y and Z to zero in the current work coordinate system.') }}">{{ _("0 All") }}</button>
                     </div>
                     <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
                         {{ _("Tip: zero only after the tool is above the board. Keep the same origin for both sides of a double-sided board.") }}
@@ -202,9 +211,16 @@
                 <div class="grblpcb-compact-section">
                     <h4><i class="fas fa-search-plus"></i> {{ _("Probe") }}</h4>
                     <div class="grblpcb-btn-wrap">
-                        <button class="btn btn-small btn-info" data-bind="click: probeZ, enable: manualIdle">Z</button>
-                        <button class="btn btn-small" data-bind="click: probeX, enable: manualIdle">X</button>
-                        <button class="btn btn-small" data-bind="click: probeY, enable: manualIdle">Y</button>
+                        <button class="btn btn-small btn-primary" data-bind="click: probeZAndZero, enable: manualIdle"
+                                title="{{ _('Lower the tool until it touches the board, set Z = 0 there and lift the tool again') }}">
+                            <i class="fas fa-arrow-down"></i> {{ _("Probe Z and zero") }}
+                        </button>
+                        <button class="btn btn-small" data-bind="click: probeZ, enable: manualIdle"
+                                title="{{ _('Lower the tool until it touches, without changing the zero') }}">Z</button>
+                        <button class="btn btn-small" data-bind="click: probeX, enable: manualIdle"
+                                title="{{ _('Move in -X until the probe touches') }}">X</button>
+                        <button class="btn btn-small" data-bind="click: probeY, enable: manualIdle"
+                                title="{{ _('Move in -Y until the probe touches') }}">Y</button>
                     </div>
                     <div class="grblpcb-section-note" data-bind="visible: showHelpNotes">
                         {{ _("Tip: probe only on a clean conductive surface and watch the first probe carefully for unexpected contact.") }}
@@ -312,8 +328,7 @@
                     <div data-bind="foreach: projectLayers" class="grblpcb-layer-list">
                         <div class="grblpcb-layer-item">
                             <label class="checkbox grblpcb-mb-0">
-                                <input type="checkbox" checked data-bind="checked: $parent.wsLayerVisible($data.layer_type),
-                                    click: function() { $parent.toggleGerberLayer($data.layer_type); return true; }">
+                                <input type="checkbox" data-bind="checked: $parent.wsLayerVisible($data.layer_type)">
                                 <span class="label grblpcb-text-xs" data-bind="text: GrblPcbLabels.layer(layer_type), css: {
                                     'label-success': layer_type === 'top_copper',
                                     'label-info': layer_type === 'bottom_copper',
@@ -572,11 +587,14 @@
                 <div class="grblpcb-compact-section">
                     <h4><i class="fas fa-th"></i> {{ _("Probe Grid") }}</h4>
                     <div class="grblpcb-grid-inputs">
-                        <label>X: <input type="number" class="input-mini grblpcb-w-45" min="2" max="20"
+                        <label title="{{ _('Number of probe points along X and Y (2 to 20 each)') }}">{{ _("Points") }} X:
+                            <input type="number" class="input-mini grblpcb-w-45" min="2" max="20"
                                    data-bind="value: autolevelGridX"></label>
-                        <label>Y: <input type="number" class="input-mini grblpcb-w-45" min="2" max="20"
+                        <label title="{{ _('Number of probe points along X and Y (2 to 20 each)') }}">Y:
+                            <input type="number" class="input-mini grblpcb-w-45" min="2" max="20"
                                    data-bind="value: autolevelGridY"></label>
-                        <label>{{ _("Margin:") }} <input type="number" class="input-mini grblpcb-w-45" step="0.5" min="0"
+                        <label title="{{ _('The grid reaches this far beyond the board edge on every side. The copper blank must be at least this much larger than the board, otherwise the outer points find no copper.') }}">{{ _("Margin:") }}
+                            <input type="number" class="input-mini grblpcb-w-45" step="0.5" min="0"
                                    data-bind="value: autolevelMargin"> mm</label>
                     </div>
                     <button class="btn btn-primary btn-small btn-block" data-bind="click: setupAutolevel, enable: canSetupGrid">
@@ -653,7 +671,8 @@
                     </div>
 
                     <!-- Execution Progress Panel -->
-                    <div class="grblpcb-execution-panel" data-bind="visible: executionActive() || executionStatus()">
+                    <div class="grblpcb-execution-panel" data-bind="visible: executionActive() || executionStatus(),
+                        css: {'grblpcb-exec-warning': executionStatusLevel() === 'warning', 'grblpcb-exec-error': executionStatusLevel() === 'error'}">
                         <div data-bind="visible: executionActive">
                             <div class="progress">
                                 <div class="bar bar-success" data-bind="style: { width: executionProgress() + '%' }"></div>
@@ -664,7 +683,7 @@
                             <button class="btn btn-mini btn-danger" data-bind="click: stopExecution">
                                 <i class="fas fa-stop"></i> {{ _("Stop") }}
                             </button>
-                            <button class="btn btn-mini btn-warning" data-bind="click: confirmToolChange">
+                            <button class="btn btn-mini btn-warning" data-bind="click: confirmToolChange, visible: executionPaused">
                                 <i class="fas fa-check"></i> {{ _("Confirm Tool Change") }}
                             </button>
                         </div>
@@ -711,11 +730,13 @@
                                 <strong class="grblpcb-op-name" data-bind="text: GrblPcbLabels.operation($data)"></strong>
                                 <div>
                                     <span class="label grblpcb-text-xs" data-bind="visible: !has_gcode">{{ _("No G-code") }}</span>
+                                    <span class="label label-important grblpcb-text-xs" data-bind="visible: outdated"
+                                          title="{{ _('Made by an older version without mirroring. Generate it again in the Board tab, then delete this one.') }}">{{ _("Outdated") }}</span>
                                     <span class="label label-info grblpcb-text-xs" data-bind="visible: has_aligned_gcode"
                                           title="{{ _('The double-sided alignment is applied to this operation.') }}">{{ _("Aligned") }}</span>
                                     <span class="label label-success grblpcb-text-xs" data-bind="visible: has_leveled_gcode"
                                           title="{{ _('The leveled G-code is sent: the height map is applied.') }}">{{ _("Leveled") }}</span>
-                                    <span class="label grblpcb-text-xs" data-bind="visible: has_gcode && !has_leveled_gcode && $parent.hasHeightmap()"
+                                    <span class="label grblpcb-text-xs" data-bind="visible: has_gcode && !has_leveled_gcode && $parent.heightmapComplete()"
                                           title="{{ _('The G-code is sent without height correction.') }}">{{ _("Not leveled") }}</span>
                                 </div>
                             </div>
@@ -736,12 +757,13 @@
                             </div>
                             <div class="grblpcb-op-actions">
                                 <button class="btn btn-small btn-success"
-                                        data-bind="click: function() { $parent.sendToCnc($index()); }, enable: has_gcode && $parent.isGrblConnector() && !$parent.executionActive()">
+                                        data-bind="click: function() { $parent.sendToCnc($index()); }, enable: $parent.sendBlockedReason($data) === '',
+                                                   attr: {title: $parent.sendBlockedReason($data) || $parent.sendButtonTitle}">
                                     <i class="fas fa-play"></i> {{ _("Send") }}
                                 </button>
                                 <span class="grblpcb-op-secondary">
                                     <button class="btn btn-mini" title="{{ _('Apply Autolevel') }}"
-                                            data-bind="click: function() { $parent.applyAutolevel($index()); }, enable: has_gcode && $parent.hasHeightmap()">
+                                            data-bind="click: function() { $parent.applyAutolevel($index()); }, enable: has_gcode && $parent.heightmapComplete()">
                                         <i class="fas fa-level-up-alt"></i>
                                     </button>
                                     <button class="btn btn-mini" title="{{ _('Mirror for the back side') }}"

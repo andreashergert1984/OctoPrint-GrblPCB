@@ -68,6 +68,9 @@ class GrblSimulator:
         # counts characters correctly never exceeds RX_BUFFER
         self._rx_pending_bytes = 0
         self.rx_overflow = False
+        # Called on Ctrl-X: the owner of the line queue flushes it, like GRBL
+        # throws away what is still in its serial RX buffer
+        self.on_reset = None
         self._probe_radius = probe_diameter / 2.0
         self._reset_state()
         threading.Thread(target=self._motion_loop, daemon=True).start()
@@ -142,6 +145,9 @@ class GrblSimulator:
                 # ... but not after a completed feed hold (Hold:0)
                 self._settle_hold()
                 in_motion = self.state in ("Run", "Jog", "Home", "Hold:1")
+                self._rx_pending_bytes = 0
+                if self.on_reset is not None:
+                    self.on_reset()
                 self._reset_state()
                 if in_motion:
                     self.state = "Alarm"
@@ -504,6 +510,18 @@ def serve(link_path, verbose=False, **kwargs):
 
     sim = GrblSimulator(write, **kwargs)
     lines = queue.Queue()
+    buf = bytearray()
+
+    def flush_rx():
+        # Ctrl-X: GRBL drops the lines it has received but not parsed yet
+        buf.clear()
+        while True:
+            try:
+                lines.get_nowait()
+            except queue.Empty:
+                return
+
+    sim.on_reset = flush_rx
 
     def line_worker():
         while True:
@@ -514,7 +532,6 @@ def serve(link_path, verbose=False, **kwargs):
 
     threading.Thread(target=line_worker, daemon=True).start()
 
-    buf = bytearray()
     warned = False
     try:
         while True:

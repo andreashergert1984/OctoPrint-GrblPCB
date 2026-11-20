@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Safety and validation tests for plugin API handlers."""
 
 
@@ -297,7 +296,7 @@ class TestManualCommandsDuringJob:
             return self.plugin.on_api_command("jog", {"axis": "X", "distance": 1})
 
     def test_rejected_while_job_runs(self):
-        response, status = self._jog(_ConnectorStub(streaming=True))
+        _response, status = self._jog(_ConnectorStub(streaming=True))
         assert status == 409
 
     def test_allowed_while_job_paused(self):
@@ -327,7 +326,7 @@ class TestAlarmBlocksJobs:
         connector = _ConnectorStub(z_zeroed=True, state="Alarm")
         self.plugin._get_grbl_connector = lambda: connector
         with self.app.app_context():
-            response, status = self.plugin._handle_send_to_cnc({"operation_index": 0, "force": True})
+            _response, status = self.plugin._handle_send_to_cnc({"operation_index": 0, "force": True})
         assert status == 409
         assert connector.calls == []
 
@@ -335,7 +334,7 @@ class TestAlarmBlocksJobs:
         self.plugin._height_map = HeightMap()
         self.plugin._get_grbl_connector = lambda: _ConnectorStub(state="Alarm")
         with self.app.app_context():
-            response, status = self.plugin._handle_start_autolevel({})
+            _response, status = self.plugin._handle_start_autolevel({})
         assert status == 409
 
 

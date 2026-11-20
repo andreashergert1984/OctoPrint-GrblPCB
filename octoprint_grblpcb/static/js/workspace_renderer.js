@@ -66,6 +66,8 @@
         this.machinePos = null;      // {x, y, z}
         this.layers = [];            // [{layer_type, min_x, min_y, max_x, max_y}, ...]
         this.gerberPolygons = null;  // { layer_type: [{exterior:[[x,y],...], interiors:[...]}, ...] }
+        this.drillHoles = [];        // [[x, y, diameter], ...]
+        this._viewInitialized = false;
 
         // View state
         this.viewMode = "2d";        // "2d" or "3d"
@@ -155,7 +157,26 @@
         this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this._logicalWidth = rect.width;
         this._logicalHeight = rect.height;
+        if (!this._viewInitialized && rect.width > 0 && rect.height > 0) {
+            this._setDefaultView();
+        } else if (this._autoFit && rect.width > 0 && rect.height > 0) {
+            // The view still shows what "fit" chose: keep it fitted when
+            // the panel changes size (wide view, side bar, window)
+            this.fitToView();
+            return;
+        }
         this.render();
+    };
+
+    // Without data: show the origin near the bottom left at a scale where
+    // a typical board (100 x 80 mm) fits
+    WorkspaceRenderer.prototype._setDefaultView = function() {
+        var w = this._logicalWidth, h = this._logicalHeight;
+        if (!w || !h) return;
+        this.zoom = Math.max(0.5, Math.min((w - 120) / 100, (h - 120) / 80));
+        this.panX = 60;
+        this.panY = h - 60;
+        this._viewInitialized = true;
     };
 
     WorkspaceRenderer.prototype._handleMouseDown = function(e) {
@@ -201,6 +222,7 @@
             this.panX += dx;
             this.panY += dy;
         }
+        if (dx !== 0 || dy !== 0) this._autoFit = false;
         this.render();
     };
 
@@ -218,6 +240,7 @@
 
     WorkspaceRenderer.prototype._handleWheel = function(e) {
         e.preventDefault();
+        this._autoFit = false;
         var factor = e.deltaY > 0 ? 0.9 : 1.1;
         // Zoom toward mouse position
         var rect = this.canvas.getBoundingClientRect();
@@ -235,7 +258,13 @@
 
     WorkspaceRenderer.prototype.fitToView = function() {
         var bounds = this._getWorldBounds();
-        if (!bounds) return;
+        if (!bounds) {
+            this._setDefaultView();
+            this.render();
+            return;
+        }
+        this._viewInitialized = true;
+        this._autoFit = true;
 
         var worldW = bounds.max_x - bounds.min_x;
         var worldH = bounds.max_y - bounds.min_y;
@@ -431,6 +460,7 @@
         // Draw layers in order (back to front for 3D)
         if (this.showLayers) this._drawGerberLayers(ctx);
         if (this.showGerberPolygons) this._drawGerberPolygons(ctx);
+        if (this.showGerberPolygons) this._drawDrillHoles(ctx);
         if (this.showBoard) this._drawBoard(ctx);
         if (this.showHeatSurface && this.probePoints.length > 0) this._drawHeatSurface(ctx);
         if (this.showToolpaths) this._drawToolpaths(ctx);
@@ -715,7 +745,7 @@
     // =========================================================================
 
     WorkspaceRenderer.prototype._gerberPolyColors = {
-        "top_copper":    { fill: "rgba(200, 160, 40, 0.45)", stroke: "rgba(200, 160, 40, 0.8)" },
+        "top_copper":    { fill: "rgba(0, 200, 80, 0.40)", stroke: "rgba(0, 200, 80, 0.85)" },
         "bottom_copper": { fill: "rgba(60, 120, 255, 0.35)", stroke: "rgba(60, 120, 255, 0.7)" },
         "outline":       { fill: "rgba(255, 60, 60, 0.20)", stroke: "rgba(255, 60, 60, 0.6)" },
         "top_silk":      { fill: "rgba(255, 255, 100, 0.15)", stroke: "rgba(255, 255, 100, 0.5)" },
@@ -724,12 +754,50 @@
         "bottom_mask":   { fill: "rgba(50, 200, 200, 0.15)", stroke: "rgba(50, 200, 200, 0.5)" }
     };
 
+    WorkspaceRenderer.prototype._isLayerVisible = function(layerType) {
+        for (var i = 0; i < this.layers.length; i++) {
+            if (this.layers[i].layer_type === layerType) return this.layers[i].visible !== false;
+        }
+        return true;
+    };
+
+    WorkspaceRenderer.prototype._drawDrillHoles = function(ctx) {
+        if (!this.drillHoles || this.drillHoles.length === 0) return;
+        if (!this._isLayerVisible("drill")) return;
+        var style = this._layerColors.drill;
+        ctx.fillStyle = "rgba(10, 10, 20, 0.85)";
+        ctx.strokeStyle = style.stroke;
+        ctx.lineWidth = 1;
+        for (var i = 0; i < this.drillHoles.length; i++) {
+            var hole = this.drillHoles[i];
+            var c = this._w2s(hole[0], hole[1], 0);
+            var r = Math.max(1.5, hole[2] / 2 * this.zoom);
+            ctx.beginPath();
+            if (this.viewMode === "3d") {
+                // Circles become ellipses in the tilted view; approximate
+                // with a polygon through projected points
+                for (var k = 0; k <= 16; k++) {
+                    var a = k / 16 * 2 * Math.PI;
+                    var p = this._w2s(hole[0] + Math.cos(a) * hole[2] / 2,
+                                      hole[1] + Math.sin(a) * hole[2] / 2, 0);
+                    if (k === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+                }
+                ctx.closePath();
+            } else {
+                ctx.arc(c.x, c.y, r, 0, 2 * Math.PI);
+            }
+            ctx.fill();
+            ctx.stroke();
+        }
+    };
+
     WorkspaceRenderer.prototype._drawGerberPolygons = function(ctx) {
         if (!this.gerberPolygons) return;
 
         for (var layerType in this.gerberPolygons) {
             var polys = this.gerberPolygons[layerType];
             if (!polys || polys.length === 0) continue;
+            if (!this._isLayerVisible(layerType)) continue;
 
             var colors = this._gerberPolyColors[layerType] || {
                 fill: "rgba(180, 180, 180, 0.25)",
@@ -1333,8 +1401,9 @@
         this.layers = layers || [];
     };
 
-    WorkspaceRenderer.prototype.updateGerberPolygons = function(geometries) {
+    WorkspaceRenderer.prototype.updateGerberPolygons = function(geometries, holes) {
         this.gerberPolygons = geometries || null;
+        this.drillHoles = holes || [];
     };
 
     WorkspaceRenderer.prototype.toggleLayer = function(layer, visible) {

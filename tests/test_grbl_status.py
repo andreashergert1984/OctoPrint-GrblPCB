@@ -28,7 +28,7 @@ def test_fields_in_between_do_not_drop_wco_and_overrides():
 
 
 def test_last_wco_is_kept_between_reports():
-    first, second = _parse(
+    _first, second = _parse(
         "<Idle|MPos:0.000,0.000,0.000|FS:0,0|WCO:5.000,6.000,7.000>",
         "<Jog|MPos:1.000,0.000,0.000|FS:1000,0>",
     )
