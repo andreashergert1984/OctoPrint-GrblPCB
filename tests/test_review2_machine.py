@@ -683,3 +683,16 @@ def test_plain_job_and_tool_change_job_still_run_on_the_simulator():
         assert sim.mpos["x"] == pytest.approx(7.0)
     finally:
         cleanup()
+
+
+def test_status_message_reports_the_probe_input_and_the_ui_shows_it():
+    c, _received, _sim, cleanup = tsp._make_setup(0.0)
+    try:
+        c._on_grbl_status({"state": "Idle", "pins": "P",
+                           "mpos": {"x": 0.0, "y": 0.0, "z": 0.0}})
+        status = [m for m in c._plugin_manager.messages if m.get("type") == "status"]
+        assert status and status[-1]["pins"] == "P"
+    finally:
+        cleanup()
+    assert 'self.probeTouching((data.pins || "").indexOf("P") !== -1)' in JS
+    assert "visible: probeTouching" in (BASE / "templates" / "grblpcb_tab.jinja2").read_text()

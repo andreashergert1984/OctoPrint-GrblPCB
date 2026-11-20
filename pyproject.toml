@@ -54,7 +54,8 @@ include = [
 grblpcb = "octoprint_grblpcb"
 
 [project.urls]
-Homepage = "https://git.hergert.info/octoprint/OctoPrint-GrblPCB"
+Homepage = "https://github.com/andreashergert1984/OctoPrint-GrblPCB"
+Issues = "https://github.com/andreashergert1984/OctoPrint-GrblPCB/issues"
 
 [project.optional-dependencies]
 develop = [

@@ -40,6 +40,8 @@
                 <!-- ko if: isConnected -->
                 <div class="grblpcb-status-row">
                     <span class="grblpcb-state-badge" data-bind="text: grblStateLabel, css: stateClass"></span>
+                    <span class="label label-warning grblpcb-text-xs" data-bind="visible: probeTouching"
+                          title="{{ _('GRBL reports the probe input as active: the bit touches the copper, or the clips touch each other') }}">{{ _("Probe contact") }}</span>
                     <span class="grblpcb-status-feeds">
                         F<span data-bind="text: feedRate"></span>
                         S<span data-bind="text: spindleSpeed"></span>
@@ -256,7 +258,7 @@
                 <div class="grblpcb-compact-section">
                     <h4><i class="fas fa-folder-open"></i> {{ _("Project") }}</h4>
                     <div class="grblpcb-mb-6">
-                        <input type="text" class="input-small grblpcb-input-block" data-bind="value: projectName" placeholder="{{ _('Project name') }}">
+                        <input type="text" class="input-small grblpcb-input-block" data-bind="value: projectName, event: {change: renameProject}, enable: hasProject" placeholder="{{ _('Project name') }}" title="{{ _('Name of the open project; type a new name to rename it') }}">
                     </div>
                     <div class="grblpcb-btn-wrap">
                         <button class="btn btn-small btn-primary" data-bind="click: newProject">
@@ -576,7 +578,7 @@
                     <strong>{{ _("Before probing:") }}</strong>
                     <ol class="grblpcb-guide-steps">
                         <li>{{ _("Clamp the board and put the engraving bit into the spindle.") }}</li>
-                        <li>{{ _("Connect the probe: one clip on the copper, one on the bit. Test it by touching them together; the status must show the probe pin.") }}</li>
+                        <li>{{ _("Connect the probe: one clip on the copper, one on the bit. Test it by touching them together; the status must show \"Probe contact\".") }}</li>
                         <li>{{ _("Jog to the lower left corner of the board and set X and Y to zero.") }}</li>
                         <li>{{ _("Probe Z on the copper and set Z to zero (Machine tab).") }}</li>
                     </ol>

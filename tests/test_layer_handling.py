@@ -89,3 +89,13 @@ def test_unmirrored_bottom_operation_is_marked_outdated():
     assert old.to_dict()["outdated"] is True
     assert new.to_dict()["outdated"] is False
     assert MillingOperation(name="D", operation_type="drill", layer_type="drill").to_dict()["outdated"] is False
+
+
+def test_rename_project(app):
+    plugin = _plugin()
+    with app.app_context():
+        body = plugin._handle_rename_project({"name": "  Two-layer demo  "}).get_json()
+        _response, status = plugin._handle_rename_project({"name": "   "})
+    assert body["project"]["name"] == "Two-layer demo"
+    assert plugin._project.name == "Two-layer demo"
+    assert status == 400

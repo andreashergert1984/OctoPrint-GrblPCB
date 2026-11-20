@@ -76,6 +76,8 @@ $(function() {
         // Observables for GRBL state
         self.grblState = ko.observable("Unknown");
         self.isConnected = ko.observable(false);
+        // Probe input active (clip on the copper touches the bit)
+        self.probeTouching = ko.observable(false);
         self.isGrblConnector = ko.observable(false);
 
         // Machine position
@@ -95,6 +97,12 @@ $(function() {
         self.machineCheckStatus = ko.observable("");
         self.machineCheckChecks = ko.observableArray([]);
         self.machineCheckLimitations = ko.observableArray([]);
+        // A check result describes the connection it was made on
+        self.isConnected.subscribe(function() {
+            self.machineCheckStatus("");
+            self.machineCheckChecks([]);
+            self.machineCheckLimitations([]);
+        });
 
         // Jog settings
         self.jogDistance = ko.observable(1);
@@ -109,6 +117,25 @@ $(function() {
         // =====================================================================
         self.project = ko.observable(null);
         self.projectName = ko.observable(gettext("Untitled PCB"));
+        // Editing the name field renames the open project (bound to the
+        // field's change event, so loading another project never renames)
+        self.renameProject = function() {
+            var proj = self.project();
+            var name = (self.projectName() || "").trim();
+            if (!proj) return true;
+            if (!name) {
+                self.projectName(proj.name);
+                return true;
+            }
+            if (name === proj.name) return true;
+            self._sendCommand("rename_project", {name: name}).done(function(response) {
+                if (response.project) {
+                    self.project(response.project);
+                    self.refreshProjectList();
+                }
+            });
+            return true;
+        };
         self.projectLayers = ko.observableArray([]);
         self.projectDrills = ko.observableArray([]);
         self.projectOperations = ko.observableArray([]);
@@ -585,8 +612,11 @@ $(function() {
             }
         };
 
-        self._applyMachineCheckReport = function(report) {
+        self._applyMachineCheckReport = function(report, showChecks) {
             report = report || {};
+            if (showChecks === false) {
+                report = {snapshot: report.snapshot};
+            }
 
             // The server's summary is an English keyword; show the verdict
             if (report.ready === undefined) {
@@ -640,7 +670,9 @@ $(function() {
         self.requestStatus = function(silent) {
             self._sendCommand("status", {}, {silent: silent === true}).done(function(response) {
                 if (response && response.report) {
-                    self._applyMachineCheckReport(response.report);
+                    // The background request only takes over the machine
+                    // state; the check list is shown when the user asks
+                    self._applyMachineCheckReport(response.report, silent !== true);
                 }
             });
         };
@@ -833,7 +865,9 @@ $(function() {
         };
 
         self.newProject = function() {
-            OctoPrint.simpleApiCommand("grblpcb", "new_project", {name: self.projectName()})
+            // A new project always starts untitled; the name field renames
+            // the open project
+            OctoPrint.simpleApiCommand("grblpcb", "new_project", {name: gettext("Untitled PCB")})
                 .done(function(response) {
                     if (response.project) {
                         self._resetProjectViewState();
@@ -908,6 +942,7 @@ $(function() {
         self._updateProjectState = function(projectData) {
             if (!projectData) return;
             self.project(projectData);
+            self.projectName(projectData.name || "");
             self.projectState(projectData.state);
             self.boardWidth(projectData.board_width);
             self.boardHeight(projectData.board_height);
@@ -973,7 +1008,7 @@ $(function() {
 
             // Ensure project exists
             if (!self.hasProject()) {
-                OctoPrint.simpleApiCommand("grblpcb", "new_project", {name: self.projectName()})
+                OctoPrint.simpleApiCommand("grblpcb", "new_project", {name: gettext("Untitled PCB")})
                     .done(function(response) {
                         self._resetProjectViewState();
                         self._updateProjectState(response.project);
@@ -2075,6 +2110,7 @@ $(function() {
                 self.isConnected(true);
                 self.isGrblConnector(true);
                 self.grblState(data.state);
+                self.probeTouching((data.pins || "").indexOf("P") !== -1);
                 
                 if (data.machine_pos) {
                     self.machinePosX(data.machine_pos.x.toFixed(3));

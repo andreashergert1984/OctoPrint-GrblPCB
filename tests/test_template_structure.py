@@ -98,3 +98,13 @@ def _fixed_text_nodes(text):
 @pytest.mark.parametrize("template", TEMPLATES, ids=lambda p: p.name)
 def test_no_fixed_words_between_tags(template):
     assert _fixed_text_nodes(template.read_text()) == []
+
+
+@pytest.mark.parametrize("template", TEMPLATES, ids=lambda p: p.name)
+def test_template_compiles(template):
+    # A quoting mistake inside _("...") breaks the whole tab at render time
+    import jinja2
+
+    env = jinja2.Environment(extensions=["jinja2.ext.i18n", "jinja2.ext.do"])
+    env.install_null_translations()
+    env.parse(template.read_text())

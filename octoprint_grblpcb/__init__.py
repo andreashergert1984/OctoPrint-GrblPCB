@@ -408,6 +408,7 @@ class GrblPcbPlugin(
             "jog": ["axis", "distance", "feed"],
             # PCB project
             "new_project": [],
+            "rename_project": ["name"],
             "get_project": [],
             "list_projects": [],
             "load_project": ["project_id"],
@@ -477,7 +478,7 @@ class GrblPcbPlugin(
 
     # Project commands touch shared state — require _project_lock
     _PROJECT_COMMANDS = frozenset({
-        "new_project", "get_project", "list_projects", "load_project",
+        "new_project", "rename_project", "get_project", "list_projects", "load_project",
         "delete_project", "import_layer", "remove_layer", "rotate_project",
         "generate_isolation", "generate_drill", "generate_outline",
         "generate_mask_expose", "get_layer_geometry",
@@ -961,6 +962,17 @@ class GrblPcbPlugin(
         self._height_map = None
         self._save_project()
         self._logger.info(f"New PCB project: {self._project.id}")
+        return flask.jsonify(result="ok", project=self._project.to_dict())
+
+    def _handle_rename_project(self, data):
+        import flask
+        if self._project is None:
+            return flask.jsonify(error=gettext("No project")), 400
+        name = str(data.get("name", "")).strip()
+        if not name:
+            return flask.jsonify(error=gettext("The project name must not be empty")), 400
+        self._project.name = name[:100]
+        self._save_project()
         return flask.jsonify(result="ok", project=self._project.to_dict())
 
     def _handle_get_project(self, data):
@@ -3324,7 +3336,7 @@ __plugin_name__ = "GrblPCB"
 __plugin_version__ = "0.1.0"
 __plugin_pythoncompat__ = ">=3.11,<4"
 __plugin_author__ = "Andreas Hergert"
-__plugin_url__ = "https://git.hergert.info/octoprint/OctoPrint-GrblPCB"
+__plugin_url__ = "https://github.com/andreashergert1984/OctoPrint-GrblPCB"
 __plugin_license__ = "AGPLv3"
 __plugin_description__ = "GRBL-based CNC control for PCB isolation milling, drilling, and outline cutting"
 

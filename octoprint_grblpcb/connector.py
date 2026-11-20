@@ -409,6 +409,9 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                     "z_zeroed": self._z_zeroed,
                     "streaming": self.is_streaming(),
                     "paused": self.is_paused_for_intervention(),
+                    # Input pins GRBL reports as active (P = probe touching);
+                    # GRBL leaves the field out when none is active
+                    "pins": status.get("pins", ""),
                 }
             if "overrides" in status:
                 msg["overrides"] = status["overrides"]

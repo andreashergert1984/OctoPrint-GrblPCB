@@ -1177,13 +1177,15 @@
             ctx.lineWidth = tp.lineWidth || 1;
             ctx.globalAlpha = tp.opacity || 0.8;
 
-            // Same Z scale as the heat surface, so the cut follows the surface
-            var first = this._w2s(tp.points[0].x, tp.points[0].y, tp.points[0].z || 0);
+            // True Z scale: the heat surface is exaggerated to make 0.1 mm
+            // visible; the same factor on toolpaths would turn a 5 mm safe
+            // height into 75 mm and a 1.6 mm outline cut into 24 mm
+            var first = this._w2s(tp.points[0].x, tp.points[0].y, tp.points[0].z || 0, 1);
 
             // Draw segments one at a time so each can have its own style
             for (var j = 1; j < tp.points.length; j++) {
                 var pt = tp.points[j];
-                var s = this._w2s(pt.x, pt.y, pt.z || 0);
+                var s = this._w2s(pt.x, pt.y, pt.z || 0, 1);
 
                 if (pt.rapid) {
                     // Rapid move — dashed, faint blue
@@ -1265,6 +1267,7 @@
     WorkspaceRenderer.prototype._drawLegend = function(ctx, w, h) {
         if (this._zMin === this._zMax && this._zMin === 0) return;
         if (this.probePoints.length === 0) return;
+        if (!this.showHeatSurface && !this.showProbeGrid) return;  // nothing it explains
 
         var lx = w - 30;
         var ly = 64;  // below the view toolbar

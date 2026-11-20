@@ -1,5 +1,5 @@
 // Run with: node tests/js/toolpath_scale.test.js
-// In 3D the toolpaths use the same Z scale as the heat surface.
+// In 3D the toolpaths are drawn at true Z scale, not with the heat surface exaggeration.
 const fs = require("fs");
 const path = require("path");
 const assert = require("assert");
@@ -30,7 +30,7 @@ r._drawToolpaths(ctx);
 const end = r._w2s(10, 5, -0.2);          // heat surface scale (default)
 const trueScale = r._w2s(10, 5, -0.2, 1);
 const drawn = moves.find((m) => m[0] === "l");
-assert.ok(Math.abs(drawn[1] - end.x) < 1e-9 && Math.abs(drawn[2] - end.y) < 1e-9,
-    "toolpath end point is not drawn at the heat surface Z scale");
-assert.ok(Math.abs(drawn[2] - trueScale.y) > 0.5, "test cannot tell the scales apart");
+assert.ok(Math.abs(drawn[1] - trueScale.x) < 1e-9 && Math.abs(drawn[2] - trueScale.y) < 1e-9,
+    "toolpath end point is not drawn at true Z scale");
+assert.ok(Math.abs(drawn[2] - end.y) > 0.5, "test cannot tell the scales apart");
 console.log("toolpath scale: ok");
