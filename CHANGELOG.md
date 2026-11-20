@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] — Unreleased
 
+### Fixed (second review of 2026-11-20)
+
+- After a tool change or program pause the tool goes to safe Z before the
+  spindle starts and before any XY move (it moved sideways at the probed
+  height); the drill program lifts before `M3`
+- Probing never uses relative mode: absolute targets from a fresh position,
+  `G90` after homing, every probe run starts with `G21 G90` and its WCS;
+  a refused or failed probe ends at once and is reported
+- "Go to 0,0" stops at safe Z; alignment probing lowers into a hole with a
+  probe move and reports a hole the bit cannot enter
+- Stop or Reset during the Z drift check ends it at once; a silent GRBL is
+  halted and treated as a lost connection; no new job starts while a stop
+  is still being carried out; the Z zero is dropped when an alarm loses the
+  position
+- A page loaded during a job shows Stop and Confirm again
+- Rotating back to 0° restores the board size; rotation and a changed drill
+  layer reset the alignment; autolevel no longer adds a move to X0 Y0
+- Gerber polygon apertures and thermals, Excellon tool selection with feed
+  and speed; isolation passes use round corners
+- The "Check" button works; the back side is drawn aligned with the copper;
+  actions that discard leveled or aligned G-code ask first; consistent
+  German terms
+
 ### Fixed (review of 2026-11-20)
 
 - Machine safety: a soft reset or OctoPrint's Cancel during a job ends the

@@ -103,7 +103,8 @@ def test_tool_changes_are_safe_and_sorted():
     assert [lines[i] for i in changes] == ["T1 M6", "T2 M6"]  # small drill first
     for i in changes:
         assert lines[i - 2].startswith("G1 Z5.000") and lines[i - 1] == "M5"
-        assert lines[i + 1].startswith("M3") and lines[i + 2].startswith("G4")
+        assert lines[i + 1].startswith("G1 Z5.000")  # lift after the tool change, before the spindle starts
+        assert lines[i + 2].startswith("M3") and lines[i + 3].startswith("G4")
     # no spindle before the first tool is in
     assert not any(ln.startswith("M3") for ln in lines[:changes[0]])
 

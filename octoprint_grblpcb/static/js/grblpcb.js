@@ -145,6 +145,8 @@ $(function() {
             return pts.length > 0 && pts.every(function(p) { return p.probed; });
         });
         self.hasHeightmap = ko.observable(false);
+        // Columns and rows of the stored height map (not the input boxes)
+        self.heightmapGrid = ko.observable({x: 0, y: 0});
 
         // G-code preview
         self.gcodePreview = ko.observable("");
@@ -283,6 +285,10 @@ $(function() {
         self.showProbeTable = ko.observable(false);
         self.workspaceSidebarOpen = ko.observable(true);
         self.workspaceToolpathList = ko.observableArray([]);
+        // Back side operations are drawn as seen from the front (see the hint)
+        self.workspaceHasMirrored = ko.pureComputed(function() {
+            return self.workspaceToolpathList().some(function(tp) { return tp.mirrored; });
+        });
         self._renderer = null;
         self._rendererInitPending = false;
 
@@ -561,10 +567,35 @@ $(function() {
                 });
         };
 
+        // A job that runs while the page loads (reload, second browser): the
+        // buttons and the progress must show it, not an idle machine
+        // Only until this page has seen a progress message of its own: a
+        // status that raced past the final message must not revive the job
+        self._adoptRunningJob = function(streaming, paused) {
+            if (!streaming || self._streamProgressSeen) return;
+            self.executionActive(true);
+            self.executionPaused(!!paused);
+            if (paused) {
+                self._adoptedPauseBanner = true;
+                self._execProblem(gettext("The job waits for a confirmation (tool change or program pause). Change the tool if needed, probe and zero Z, then click Confirm."), "warning");
+            } else if (self._adoptedPauseBanner || !self.executionStatus()) {
+                // The pause is over (confirmed elsewhere): the banner is stale
+                self._adoptedPauseBanner = false;
+                self.executionStatus(gettext("A job is running"));
+            }
+        };
+
         self._applyMachineCheckReport = function(report) {
             report = report || {};
 
-            self.machineCheckStatus(report.summary || "");
+            // The server's summary is an English keyword; show the verdict
+            if (report.ready === undefined) {
+                self.machineCheckStatus("");
+            } else {
+                self.machineCheckStatus(report.ready
+                    ? gettext("Machine ready")
+                    : gettext("Attention required"));
+            }
             self.machineCheckChecks(report.checks || []);
             self.machineCheckLimitations(report.limitations || []);
 
@@ -596,6 +627,7 @@ $(function() {
                 if (snapshot.wcs) {
                     self.currentWCS(snapshot.wcs);
                 }
+                self._adoptRunningJob(snapshot.streaming, snapshot.paused);
             }
         };
 
@@ -604,8 +636,9 @@ $(function() {
         self.softReset = function() { self._sendCommand("reset"); };
         self.feedHold = function() { self._sendCommand("hold"); };
         self.resume = function() { self._sendCommand("resume"); };
-        self.requestStatus = function() {
-            self._sendCommand("status").done(function(response) {
+        // silent: no error popup (the page load must not nag users without the STATUS permission)
+        self.requestStatus = function(silent) {
+            self._sendCommand("status", {}, {silent: silent === true}).done(function(response) {
                 if (response && response.report) {
                     self._applyMachineCheckReport(response.report);
                 }
@@ -660,10 +693,12 @@ $(function() {
                 alarm: gettext("GRBL raised an alarm."),
                 reset: gettext("GRBL was reset during probing. Check the position and the zero before probing again."),
                 timeout: gettext("No probe result in time."),
-                disconnected: gettext("The connection to GRBL was lost.")
+                disconnected: gettext("The connection to GRBL was lost."),
+                rejected: gettext("GRBL refused the probe move (for example because a jog is still running). Wait until the machine is idle, then try again."),
+                busy: gettext("The machine is not idle. Wait until it stands still, then try again.")
             };
             new PNotify({
-                title: gettext("Probing Z failed"),
+                title: (data.axis && data.axis !== "Z") ? gettext("Probing failed") : gettext("Probing Z failed"),
                 text: (reasons[data.reason] || data.reason || "") + " " + gettext("The zero stays unchanged."),
                 type: "error",
                 hide: false
@@ -737,10 +772,71 @@ $(function() {
         // PCB Project Commands
         // =====================================================================
 
+        // One place that forgets everything derived from the open project, so
+        // that new, load and delete of the open project start from a clean view
+        self._resetProjectViewState = function() {
+            self.project(null);
+            self.projectLayers([]);
+            self.projectDrills([]);
+            self.projectOperations([]);
+            self.projectState("");
+            self.boardWidth(0);
+            self.boardHeight(0);
+            self.heightmapPoints([]);
+            self.heightmapGrid({x: 0, y: 0});
+            self.hasHeightmap(false);
+            self.autolevelStatus("");
+            self.autolevelProgress(0);
+            self.alignmentHoles([]);
+            self.alignmentTransform(null);
+            self.alignmentStatus("");
+            self.workspaceToolpathList([]);
+            self.gcodePreview("");
+            self.selectedOperationIndex(-1);
+            if (!self.executionActive()) {
+                self.executionStatus("");
+            }
+            self._fittedBoardKey = null;
+            if (self._renderer) {
+                self._renderer.updateGerberPolygons(null, []);
+                self._renderer.updateToolpaths([]);
+                self._renderer.updateProbeGrid([], 0, 0);
+                self._renderer.updateLayers([]);
+                self._renderer.updateBoardBounds(null);
+            }
+            self._syncWorkspaceData();
+        };
+
+        // Number of columns and rows of the probe points themselves; the
+        // input boxes may already show a different, not yet applied grid
+        self._gridOfPoints = function(points, hint) {
+            if (hint && hint.grid_x > 0 && hint.grid_y > 0) {
+                return {x: hint.grid_x, y: hint.grid_y};
+            }
+            var xs = {}, ys = {};
+            (points || []).forEach(function(p) {
+                xs[Number(p.x).toFixed(6)] = true;
+                ys[Number(p.y).toFixed(6)] = true;
+            });
+            return {x: Object.keys(xs).length, y: Object.keys(ys).length};
+        };
+
+        self._anyOperation = function(flag) {
+            return self.projectOperations().some(function(op) { return !!op[flag]; });
+        };
+
+        // Run `proceed` at once, or after the user confirmed that `message`
+        // (what would be lost) is fine; `needed` is false when nothing is lost
+        self._confirmDiscard = function(needed, title, message, proceedLabel, proceed) {
+            if (!needed) { proceed(); return; }
+            self._ask(title, message, proceedLabel, proceed);
+        };
+
         self.newProject = function() {
             OctoPrint.simpleApiCommand("grblpcb", "new_project", {name: self.projectName()})
                 .done(function(response) {
                     if (response.project) {
+                        self._resetProjectViewState();
                         self._updateProjectState(response.project);
                         self.uploadMessage(_.sprintf(gettext("Project '%s' created"), response.project.name));
                         // Files of the previous project must be selectable again
@@ -773,6 +869,7 @@ $(function() {
             OctoPrint.simpleApiCommand("grblpcb", "load_project", {project_id: projectSummary.id})
                 .done(function(response) {
                     if (response.project) {
+                        self._resetProjectViewState();
                         self._updateProjectState(response.project);
                         self.projectName(response.project.name);
                         self.uploadMessage(_.sprintf(gettext("Project '%s' loaded"), response.project.name));
@@ -799,13 +896,7 @@ $(function() {
                     self.savedProjects(response.projects || []);
                     // If we deleted the active project, clear the UI
                     if (self.project() && self.project().id === projectSummary.id) {
-                        self.project(null);
-                        self.projectLayers([]);
-                        self.projectOperations([]);
-                        self.projectState("");
-                        self.boardWidth(0);
-                        self.boardHeight(0);
-                        self._syncWorkspaceData();
+                        self._resetProjectViewState();
                     }
                     self.uploadMessage(_.sprintf(gettext("Project '%s' deleted"), projectSummary.name));
                 })
@@ -838,20 +929,22 @@ $(function() {
             layers.sort(function(a, b) { return rank(a.layer_type) - rank(b.layer_type); });
             self.projectLayers(layers);
 
-            // Update operations
-            if (projectData.operations) {
-                self.projectOperations(projectData.operations);
-            }
+            // Update operations (an absent list means none)
+            self.projectOperations(projectData.operations || []);
 
             // Update drills
             self.projectDrills(projectData.drills || []);
 
-            self.hasHeightmap(projectData.has_height_map || false);
-
-            // Restore heightmap probe points if available
-            if (projectData.height_map && projectData.height_map.points) {
-                self.heightmapPoints(projectData.height_map.points);
+            // The height map shown is the one the server has: none there, none here
+            var hm = projectData.height_map;
+            if (hm && hm.points) {
+                self.heightmapPoints(hm.points);
+                self.heightmapGrid(self._gridOfPoints(hm.points, hm));
                 self.hasHeightmap(true);
+            } else {
+                self.heightmapPoints([]);
+                self.heightmapGrid({x: 0, y: 0});
+                self.hasHeightmap(false);
             }
 
             // Restore alignment data
@@ -864,9 +957,12 @@ $(function() {
             // Load Gerber polygon geometry for canvas
             self._loadGerberGeometry();
 
-            // Auto-load toolpaths if operations exist
+            // Auto-load toolpaths if operations exist, otherwise drop the old ones
             if (projectData.operations && projectData.operations.length > 0) {
                 self.loadToolpathsIntoWorkspace();
+            } else {
+                self.workspaceToolpathList([]);
+                self._updateRendererToolpaths();
             }
         };
 
@@ -879,6 +975,7 @@ $(function() {
             if (!self.hasProject()) {
                 OctoPrint.simpleApiCommand("grblpcb", "new_project", {name: self.projectName()})
                     .done(function(response) {
+                        self._resetProjectViewState();
                         self._updateProjectState(response.project);
                         self._doUpload(files);
                     });
@@ -927,6 +1024,17 @@ $(function() {
                             type: "info"
                         });
                     }
+                    var shapes = _.reduce(response.project.layers || {}, function(sum, layer) {
+                        return sum + (layer.unsupported_shapes || 0);
+                    }, 0);
+                    if (shapes > 0) {
+                        new PNotify({
+                            title: gettext("Unsupported shapes in the Gerber file"),
+                            text: _.sprintf(gettext("%d pad(s) use a shape that is not supported and are missing from the copper. Check the layer before milling."), shapes),
+                            type: "error",
+                            hide: false
+                        });
+                    }
                     if (slots > 0) {
                         new PNotify({
                             title: gettext("Slots in the drill file"),
@@ -973,6 +1081,19 @@ $(function() {
         self.rotateProject = function(angle) {
             if (self.busyGenerating()) return;
             if (!angle || isNaN(angle)) return;
+            // Rotating removes the operations and the height map: ask first
+            // when there is something to lose
+            self._confirmDiscard(
+                self.projectOperations().length > 0 || self.hasHeightmap() || self.alignmentHoles().length > 0,
+                gettext("Rotate the board?"),
+                gettext("Rotating removes all generated operations, the height map and the alignment. They have to be created again."),
+                gettext("Rotate"),
+                function() { self._rotateProjectNow(angle); }
+            );
+        };
+
+        self._rotateProjectNow = function(angle) {
+            if (self.busyGenerating()) return;
             self.busyGenerating(true);
             self.uploadMessage(_.sprintf(gettext("Rotating board by %d°..."), angle));
             OctoPrint.simpleApiCommand("grblpcb", "rotate_project", {angle: angle})
@@ -1175,16 +1296,36 @@ $(function() {
                 margin: parseFloat(self.autolevelMargin())
             }).done(function(response) {
                 self.heightmapPoints(response.heightmap.points);
+                self.heightmapGrid(self._gridOfPoints(response.heightmap.points, response.heightmap));
                 self.hasHeightmap(true);
                 self.autolevelStatus(
                     _.sprintf(gettext("Grid ready: %d probe points"), response.total_points)
                 );
                 self._syncWorkspaceData();
                 if (self._renderer) self._renderer.fitToView();
+                // leveled G-code was discarded: refresh the "Leveled" labels
+                self._refreshProject();
+            }).fail(function(xhr) {
+                self.autolevelStatus(gettext("Error: ") + ((xhr.responseJSON && xhr.responseJSON.error) || gettext("failed")));
             });
         };
 
         self.startAutolevel = function() {
+            // A complete map is measured again from scratch; the leveled
+            // G-code made from the old heights goes away
+            if (self.heightmapComplete() && self._anyOperation("has_leveled_gcode")) {
+                self._ask(
+                    gettext("Probe again?"),
+                    gettext("All points are measured again. The leveled G-code made from the old heights is removed."),
+                    gettext("Probe again"),
+                    self._startAutolevelAfterConfirm
+                );
+                return;
+            }
+            self._startAutolevelAfterConfirm();
+        };
+
+        self._startAutolevelAfterConfirm = function() {
             if (!self.zZeroed()) {
                 self._ask(
                     gettext("Z is not zeroed"),
@@ -1268,11 +1409,8 @@ $(function() {
             }
 
             // Probe grid
-            self._renderer.updateProbeGrid(
-                self.heightmapPoints(),
-                parseInt(self.autolevelGridX()),
-                parseInt(self.autolevelGridY())
-            );
+            var grid = self.heightmapGrid();
+            self._renderer.updateProbeGrid(self.heightmapPoints(), grid.x, grid.y);
 
             // Gerber layers
             self._syncLayersToRenderer();
@@ -1392,6 +1530,7 @@ $(function() {
                             name: GrblPcbLabels.operation(tp),
                             color: colors[i % colors.length],
                             points: tp.points,
+                            mirrored: !!tp.mirrored,
                             visible: vis
                         });
                     }
@@ -1458,6 +1597,16 @@ $(function() {
         // =================================================================
 
         self.setAlignmentHolesFromDrills = function() {
+            self._confirmDiscard(
+                self.hasAlignmentTransform() || self._anyOperation("has_aligned_gcode"),
+                gettext("Select new alignment holes?"),
+                gettext("The measured holes and the alignment are discarded, and so is the aligned and leveled G-code made from them."),
+                gettext("Select holes"),
+                self._setAlignmentHolesFromDrillsNow
+            );
+        };
+
+        self._setAlignmentHolesFromDrillsNow = function() {
             // The backend picks the two farthest holes and gives their
             // positions on the flipped board (back-side work coordinates)
             OctoPrint.simpleApiCommand("grblpcb", "auto_alignment_holes", {})
@@ -1470,6 +1619,9 @@ $(function() {
                     self.alignmentStatus(
                         _.sprintf(gettext("Set %d alignment holes (dist=%smm)"), holes.length, Math.sqrt(dx * dx + dy * dy).toFixed(1))
                     );
+                    if (response.warning) {
+                        new PNotify({title: gettext("Small alignment holes"), text: response.warning, type: "notice", hide: false});
+                    }
                     self._refreshProject();
                 })
                 .fail(function(xhr) {
@@ -1485,6 +1637,7 @@ $(function() {
                 self.alignmentHoles(response.alignment_holes);
                 self.alignmentTransform(null);
                 self.alignmentStatus(_.sprintf(gettext("Set %d alignment holes"), holes.length));
+                self._refreshProject();
             });
         };
 
@@ -1508,9 +1661,20 @@ $(function() {
         };
 
         self.computeAlignment = function() {
+            self._confirmDiscard(
+                self._anyOperation("has_aligned_gcode"),
+                gettext("Compute the alignment again?"),
+                gettext("The aligned G-code made from the previous alignment is removed, and so is the leveled G-code built on it."),
+                gettext("Compute"),
+                self._computeAlignmentNow
+            );
+        };
+
+        self._computeAlignmentNow = function() {
             OctoPrint.simpleApiCommand("grblpcb", "compute_alignment", {})
                 .done(function(response) {
                     self.alignmentTransform(response.transform);
+                    self._refreshProject();
                     // The numbers are in the transform line; say what they mean
                     var rms = response.transform ? response.transform.rms_error : 0;
                     self.alignmentStatus(rms <= 0.05
@@ -1524,34 +1688,68 @@ $(function() {
         };
 
         self.applyAlignment = function(operationIndex) {
+            var op = self.projectOperations()[operationIndex];
+            self._confirmDiscard(
+                !!(op && op.has_leveled_gcode),
+                gettext("Apply the alignment?"),
+                gettext("The leveled G-code of this operation is removed. Level it again afterwards."),
+                gettext("Apply"),
+                function() { self._applyAlignmentNow(operationIndex); }
+            );
+        };
+
+        self._applyAlignmentNow = function(operationIndex) {
             OctoPrint.simpleApiCommand("grblpcb", "apply_alignment", {
                 operation_index: operationIndex
             }).done(function(response) {
                 self.uploadMessage(response.message);
                 self._refreshProject();
+            }).fail(function(xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.error) || gettext("failed");
+                self.uploadMessage(gettext("Error: ") + msg);
+                self.alignmentStatus(gettext("Error: ") + msg);
             });
         };
 
         self.applyAlignmentToAll = function() {
             // Apply alignment transform to all mirrored operations
             var ops = self.projectOperations();
-            var applied = 0;
+            var targets = [];
             for (var i = 0; i < ops.length; i++) {
                 if (ops[i].mirrored && ops[i].has_gcode) {
-                    self.applyAlignment(i);
-                    applied++;
+                    targets.push(i);
                 }
             }
-            if (applied === 0) {
+            if (targets.length === 0) {
                 self.alignmentStatus(gettext("No mirrored operations found to align"));
+                return;
             }
+            self._confirmDiscard(
+                targets.some(function(i) { return ops[i].has_leveled_gcode; }),
+                gettext("Apply the alignment to all?"),
+                gettext("The leveled G-code of the mirrored operations is removed. Level it again afterwards."),
+                gettext("Apply to all"),
+                function() { targets.forEach(self._applyAlignmentNow); }
+            );
         };
 
+        // The server forgets the measurements and the transform but keeps
+        // the selected holes; the view shows what the server says afterwards
         self.clearAlignment = function() {
+            self._confirmDiscard(
+                self.hasAlignmentTransform() || self._anyOperation("has_aligned_gcode"),
+                gettext("Clear the alignment?"),
+                gettext("The measurements and the alignment are discarded, and so is the aligned and leveled G-code made from them. The selected holes stay."),
+                gettext("Clear"),
+                self._clearAlignmentNow
+            );
+        };
+
+        self._clearAlignmentNow = function() {
             self._sendCommand("clear_alignment").done(function() {
-                self.alignmentHoles([]);
                 self.alignmentTransform(null);
-                self.alignmentStatus(gettext("Alignment cleared"));
+                self.alignmentStatus(gettext("Measurements cleared. The alignment holes stay selected; probe them again."));
+                self._refreshProject();
             });
         };
 
@@ -1836,6 +2034,8 @@ $(function() {
                 self.isGrblConnector(connector === "grbl");
             });
 
+            // A running job or the machine state, before the first status message
+            self.requestStatus(true);
             // Load existing project if any
             self._refreshProject();
             // Load project list for browser
@@ -1899,6 +2099,7 @@ $(function() {
                 if (data.spindle !== undefined) self.spindleSpeed(data.spindle);
                 if (data.wcs) self.currentWCS(data.wcs);
                 if (data.z_zeroed !== undefined) self.zZeroed(!!data.z_zeroed);
+                self._adoptRunningJob(data.streaming, data.paused);
                 if (data.overrides) {
                     self.feedOverride(data.overrides.feed || 100);
                     self.rapidOverride(data.overrides.rapid || 100);
@@ -1949,7 +2150,7 @@ $(function() {
                     no_contact: gettext("The probe did not touch the board within the probe depth."),
                     grbl_error: gettext("GRBL rejected the probe command."),
                     alarm: gettext("GRBL raised an alarm."),
-                    timeout: gettext("No probe result within 30 seconds."),
+                    timeout: gettext("No probe result in the expected time."),
                     move_rejected: gettext("GRBL did not accept a positioning move, so the machine is not where the probe should be."),
                     reset: gettext("GRBL was reset during probing. Check the position and the zero before probing again.")
                 };
@@ -1957,6 +2158,10 @@ $(function() {
                     gettext("Probing stopped at point %(point)d of %(total)d. No height was recorded for this point."),
                     {point: data.index + 1, total: data.total}
                 ) + " " + (reasons[data.reason] || data.reason);
+                if (data.stage === "drift_check") {
+                    failText = gettext("The height map is complete, but the check of the Z drift was interrupted. Check the position and the zero before milling.")
+                        + " " + (reasons[data.reason] || data.reason);
+                }
                 self.autolevelStatus("⚠ " + failText);
                 new PNotify({
                     title: gettext("Autolevel aborted"),
@@ -1990,7 +2195,15 @@ $(function() {
                 // Update workspace
                 self._syncWorkspaceData();
             }
+            else if (data.type === "alignment_hole_failed") {
+                self.alignmentStatus("⚠ " + _.sprintf(
+                    gettext("Hole %(hole)d: the bit touched the board instead of entering the hole. The hole is not where it is expected; check the clamping and the zero."),
+                    {hole: data.index + 1}
+                ));
+            }
             else if (data.type === "alignment_progress") {
+                // also after a page reload during probing
+                self.alignmentProbing(true);
                 var h = data.hole;
                 self.alignmentStatus(
                     _.sprintf(gettext("Probing hole %d/%d (%d%%)"), data.index + 1, data.total, data.percent) +
@@ -2012,6 +2225,11 @@ $(function() {
                     self.computeAlignment();
                 } else if (data.abort_reason === "reset") {
                     self.alignmentStatus("⚠ " + gettext("Probing aborted: GRBL was reset. Check the position and the zero, then probe again."));
+                } else if ((data.failed_holes || []).length > 0) {
+                    self.alignmentStatus("⚠ " + _.sprintf(
+                        gettext("Probing finished, but the bit did not enter hole %s. The hole is not where it is expected; check the clamping and the zero, then probe again."),
+                        data.failed_holes.map(function(f) { return f.index + 1; }).join(", ")
+                    ));
                 } else if (data.abort_reason) {
                     self.alignmentStatus("⚠ " + gettext("Probing aborted: GRBL did not accept a positioning move. Check the alarm state and the travel limits, then probe again."));
                 } else {
@@ -2024,6 +2242,11 @@ $(function() {
                 self.executionProgress(data.percent);
                 
                 self._streamProgressSeen = true;
+                // Any message but the final ones means the job is running
+                // (also when this page was loaded in the middle of it)
+                if (["completed", "stopped", "failed"].indexOf(data.status) === -1) {
+                    self.executionActive(true);
+                }
                 self.executionPaused(["tool_change", "pause", "confirm_again", "waiting_for_idle"].indexOf(data.status) !== -1);
 
                 if (data.status === "completed") {

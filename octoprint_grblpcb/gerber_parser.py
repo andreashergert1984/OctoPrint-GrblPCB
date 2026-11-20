@@ -5,6 +5,7 @@ Parses Gerber (RS-274X) files using pygerber and Excellon drill files
 with a custom parser. Extracts geometry for toolpath generation.
 """
 
+import itertools
 import logging
 import math
 import re
@@ -51,6 +52,7 @@ def parse_gerber_file(filepath: str) -> tuple[PCBLayer, list]:
 
     _logger.info(f"Parsing Gerber file: {filepath}")
 
+    _install_pygerber_extensions()
     gerber = GerberFile.from_file(filepath)
     parsed = gerber.parse()
     info = parsed.get_info()
@@ -79,8 +81,19 @@ def parse_gerber_file(filepath: str) -> tuple[PCBLayer, list]:
         _logger.warning(f"Could not render SVG preview: {e}")
 
     # Extract Shapely geometries from commands
-    geometries = _extract_geometries(parsed)
+    stats: dict = {}
+    geometries = _extract_geometries(parsed, stats)
+    layer.unsupported_shapes = stats.get("unsupported", 0)
     layer.stroke_width = _max_stroke_width(parsed)
+    ring_width = _board_ring_stroke_width(geometries)
+    if ring_width > 0:
+        # The ring's width is measured from its area (rounded corners make it
+        # slightly off): snap it to the aperture width it was drawn with
+        widths = _stroke_widths(parsed)
+        nearest = min(widths, key=lambda w: abs(w - ring_width), default=None)
+        if nearest is not None and abs(nearest - ring_width) <= 0.02 * max(nearest, 1e-9):
+            ring_width = nearest
+        layer.stroke_width = ring_width
 
     # Recompute layer bounds from our extracted geometries (more accurate
     # than pygerber's get_info() which may miscalculate arc bounding boxes)
@@ -105,7 +118,7 @@ def parse_gerber_file(filepath: str) -> tuple[PCBLayer, list]:
     return layer, geometries
 
 
-def _extract_geometries(parsed) -> list:
+def _extract_geometries(parsed, stats: dict | None = None) -> list:
     """
     Extract Shapely geometries from parsed Gerber commands.
 
@@ -115,6 +128,7 @@ def _extract_geometries(parsed) -> list:
 
     geometries = []
     skipped = 0
+    unsupported = 0
 
     for cmd in _iter_objects(parsed._command_buffer):
         try:
@@ -124,6 +138,9 @@ def _extract_geometries(parsed) -> list:
             _logger.debug(f"Could not convert command {type(cmd).__name__}: {e}")
             continue
         if geom is None or geom.is_empty:
+            if type(cmd).__name__ == "Flash2":
+                # A pad whose shape is unknown: it is missing from the copper
+                unsupported += 1
             continue
         if _is_clear(cmd):
             # Clear polarity (%LPC*%) erases what was drawn before it, e.g.
@@ -137,7 +154,27 @@ def _extract_geometries(parsed) -> list:
         _logger.warning(
             f"{skipped} Gerber object(s) could not be converted and are missing from the geometry"
         )
+    if unsupported:
+        _logger.warning(
+            f"{unsupported} pad(s) use an aperture shape that is not supported "
+            f"(macro primitives such as moire or vector line) and are missing from the geometry"
+        )
+    if stats is not None:
+        stats["unsupported"] = unsupported + skipped
     return geometries
+
+
+def _stroke_widths(parsed) -> list[float]:
+    """Stroke widths (mm) of all line and arc objects of the layer."""
+    widths = []
+    for cmd in _iter_objects(parsed._command_buffer):
+        if type(cmd).__name__ in ("Line2", "Arc2", "CCArc2"):
+            try:
+                widths.append(_aperture_radius(cmd.aperture) * 2)
+            except Exception as exc:  # noqa: BLE001 - unknown aperture types; skip this object
+                _logger.debug("Skipping object without usable aperture width: %s", exc)
+                continue
+    return widths
 
 
 def _max_stroke_width(parsed) -> float:
@@ -147,15 +184,28 @@ def _max_stroke_width(parsed) -> float:
     Edge.Cuts is drawn with strokes whose centre line is the board edge, so
     the layer bounds are one half stroke wider than the board on each side.
     """
-    widest = 0.0
-    for cmd in _iter_objects(parsed._command_buffer):
-        if type(cmd).__name__ in ("Line2", "Arc2", "CCArc2"):
-            try:
-                widest = max(widest, _aperture_radius(cmd.aperture) * 2)
-            except Exception as exc:  # noqa: BLE001 - unknown aperture types; skip this object
-                _logger.debug("Skipping object without usable aperture width: %s", exc)
-                continue
-    return widest
+    return max(_stroke_widths(parsed), default=0.0)
+
+
+def _board_ring_stroke_width(geometries) -> float:
+    """
+    Stroke width of the outline ring that defines the board (0 if none).
+
+    Same reading as board_shape_from_outline: the largest closed stroke ring
+    is the board edge, its width is area / mean of outer and inner length.
+    A wider stroke elsewhere (e.g. a cutout) must not shift the board edge.
+    """
+    valid = [g for g in geometries if g is not None and not g.is_empty]
+    if not valid:
+        return 0.0
+    merged = unary_union(valid)
+    polys = list(merged.geoms) if hasattr(merged, "geoms") else [merged]
+    rings = [p for p in polys if isinstance(p, Polygon) and p.interiors]
+    if not rings:
+        return 0.0
+    ring = max(rings, key=lambda p: Polygon(p.exterior).area)
+    perimeter = ring.exterior.length + sum(r.length for r in ring.interiors)
+    return 2 * ring.area / perimeter if perimeter else 0.0
 
 
 def _iter_objects(commands):
@@ -255,9 +305,15 @@ def _flash_shape(ap, x: float, y: float):
     # sub-primitives instead of using a simple circle.
     if ap_type == "Macro2" and hasattr(ap, "command_buffer"):
         macro = _macro_aperture_to_shapely(ap)
-        if macro is not None and not macro.is_empty:
-            from shapely.affinity import translate
-            shape = translate(macro, xoff=x, yoff=y)
+        if macro is None or macro.is_empty:
+            # Unknown macro shape: never replace it by a guessed dot
+            return None
+        from shapely.affinity import translate
+        shape = translate(macro, xoff=x, yoff=y)
+    elif ap_type == "Macro2":
+        return None
+    elif ap_type == "Polygon2" and hasattr(ap, "number_vertices"):
+        shape = _polygon_aperture_flash(ap, x, y)
     elif ap_type == "Rectangle2" and hasattr(ap, "x_size") and hasattr(ap, "y_size"):
         shape = _rectangle_aperture_flash(ap, x, y)
     elif ap_type == "Obround2" and hasattr(ap, "x_size") and hasattr(ap, "y_size"):
@@ -272,11 +328,28 @@ def _flash_shape(ap, x: float, y: float):
 
     # Standard apertures may have a round hole (C,2.0X1.0)
     hole = getattr(ap, "hole_diameter", None)
-    if hole is not None and ap_type != "Macro2":
+    if hole is not None and ap_type != "Macro2" and shape is not None:
         hole_d = _to_float(hole)
         if hole_d > 0:
             shape = shape.difference(Point(x, y).buffer(hole_d / 2, quad_segs=32))
     return shape
+
+
+def _polygon_aperture_flash(aperture, x: float, y: float):
+    """Regular n-gon of a Polygon2 (``P``) aperture or macro primitive 5.
+
+    The outer diameter is the circumscribed circle; the first vertex lies on
+    the +X axis rotated by the aperture rotation (degrees, CCW).
+    """
+    n = max(3, int(aperture.number_vertices))
+    radius = _to_float(aperture.outer_diameter) / 2
+    rotation = math.radians(float(getattr(aperture, "rotation", 0) or 0))
+    pts = [
+        (x + radius * math.cos(rotation + 2 * math.pi * i / n),
+         y + radius * math.sin(rotation + 2 * math.pi * i / n))
+        for i in range(n)
+    ]
+    return Polygon(pts)
 
 
 def _rectangle_aperture_flash(aperture, x: float, y: float):
@@ -335,6 +408,107 @@ def _obround_aperture_flash(aperture, x: float, y: float):
         shape = rotate(shape, rotation, origin=(0, 0), use_radians=False)
 
     return translate(shape, xoff=x, yoff=y)
+
+
+def thermal_shape(cx, cy, outer, inner, gap, rotation_deg):
+    """Thermal relief (macro primitive 7) as a Shapely geometry.
+
+    A ring between ``inner`` and ``outer`` diameter, cut by two gaps of width
+    ``gap`` that cross at the centre, rotated by ``rotation_deg`` about the
+    macro origin. The centre is rotated with it (Gerber spec 4.12.4.7).
+    """
+    from shapely.affinity import rotate
+    from shapely.geometry import box
+
+    ring = Point(0, 0).buffer(outer / 2, quad_segs=32)
+    if inner > 0:
+        ring = ring.difference(Point(0, 0).buffer(inner / 2, quad_segs=32))
+    if gap > 0:
+        reach = outer + gap
+        ring = ring.difference(box(-reach, -gap / 2, reach, gap / 2))
+        ring = ring.difference(box(-gap / 2, -reach, gap / 2, reach))
+    ring = rotate(ring, rotation_deg, origin=(0, 0))
+    rad = math.radians(rotation_deg)
+    from shapely.affinity import translate
+    return translate(
+        ring,
+        xoff=cx * math.cos(rad) - cy * math.sin(rad),
+        yoff=cx * math.sin(rad) + cy * math.cos(rad),
+    )
+
+
+_EXTENSIONS_INSTALLED = False
+
+
+def _install_pygerber_extensions():
+    """Teach pygerber the thermal macro primitive (code 7).
+
+    pygerber ignores it, so a thermal pad would come out as nothing. The
+    replacement hook emits the ring as dark regions into the macro buffer.
+    Without a matching pygerber internals the pad stays unsupported and is
+    reported on import instead.
+    """
+    global _EXTENSIONS_INSTALLED
+    if _EXTENSIONS_INSTALLED:
+        return
+    _EXTENSIONS_INSTALLED = True
+    try:
+        from decimal import Decimal
+
+        from pygerber.gerberx3.math.offset import Offset
+        from pygerber.gerberx3.math.vector_2d import Vector2D
+        from pygerber.gerberx3.parser2 import parser2hooks as h
+        from pygerber.gerberx3.parser2.apertures2.circle2 import Circle2
+        from pygerber.gerberx3.parser2.command_buffer2 import CommandBuffer2
+        from pygerber.gerberx3.parser2.commands2.line2 import Line2
+        from pygerber.gerberx3.parser2.commands2.region2 import Region2
+        from pygerber.gerberx3.parser2.state2 import ApertureTransform
+        from pygerber.gerberx3.state_enums import Mirroring, Polarity
+        from pygerber.gerberx3.tokenizer.aperture_id import ApertureID
+
+        def on_code_7_thermal(self, context, primitive):
+            ev = lambda e: float(e.on_parser2_eval_expression(context))
+            geom = thermal_shape(
+                ev(primitive.center_x), ev(primitive.center_y),
+                ev(primitive.outer_diameter), ev(primitive.inner_diameter),
+                ev(primitive.gap), ev(primitive.rotation),
+            )
+            units = context.get_draw_units()
+            transform = ApertureTransform(
+                polarity=Polarity.Dark, mirroring=Mirroring.NoMirroring,
+                rotation=Decimal("0.0"), scaling=Decimal("1.0"),
+            )
+            polys = list(geom.geoms) if hasattr(geom, "geoms") else [geom]
+            for poly in polys:
+                if poly.is_empty:
+                    continue
+                lines = []
+                for ring in [poly.exterior, *poly.interiors]:
+                    pts = list(ring.coords)
+                    for a, b in itertools.pairwise(pts):
+                        lines.append(Line2(
+                            transform=transform,
+                            aperture=Circle2(
+                                identifier=ApertureID(self.get_next_id()),
+                                diameter=Offset.NULL, hole_diameter=None,
+                            ),
+                            start_point=Vector2D(
+                                x=Offset.new(Decimal(repr(a[0])), units),
+                                y=Offset.new(Decimal(repr(a[1])), units),
+                            ),
+                            end_point=Vector2D(
+                                x=Offset.new(Decimal(repr(b[0])), units),
+                                y=Offset.new(Decimal(repr(b[1])), units),
+                            ),
+                        ))
+                context.get_macro_eval_buffer().add_command(
+                    Region2(transform=transform,
+                            command_buffer=CommandBuffer2(lines).get_readonly())
+                )
+
+        h.Parser2Hooks.MacroEvalHooks.on_code_7_thermal = on_code_7_thermal
+    except Exception as exc:  # noqa: BLE001 - pygerber internals; thermal pads are reported as unsupported
+        _logger.warning("Thermal macro support unavailable: %s", exc)
 
 
 def _aperture_radius(aperture) -> float:
@@ -545,7 +719,7 @@ _HEADER_START = re.compile(r"^M48")
 _HEADER_END = re.compile(r"^%$|^M95")
 # Tool definition, optionally with feed/speed before the diameter: T1F00S00C0.8
 _TOOL_DEF = re.compile(r"^T(\d+)(?:[FSBH][\d.]+)*C([\d.]+)")
-_TOOL_SELECT = re.compile(r"^T(\d+)$")
+_TOOL_SELECT = re.compile(r"^T(\d+)(?:[FSBH][\d.]+)*$")
 # X and/or Y; a missing axis keeps its previous value (modal)
 _COORD_LINE = re.compile(
     r"^(?:X([+-]?[\d.]+))?(?:Y([+-]?[\d.]+))?",

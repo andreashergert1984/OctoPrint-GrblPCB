@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: OctoPrint-GrblPCB 0.1.0\n"
 "Report-Msgid-Bugs-To: i18n@octoprint.org\n"
-"POT-Creation-Date: 2026-11-20 15:38+0100\n"
+"POT-Creation-Date: 2026-11-20 18:55+0100\n"
 "PO-Revision-Date: 2025-07-19 18:00+0100\n"
 "Last-Translator: Andreas Hergert <andreas@hergert.info>\n"
 "Language: de\n"
@@ -19,363 +19,393 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: octoprint_grblpcb/__init__.py:343
+#: octoprint_grblpcb/__init__.py:344
 msgid "GRBL CNC Connection"
 msgstr "GRBL-CNC-Verbindung"
 
-#: octoprint_grblpcb/__init__.py:351
+#: octoprint_grblpcb/__init__.py:352
 msgid "GRBL CNC / PCB Milling"
 msgstr "GRBL-CNC / Platinenfräsen"
 
-#: octoprint_grblpcb/__init__.py:558 octoprint_grblpcb/__init__.py:1047
+#: octoprint_grblpcb/__init__.py:560 octoprint_grblpcb/__init__.py:1095
 msgid "You do not have the permission for this action."
-msgstr "Für diese Aktion fehlt dir die Berechtigung."
+msgstr "Für diese Aktion fehlt die Berechtigung."
 
-#: octoprint_grblpcb/__init__.py:570
+#: octoprint_grblpcb/__init__.py:572
 msgid "Not possible while a job is running. Wait for a tool change or pause, or stop the job."
 msgstr "Nicht möglich, solange ein Auftrag läuft. Auf einen Werkzeugwechsel oder eine Pause warten oder den Auftrag stoppen."
 
-#: octoprint_grblpcb/__init__.py:584
+#: octoprint_grblpcb/__init__.py:586
 msgid "Unknown command"
 msgstr "Unbekannter Befehl"
 
-#: octoprint_grblpcb/__init__.py:599 octoprint_grblpcb/__init__.py:808
-#: octoprint_grblpcb/__init__.py:1955 octoprint_grblpcb/__init__.py:2492
-#: octoprint_grblpcb/__init__.py:2916 octoprint_grblpcb/__init__.py:2985
-#: octoprint_grblpcb/__init__.py:2996 octoprint_grblpcb/__init__.py:3007
+#: octoprint_grblpcb/__init__.py:601 octoprint_grblpcb/__init__.py:830
+#: octoprint_grblpcb/__init__.py:2064 octoprint_grblpcb/__init__.py:2630
+#: octoprint_grblpcb/__init__.py:3113 octoprint_grblpcb/__init__.py:3182
+#: octoprint_grblpcb/__init__.py:3193 octoprint_grblpcb/__init__.py:3204
 msgid "Not connected to GRBL"
 msgstr "Nicht mit GRBL verbunden"
 
-#: octoprint_grblpcb/__init__.py:608
-msgid "Not possible while probing is running. Wait until it is done or stop it."
-msgstr "Nicht möglich, solange das Abtasten läuft. Warten, bis es fertig ist, oder es stoppen."
-
 #: octoprint_grblpcb/__init__.py:618
+msgid "Not possible while probing is running. Wait until it is done or stop it."
+msgstr "Nicht möglich, solange das Antasten läuft. Warten, bis es fertig ist, oder es stoppen."
+
+#: octoprint_grblpcb/__init__.py:629
+msgid "The machine is still being stopped. Wait a moment, then try again."
+msgstr "Die Maschine wird noch gestoppt. Einen Moment warten, dann erneut versuchen."
+
+#: octoprint_grblpcb/__init__.py:634
 #, python-format
 msgid "GRBL is busy (state: %(state)s). Wait until the machine is idle, then try again."
 msgstr "GRBL ist beschäftigt (Zustand: %(state)s). Warten, bis die Maschine bereit ist, dann erneut versuchen."
 
-#: octoprint_grblpcb/__init__.py:628
+#: octoprint_grblpcb/__init__.py:644
 msgid "GRBL is in alarm. Unlock it (or home), check the position and the zero, then try again."
 msgstr "GRBL ist im Alarm. Erst entsperren (oder Referenzfahrt), Position und Nullpunkt prüfen, dann erneut versuchen."
 
-#: octoprint_grblpcb/__init__.py:646 octoprint_grblpcb/__init__.py:1853
+#: octoprint_grblpcb/__init__.py:662 octoprint_grblpcb/__init__.py:1943
 #, python-format
 msgid "Invalid layer type: %(value)s"
 msgstr "Ungültiger Lagentyp: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:666
+#: octoprint_grblpcb/__init__.py:682
 #, python-format
 msgid "Invalid probe axis: %(value)s"
 msgstr "Ungültige Antastachse: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:742
+#: octoprint_grblpcb/__init__.py:759
 #, python-format
 msgid "Invalid WCS: %(value)s"
 msgstr "Ungültiges Werkstück-Koordinatensystem: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:753
+#: octoprint_grblpcb/__init__.py:770
 #, python-format
 msgid "Invalid axis: %(value)s"
 msgstr "Ungültige Achse: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:808
+#: octoprint_grblpcb/__init__.py:830
 msgid "Connected to GRBL"
 msgstr "Mit GRBL verbunden"
 
-#: octoprint_grblpcb/__init__.py:813
+#: octoprint_grblpcb/__init__.py:835
 msgid "Connection is required before machine checks can run"
 msgstr "Für den Maschinencheck ist eine Verbindung nötig"
 
-#: octoprint_grblpcb/__init__.py:815
+#: octoprint_grblpcb/__init__.py:837
 #, python-format
 msgid "GRBL is in ALARM state (%(state)s)"
 msgstr "GRBL ist im Alarm (%(state)s)"
 
-#: octoprint_grblpcb/__init__.py:817
+#: octoprint_grblpcb/__init__.py:839
 msgid "GRBL is idle and ready"
 msgstr "GRBL ist im Leerlauf und bereit"
 
-#: octoprint_grblpcb/__init__.py:819
+#: octoprint_grblpcb/__init__.py:841
 #, python-format
 msgid "GRBL is busy or paused (%(state)s)"
 msgstr "GRBL ist beschäftigt oder pausiert (%(state)s)"
 
-#: octoprint_grblpcb/__init__.py:824
+#: octoprint_grblpcb/__init__.py:846
 msgid "No active stream"
 msgstr "Kein laufender Auftrag"
 
-#: octoprint_grblpcb/__init__.py:824
+#: octoprint_grblpcb/__init__.py:846
 msgid "A G-code stream is active"
 msgstr "Ein G-Code-Auftrag läuft"
 
-#: octoprint_grblpcb/__init__.py:830
+#: octoprint_grblpcb/__init__.py:852
 msgid "No active probe"
-msgstr "Keine laufende Abtastung"
+msgstr "Es läuft kein Antasten"
 
-#: octoprint_grblpcb/__init__.py:830
+#: octoprint_grblpcb/__init__.py:852
 msgid "A probe run is active"
-msgstr "Eine Abtastung läuft"
+msgstr "Das Antasten läuft"
 
-#: octoprint_grblpcb/__init__.py:843
+#: octoprint_grblpcb/__init__.py:865
 msgid "This check verifies controller state and workflow safety."
 msgstr "Dieser Check prüft den Zustand der Steuerung und die Ablaufsicherheit."
 
-#: octoprint_grblpcb/__init__.py:844
+#: octoprint_grblpcb/__init__.py:866
 msgid "Step loss, backlash, and absolute accuracy require external measurement such as a dial indicator, gauge block, or probe pad."
 msgstr "Schrittverlust, Umkehrspiel und absolute Genauigkeit lassen sich nur mit externer Messung prüfen, etwa mit Messuhr, Endmaß oder Antastplatte."
 
-#: octoprint_grblpcb/__init__.py:864
+#: octoprint_grblpcb/__init__.py:886
 msgid "Speed must be a number"
 msgstr "Die Drehzahl muss eine Zahl sein"
 
-#: octoprint_grblpcb/__init__.py:866
+#: octoprint_grblpcb/__init__.py:888
 #, python-format
 msgid "Speed out of range (0-30000): %(value)s"
 msgstr "Drehzahl außerhalb des Bereichs (0 bis 30000): %(value)s"
 
-#: octoprint_grblpcb/__init__.py:894
+#: octoprint_grblpcb/__init__.py:916
 #, python-format
 msgid "Invalid jog axis: %(value)s"
 msgstr "Ungültige Achse zum Tippen: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:898
+#: octoprint_grblpcb/__init__.py:920
 msgid "Distance must be a number"
 msgstr "Der Weg muss eine Zahl sein"
 
-#: octoprint_grblpcb/__init__.py:900
+#: octoprint_grblpcb/__init__.py:922
 #, python-format
 msgid "Jog distance too large: %(value)s"
 msgstr "Tippweg zu groß: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:904
+#: octoprint_grblpcb/__init__.py:926
 msgid "Feed must be a number"
 msgstr "Der Vorschub muss eine Zahl sein"
 
-#: octoprint_grblpcb/__init__.py:906
+#: octoprint_grblpcb/__init__.py:928
 #, python-format
 msgid "Feed out of range (1-10000): %(value)s"
 msgstr "Vorschub außerhalb des Bereichs (1 bis 10000): %(value)s"
 
-#: octoprint_grblpcb/__init__.py:949 octoprint_grblpcb/__init__.py:1010
-#: octoprint_grblpcb/__init__.py:1593 octoprint_grblpcb/__init__.py:1671
-#: octoprint_grblpcb/__init__.py:1773 octoprint_grblpcb/__init__.py:1847
-#: octoprint_grblpcb/__init__.py:1918 octoprint_grblpcb/__init__.py:2372
-#: octoprint_grblpcb/__init__.py:2409 octoprint_grblpcb/__init__.py:2449
-#: octoprint_grblpcb/__init__.py:2485 octoprint_grblpcb/__init__.py:2756
-#: octoprint_grblpcb/__init__.py:2793 octoprint_grblpcb/__init__.py:2832
-#: octoprint_grblpcb/__init__.py:2850 octoprint_grblpcb/__init__.py:2872
-#: octoprint_grblpcb/__init__.py:2892 octoprint_grblpcb/__init__.py:2912
+#: octoprint_grblpcb/__init__.py:983 octoprint_grblpcb/__init__.py:1045
+#: octoprint_grblpcb/__init__.py:1674 octoprint_grblpcb/__init__.py:1761
+#: octoprint_grblpcb/__init__.py:1863 octoprint_grblpcb/__init__.py:1937
+#: octoprint_grblpcb/__init__.py:2008 octoprint_grblpcb/__init__.py:2493
+#: octoprint_grblpcb/__init__.py:2530 octoprint_grblpcb/__init__.py:2570
+#: octoprint_grblpcb/__init__.py:2623 octoprint_grblpcb/__init__.py:2953
+#: octoprint_grblpcb/__init__.py:2990 octoprint_grblpcb/__init__.py:3029
+#: octoprint_grblpcb/__init__.py:3047 octoprint_grblpcb/__init__.py:3069
+#: octoprint_grblpcb/__init__.py:3089 octoprint_grblpcb/__init__.py:3109
 msgid "No project"
 msgstr "Kein Projekt"
 
-#: octoprint_grblpcb/__init__.py:1015
+#: octoprint_grblpcb/__init__.py:1050
 #, python-format
 msgid "Invalid board side: %(value)s"
 msgstr "Ungültige Platinenseite: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:1213
+#: octoprint_grblpcb/__init__.py:1056
+#, python-format
+msgid "Invalid flip axis: %(value)s"
+msgstr "Ungültige Spiegelachse: %(value)s"
+
+#: octoprint_grblpcb/__init__.py:1263
 #, python-format
 msgid "File not found: %(value)s"
 msgstr "Datei nicht gefunden: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:1229 octoprint_grblpcb/__init__.py:1299
+#: octoprint_grblpcb/__init__.py:1279 octoprint_grblpcb/__init__.py:1349
 msgid "No project_id provided"
 msgstr "Keine Projekt-ID angegeben"
 
-#: octoprint_grblpcb/__init__.py:1233
+#: octoprint_grblpcb/__init__.py:1283
 msgid "Invalid project ID"
 msgstr "Ungültige Projekt-ID"
 
-#: octoprint_grblpcb/__init__.py:1236 octoprint_grblpcb/__init__.py:1311
+#: octoprint_grblpcb/__init__.py:1286 octoprint_grblpcb/__init__.py:1361
 #, python-format
 msgid "Project not found: %(value)s"
 msgstr "Projekt nicht gefunden: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:1462 octoprint_grblpcb/__init__.py:1725
+#: octoprint_grblpcb/__init__.py:1541 octoprint_grblpcb/__init__.py:1815
 msgid "No project loaded"
 msgstr "Kein Projekt geladen"
 
-#: octoprint_grblpcb/__init__.py:1599
+#: octoprint_grblpcb/__init__.py:1680
 #, python-format
 msgid "No geometry for %(value)s"
 msgstr "Keine Geometrie für %(value)s"
 
-#: octoprint_grblpcb/__init__.py:1728
+#: octoprint_grblpcb/__init__.py:1818
 msgid "Drill file contains no holes (0 tools, 0 holes)"
 msgstr "Die Bohrdatei enthält keine Bohrungen (0 Werkzeuge, 0 Bohrungen)"
 
-#: octoprint_grblpcb/__init__.py:1797 octoprint_grblpcb/__init__.py:1818
+#: octoprint_grblpcb/__init__.py:1887 octoprint_grblpcb/__init__.py:1908
 msgid "No outline layer and no board dimensions"
 msgstr "Keine Umrisslage und keine Platinenmaße"
 
-#: octoprint_grblpcb/__init__.py:1862
+#: octoprint_grblpcb/__init__.py:1952
 msgid "No board dimensions available"
 msgstr "Keine Platinenmaße vorhanden"
 
-#: octoprint_grblpcb/__init__.py:1885
+#: octoprint_grblpcb/__init__.py:1975
 msgid "Generated empty G-code: nothing to expose"
 msgstr "Leerer G-Code erzeugt: nichts zu belichten"
 
-#: octoprint_grblpcb/__init__.py:1951
+#: octoprint_grblpcb/__init__.py:2023
+msgid "The grid needs a whole number of 2 to 20 points in X and Y."
+msgstr "Das Raster braucht in X und Y je eine ganze Zahl von 2 bis 20 Punkten."
+
+#: octoprint_grblpcb/__init__.py:2031
+msgid "The margin must be a number from 0 to 50 mm."
+msgstr "Der Rand muss eine Zahl von 0 bis 50 mm sein."
+
+#: octoprint_grblpcb/__init__.py:2060
 msgid "No height map configured"
 msgstr "Keine Höhenkarte eingerichtet"
 
-#: octoprint_grblpcb/__init__.py:1958 octoprint_grblpcb/__init__.py:2495
+#: octoprint_grblpcb/__init__.py:2067 octoprint_grblpcb/__init__.py:2633
 msgid "Probing already in progress"
-msgstr "Die Abtastung läuft bereits"
+msgstr "Das Antasten läuft bereits"
 
-#: octoprint_grblpcb/__init__.py:1961 octoprint_grblpcb/__init__.py:2498
+#: octoprint_grblpcb/__init__.py:2070 octoprint_grblpcb/__init__.py:2636
 msgid "Cannot start probing while streaming is active"
-msgstr "Abtasten ist nicht möglich, solange ein Auftrag läuft"
+msgstr "Antasten ist nicht möglich, solange ein Auftrag läuft"
 
-#: octoprint_grblpcb/__init__.py:1990
+#: octoprint_grblpcb/__init__.py:2099
 msgid "Probing started"
-msgstr "Abtastung gestartet"
+msgstr "Antasten gestartet"
 
-#: octoprint_grblpcb/__init__.py:2331
+#: octoprint_grblpcb/__init__.py:2452
 msgid "Height map not complete"
 msgstr "Höhenkarte nicht vollständig"
 
-#: octoprint_grblpcb/__init__.py:2335 octoprint_grblpcb/__init__.py:2376
-#: octoprint_grblpcb/__init__.py:2800 octoprint_grblpcb/__init__.py:2854
-#: octoprint_grblpcb/__init__.py:2876 octoprint_grblpcb/__init__.py:2927
+#: octoprint_grblpcb/__init__.py:2456 octoprint_grblpcb/__init__.py:2497
+#: octoprint_grblpcb/__init__.py:2997 octoprint_grblpcb/__init__.py:3051
+#: octoprint_grblpcb/__init__.py:3073 octoprint_grblpcb/__init__.py:3124
 msgid "Invalid operation index"
 msgstr "Ungültige Operation"
 
-#: octoprint_grblpcb/__init__.py:2339
+#: octoprint_grblpcb/__init__.py:2460
 msgid "No G-code to correct"
 msgstr "Kein G-Code zum Korrigieren"
 
-#: octoprint_grblpcb/__init__.py:2380
+#: octoprint_grblpcb/__init__.py:2501
 msgid "This operation is already the back-side version"
 msgstr "Diese Operation ist bereits die Rückseite"
 
-#: octoprint_grblpcb/__init__.py:2385
+#: octoprint_grblpcb/__init__.py:2506
 msgid "Only drilling and the outline are mirrored for the back side. Bottom copper is generated for the back side directly."
 msgstr "Für die Rückseite werden nur Bohren und Umriss gespiegelt. Das Kupfer unten wird direkt für die Rückseite erzeugt."
 
-#: octoprint_grblpcb/__init__.py:2389
+#: octoprint_grblpcb/__init__.py:2510
 msgid "Generate this operation again, then it can be mirrored for the back side."
 msgstr "Diese Operation bitte neu erzeugen, dann lässt sie sich für die Rückseite spiegeln."
 
-#: octoprint_grblpcb/__init__.py:2413 octoprint_grblpcb/__init__.py:2458
+#: octoprint_grblpcb/__init__.py:2534 octoprint_grblpcb/__init__.py:2579
 msgid "Need at least 2 alignment holes"
 msgstr "Mindestens 2 Ausrichtungslöcher erforderlich"
 
-#: octoprint_grblpcb/__init__.py:2488
+#: octoprint_grblpcb/__init__.py:2589
+#, python-format
+msgid "Fewer than two drill holes are at least %(d)s mm wide. The probe may not fit into the selected holes; add larger holes for alignment if probing fails."
+msgstr "Weniger als zwei Bohrungen sind mindestens %(d)s mm breit. Der Taster passt eventuell nicht in die gewählten Löcher; schlägt das Antasten fehl, größere Löcher für die Ausrichtung vorsehen."
+
+#: octoprint_grblpcb/__init__.py:2626
 msgid "No alignment holes set"
 msgstr "Keine Ausrichtungslöcher festgelegt"
 
-#: octoprint_grblpcb/__init__.py:2516
+#: octoprint_grblpcb/__init__.py:2654
 msgid "Alignment probing started"
-msgstr "Ausrichtungsabtastung gestartet"
+msgstr "Antasten der Ausrichtungslöcher gestartet"
 
-#: octoprint_grblpcb/__init__.py:2762
+#: octoprint_grblpcb/__init__.py:2959
 #, python-format
 msgid "Need at least 2 probed holes, have %(value)s"
 msgstr "Mindestens 2 abgetastete Löcher erforderlich, vorhanden: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:2771
+#: octoprint_grblpcb/__init__.py:2968
 #, python-format
 msgid "Transform computation failed: %(value)s"
 msgstr "Berechnung der Ausrichtung fehlgeschlagen: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:2781
+#: octoprint_grblpcb/__init__.py:2978
 #, python-format
 msgid "Alignment: rotation %(angle).3f°, offset (%(tx).4f, %(ty).4f) mm, RMS error %(rms).4f mm"
 msgstr "Ausrichtung: Drehung %(angle).3f°, Versatz (%(tx).4f, %(ty).4f) mm, RMS-Fehler %(rms).4f mm"
 
-#: octoprint_grblpcb/__init__.py:2796
+#: octoprint_grblpcb/__init__.py:2993
 msgid "No alignment transform computed"
 msgstr "Keine Ausrichtung berechnet"
 
-#: octoprint_grblpcb/__init__.py:2805
+#: octoprint_grblpcb/__init__.py:3002
 msgid "No G-code to transform"
 msgstr "Kein G-Code zum Umrechnen"
 
-#: octoprint_grblpcb/__init__.py:2822
+#: octoprint_grblpcb/__init__.py:3019
 #, python-format
 msgid "Alignment applied: %(angle).3f° rotation, (%(tx).4f, %(ty).4f) mm offset"
 msgstr "Ausrichtung angewendet: %(angle).3f° Drehung, Versatz (%(tx).4f, %(ty).4f) mm"
 
-#: octoprint_grblpcb/__init__.py:2859
+#: octoprint_grblpcb/__init__.py:3056
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:732
 msgid "No G-code"
 msgstr "Kein G-Code"
 
-#: octoprint_grblpcb/__init__.py:2897
+#: octoprint_grblpcb/__init__.py:3094
 msgid "Invalid order - must be permutation of indices"
 msgstr "Ungültige Reihenfolge: Jede Operation muss genau einmal vorkommen"
 
-#: octoprint_grblpcb/__init__.py:2919
+#: octoprint_grblpcb/__init__.py:3116
 msgid "Cannot start streaming while probing is active"
-msgstr "Senden ist nicht möglich, solange eine Abtastung läuft"
+msgstr "Senden ist nicht möglich, solange das Antasten läuft"
 
-#: octoprint_grblpcb/__init__.py:2932
+#: octoprint_grblpcb/__init__.py:3129
 msgid "No G-code to execute"
 msgstr "Kein G-Code zum Ausführen"
 
-#: octoprint_grblpcb/__init__.py:2939
+#: octoprint_grblpcb/__init__.py:3136
 msgid "This bottom-layer operation is not mirrored. Generate it again (it is mirrored automatically)."
 msgstr "Diese Operation der Unterseite ist nicht gespiegelt. Sie neu erzeugen (sie wird dann automatisch gespiegelt)."
 
-#: octoprint_grblpcb/__init__.py:2971
+#: octoprint_grblpcb/__init__.py:3168
 msgid "Failed to start streaming"
 msgstr "Senden konnte nicht gestartet werden"
 
-#: octoprint_grblpcb/__init__.py:2988
+#: octoprint_grblpcb/__init__.py:3185
 msgid "Execution stopped"
 msgstr "Ausführung gestoppt"
 
-#: octoprint_grblpcb/__init__.py:2999
+#: octoprint_grblpcb/__init__.py:3196
 msgid "Tool change confirmed"
 msgstr "Werkzeugwechsel bestätigt"
 
-#: octoprint_grblpcb/__init__.py:3016
+#: octoprint_grblpcb/__init__.py:3213
 #, python-format
 msgid "Invalid override type: %(value)s"
 msgstr "Ungültige Übersteuerung: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:3018
+#: octoprint_grblpcb/__init__.py:3215
 #, python-format
 msgid "Invalid action: %(value)s"
 msgstr "Ungültige Aktion: %(value)s"
 
-#: octoprint_grblpcb/__init__.py:3022
+#: octoprint_grblpcb/__init__.py:3219
 msgid "Failed to send override"
 msgstr "Übersteuerung konnte nicht gesendet werden"
 
-#: octoprint_grblpcb/connector.py:250
+#: octoprint_grblpcb/connector.py:260
 #, python-format
 msgid "No GRBL status report on %(port)s at %(baudrate)s baud. Check the port and the baud rate."
-msgstr "Kein GRBL-Statusbericht an %(port)s mit %(baudrate)s Baud. Prüfe den Anschluss und die Baudrate."
+msgstr "Kein GRBL-Statusbericht an %(port)s mit %(baudrate)s Baud. Den Anschluss und die Baudrate prüfen."
 
-#: octoprint_grblpcb/connector.py:269
-#: octoprint_grblpcb/static/js/grblpcb.js:1939
+#: octoprint_grblpcb/connector.py:279
+#: octoprint_grblpcb/static/js/grblpcb.js:2141
 msgid "Connection to GRBL lost"
 msgstr "Verbindung zu GRBL verloren"
 
-#: octoprint_grblpcb/connector.py:271
+#: octoprint_grblpcb/connector.py:281
 msgid "The position and the work zero may be lost. Reconnect, home or check the zero before milling."
 msgstr "Die Position und der Werkstück-Nullpunkt sind möglicherweise verloren. Neu verbinden, dann Referenzfahrt machen oder den Nullpunkt prüfen, bevor gefräst wird."
 
-#: octoprint_grblpcb/connector.py:433
+#: octoprint_grblpcb/connector.py:452
 msgid "Alarm (GRBL)"
 msgstr "Alarm (GRBL)"
 
-#: octoprint_grblpcb/connector.py:469
+#: octoprint_grblpcb/connector.py:488
 msgid "not sent: probing is running. Wait until it is done or stop it."
-msgstr "nicht gesendet: Das Abtasten läuft. Warten, bis es fertig ist, oder es stoppen."
+msgstr "nicht gesendet: Das Antasten läuft. Warten, bis es fertig ist, oder es stoppen."
 
-#: octoprint_grblpcb/connector.py:471
+#: octoprint_grblpcb/connector.py:490
 msgid "not sent: a job is running. Wait for a pause or stop the job."
-msgstr "nicht gesendet: Ein Auftrag läuft. Warte auf eine Pause oder stoppe den Auftrag."
+msgstr "nicht gesendet: Ein Auftrag läuft. Auf eine Pause warten oder den Auftrag stoppen."
 
-#: octoprint_grblpcb/connector.py:923
-#: octoprint_grblpcb/static/js/grblpcb.js:2045
+#: octoprint_grblpcb/connector.py:681
+msgid "not sent: the machine is still being stopped."
+msgstr "nicht gesendet: Die Maschine wird noch gestoppt."
+
+#: octoprint_grblpcb/connector.py:1039
+#: octoprint_grblpcb/static/js/grblpcb.js:2269
 msgid "GRBL was reset during the job. Check the position and the zero before milling again."
 msgstr "GRBL wurde während des Auftrags zurückgesetzt. Vor dem nächsten Fräsen Position und Nullpunkt prüfen."
+
+#: octoprint_grblpcb/connector.py:1197
+msgid "GRBL stopped answering, the serial port is still open."
+msgstr "GRBL antwortet nicht mehr, der serielle Port ist aber noch offen."
 
 #: octoprint_grblpcb/static/js/grblpcb.js:111
 msgid "Untitled PCB"
@@ -384,819 +414,958 @@ msgstr "Unbenannte Platine"
 #: octoprint_grblpcb/static/js/grblpcb.js:137
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:212
 msgid "Probe"
-msgstr "Abtasten"
+msgstr "Antasten"
 
 #: octoprint_grblpcb/static/js/grblpcb.js:138
+#: octoprint_grblpcb/static/js/grblpcb.js:1320
 msgid "Probe again"
-msgstr "Neu abtasten"
+msgstr "Erneut antasten"
 
 #: octoprint_grblpcb/static/js/grblpcb.js:139
 msgid "Continue probing"
-msgstr "Abtasten fortsetzen"
+msgstr "Antasten fortsetzen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:219
+#: octoprint_grblpcb/static/js/grblpcb.js:221
 msgid "Cancel"
 msgstr "Abbrechen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:302
+#: octoprint_grblpcb/static/js/grblpcb.js:308
 msgid "disconnected"
 msgstr "getrennt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:317
+#: octoprint_grblpcb/static/js/grblpcb.js:323
 msgid "Ready"
 msgstr "Bereit"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:318
+#: octoprint_grblpcb/static/js/grblpcb.js:324
 msgid "Running"
 msgstr "Läuft"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:319
+#: octoprint_grblpcb/static/js/grblpcb.js:325
 msgid "Paused (feed hold)"
-msgstr "Angehalten"
+msgstr "Pausiert (Vorschubhalt)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:320
+#: octoprint_grblpcb/static/js/grblpcb.js:326
 msgid "Jogging"
 msgstr "Tippen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:321
+#: octoprint_grblpcb/static/js/grblpcb.js:327
 msgid "Homing"
 msgstr "Referenzfahrt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:322
+#: octoprint_grblpcb/static/js/grblpcb.js:328
 msgid "Alarm"
 msgstr "Alarm"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:323
+#: octoprint_grblpcb/static/js/grblpcb.js:329
 msgid "Door open"
 msgstr "Tür offen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:324
+#: octoprint_grblpcb/static/js/grblpcb.js:330
 msgid "Check mode"
 msgstr "Prüfmodus"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:325
+#: octoprint_grblpcb/static/js/grblpcb.js:331
 msgid "Sleeping"
 msgstr "Ruhezustand"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:337
+#: octoprint_grblpcb/static/js/grblpcb.js:343
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:4
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:460
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:906
 msgid "Board"
 msgstr "Platine"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:338
+#: octoprint_grblpcb/static/js/grblpcb.js:344
 msgid "Import Gerber and drill files, then generate the toolpaths."
 msgstr "Gerber- und Bohrdateien importieren, dann die Fräsbahnen erzeugen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:339
+#: octoprint_grblpcb/static/js/grblpcb.js:345
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:7
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:61
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:138
 msgid "Machine"
 msgstr "Maschine"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:340
+#: octoprint_grblpcb/static/js/grblpcb.js:346
 msgid "Connect, home, move to the board corner, zero X/Y, probe and zero Z."
 msgstr "Verbinden, Referenzfahrt, zur Platinenecke fahren, X/Y nullen, Z antasten und nullen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:341
+#: octoprint_grblpcb/static/js/grblpcb.js:347
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:10
 msgid "Autolevel"
 msgstr "Autolevel"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:342
+#: octoprint_grblpcb/static/js/grblpcb.js:348
 msgid "Optional: probe the board surface and apply the height map to the toolpaths."
-msgstr "Optional: Platinenoberfläche abtasten und die Höhenkarte auf die Fräsbahnen anwenden."
+msgstr "Optional: Platinenoberfläche antasten und die Höhenkarte auf die Fräsbahnen anwenden."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:343
+#: octoprint_grblpcb/static/js/grblpcb.js:349
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:13
 msgid "Milling"
 msgstr "Fräsen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:344
+#: octoprint_grblpcb/static/js/grblpcb.js:350
 msgid "Send the operations to the machine one after another."
 msgstr "Die Operationen nacheinander an die Maschine senden."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:356
+#: octoprint_grblpcb/static/js/grblpcb.js:362
 msgid "Create a project in the Board tab and import the Gerber and drill files."
 msgstr "Im Reiter „Platine“ ein Projekt anlegen und die Gerber- und Bohrdateien importieren."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:359
+#: octoprint_grblpcb/static/js/grblpcb.js:365
 msgid "Generate the toolpaths in the Board tab (isolation, drilling, outline)."
 msgstr "Im Reiter „Platine“ die Fräsbahnen erzeugen (Isolation, Bohren, Umriss)."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:362
+#: octoprint_grblpcb/static/js/grblpcb.js:368
 msgid "Connect the machine on the left: connection type 'GRBL CNC Connection'."
 msgstr "Links die Maschine verbinden: Verbindungstyp „GRBL CNC Connection“."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:365
+#: octoprint_grblpcb/static/js/grblpcb.js:371
 msgid "Machine tab: home, move to the board corner, zero X/Y, then probe and zero Z."
 msgstr "Reiter „Maschine“: Referenzfahrt, zur Platinenecke fahren, X/Y nullen, dann Z antasten und nullen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:370
+#: octoprint_grblpcb/static/js/grblpcb.js:376
 msgid "Milling tab: send the operations in order. Autolevel before is optional."
 msgstr "Reiter „Fräsen“: die Operationen der Reihe nach senden. Autolevel vorher ist optional."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:375
+#: octoprint_grblpcb/static/js/grblpcb.js:381
 #, python-format
 msgid "X %(x)s, Y %(y)s, ⌀ %(d)s mm"
 msgstr "X %(x)s, Y %(y)s, ⌀ %(d)s mm"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:381
+#: octoprint_grblpcb/static/js/grblpcb.js:387
 #, python-format
 msgid "Hole %(n)d: not probed yet"
 msgstr "Loch %(n)d: noch nicht angetastet"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:384
+#: octoprint_grblpcb/static/js/grblpcb.js:390
 #, python-format
 msgid "Hole %(n)d: off by %(dev)s mm"
 msgstr "Loch %(n)d: Abweichung %(dev)s mm"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:448
+#: octoprint_grblpcb/static/js/grblpcb.js:454
 #, python-format
 msgid "(%(count)d holes)"
 msgstr "(%(count)d Bohrungen)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:452
+#: octoprint_grblpcb/static/js/grblpcb.js:458
 msgid "Drill file contains no holes"
 msgstr "Die Bohrdatei enthält keine Bohrungen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:456
+#: octoprint_grblpcb/static/js/grblpcb.js:462
 msgid "Error"
 msgstr "Fehler"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:460
+#: octoprint_grblpcb/static/js/grblpcb.js:466
 #, python-format
 msgid "%(count)d lines"
 msgstr "%(count)d Zeilen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:464
+#: octoprint_grblpcb/static/js/grblpcb.js:470
 #, python-format
 msgid "(%(count)d points)"
 msgstr "(%(count)d Punkte)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:475
+#: octoprint_grblpcb/static/js/grblpcb.js:481
 #, python-format
 msgid "θ=%(angle)s°  offset=(%(tx)s, %(ty)s) mm  RMS=%(rms)s mm"
 msgstr "θ=%(angle)s°  Versatz=(%(tx)s, %(ty)s) mm  RMS=%(rms)s mm"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:484
+#: octoprint_grblpcb/static/js/grblpcb.js:490
 #, python-format
 msgid "%(layers)d layers, %(operations)d operations"
 msgstr "%(layers)d Lagen, %(operations)d Operationen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:502
+#: octoprint_grblpcb/static/js/grblpcb.js:508
 msgid "Expose solder mask using UV LED raster scan"
 msgstr "Lötstoppmaske per UV-LED-Rasterscan belichten"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:556
-#: octoprint_grblpcb/static/js/grblpcb.js:966
-#: octoprint_grblpcb/static/js/grblpcb.js:990
-#: octoprint_grblpcb/static/js/grblpcb.js:1056
-#: octoprint_grblpcb/static/js/grblpcb.js:1081
-#: octoprint_grblpcb/static/js/grblpcb.js:1111
-#: octoprint_grblpcb/static/js/grblpcb.js:1137
-#: octoprint_grblpcb/static/js/grblpcb.js:1206
-#: octoprint_grblpcb/static/js/grblpcb.js:1226
-#: octoprint_grblpcb/static/js/grblpcb.js:1451
-#: octoprint_grblpcb/static/js/grblpcb.js:1475
-#: octoprint_grblpcb/static/js/grblpcb.js:1697
-#: octoprint_grblpcb/static/js/grblpcb.js:1731
-#: octoprint_grblpcb/static/js/grblpcb.js:1742
+#: octoprint_grblpcb/static/js/grblpcb.js:562
+#: octoprint_grblpcb/static/js/grblpcb.js:1075
+#: octoprint_grblpcb/static/js/grblpcb.js:1112
+#: octoprint_grblpcb/static/js/grblpcb.js:1178
+#: octoprint_grblpcb/static/js/grblpcb.js:1203
+#: octoprint_grblpcb/static/js/grblpcb.js:1233
+#: octoprint_grblpcb/static/js/grblpcb.js:1259
+#: octoprint_grblpcb/static/js/grblpcb.js:1309
+#: octoprint_grblpcb/static/js/grblpcb.js:1348
+#: octoprint_grblpcb/static/js/grblpcb.js:1368
+#: octoprint_grblpcb/static/js/grblpcb.js:1591
+#: octoprint_grblpcb/static/js/grblpcb.js:1628
+#: octoprint_grblpcb/static/js/grblpcb.js:1708
+#: octoprint_grblpcb/static/js/grblpcb.js:1896
+#: octoprint_grblpcb/static/js/grblpcb.js:1930
+#: octoprint_grblpcb/static/js/grblpcb.js:1941
 msgid "failed"
 msgstr "fehlgeschlagen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:559
+#: octoprint_grblpcb/static/js/grblpcb.js:565
 msgid "Command not executed"
 msgstr "Befehl nicht ausgeführt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:637
-#: octoprint_grblpcb/static/js/grblpcb.js:654
+#: octoprint_grblpcb/static/js/grblpcb.js:580
+msgid "The job waits for a confirmation (tool change or program pause). Change the tool if needed, probe and zero Z, then click Confirm."
+msgstr "Der Auftrag wartet auf eine Bestätigung (Werkzeugwechsel oder Programmpause). Bei Bedarf das Werkzeug wechseln, Z antasten und nullen, dann auf „Bestätigen“ klicken."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:584
+#: octoprint_grblpcb/static/js/grblpcb.js:1838
+msgid "A job is running"
+msgstr "Ein Auftrag läuft"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:596
+msgid "Machine ready"
+msgstr "Maschine bereit"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:597
+msgid "Attention required"
+msgstr "Bitte prüfen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:671
+#: octoprint_grblpcb/static/js/grblpcb.js:688
 msgid "Probing Z"
 msgstr "Z wird angetastet"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:638
+#: octoprint_grblpcb/static/js/grblpcb.js:672
 msgid "Probing Z..."
 msgstr "Z wird angetastet ..."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:647
+#: octoprint_grblpcb/static/js/grblpcb.js:681
 msgid "Z is set to 0 where the tool touched. The tool is lifted."
 msgstr "Z ist dort auf 0 gesetzt, wo das Werkzeug berührt hat. Das Werkzeug ist angehoben."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:650
+#: octoprint_grblpcb/static/js/grblpcb.js:684
 #, python-format
 msgid "Z is set to 0 where the tool touched (machine Z %(z)s mm). The tool is lifted."
 msgstr "Z ist dort auf 0 gesetzt, wo das Werkzeug berührt hat (Maschinen-Z %(z)s mm). Das Werkzeug ist angehoben."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:658
-#: octoprint_grblpcb/static/js/grblpcb.js:1948
+#: octoprint_grblpcb/static/js/grblpcb.js:692
+#: octoprint_grblpcb/static/js/grblpcb.js:2150
 msgid "The probe did not touch the board within the probe depth."
 msgstr "Der Taster hat die Platine innerhalb der Antasttiefe nicht berührt."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:659
-#: octoprint_grblpcb/static/js/grblpcb.js:1950
+#: octoprint_grblpcb/static/js/grblpcb.js:693
+#: octoprint_grblpcb/static/js/grblpcb.js:2152
 msgid "GRBL raised an alarm."
 msgstr "GRBL hat einen Alarm ausgelöst."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:660
-#: octoprint_grblpcb/static/js/grblpcb.js:1953
+#: octoprint_grblpcb/static/js/grblpcb.js:694
+#: octoprint_grblpcb/static/js/grblpcb.js:2155
 msgid "GRBL was reset during probing. Check the position and the zero before probing again."
-msgstr "GRBL wurde während des Abtastens zurückgesetzt. Vor dem nächsten Abtasten Position und Nullpunkt prüfen."
+msgstr "GRBL wurde während des Antastens zurückgesetzt. Vor dem nächsten Antasten Position und Nullpunkt prüfen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:661
+#: octoprint_grblpcb/static/js/grblpcb.js:695
 msgid "No probe result in time."
 msgstr "Kein Antastergebnis innerhalb der erwarteten Zeit."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:662
+#: octoprint_grblpcb/static/js/grblpcb.js:696
 msgid "The connection to GRBL was lost."
 msgstr "Die Verbindung zu GRBL ist abgebrochen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:665
+#: octoprint_grblpcb/static/js/grblpcb.js:697
+msgid "GRBL refused the probe move (for example because a jog is still running). Wait until the machine is idle, then try again."
+msgstr "GRBL hat die Antastfahrt abgelehnt (zum Beispiel, weil noch eine Handfahrt läuft). Warten, bis die Maschine bereit ist, dann erneut versuchen."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:698
+msgid "The machine is not idle. Wait until it stands still, then try again."
+msgstr "Die Maschine ist nicht bereit. Warten, bis sie steht, dann erneut versuchen."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:701
+msgid "Probing failed"
+msgstr "Antasten fehlgeschlagen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:701
 msgid "Probing Z failed"
 msgstr "Z-Antasten fehlgeschlagen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:666
+#: octoprint_grblpcb/static/js/grblpcb.js:702
 msgid "The zero stays unchanged."
 msgstr "Der Nullpunkt bleibt unverändert."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:691
+#: octoprint_grblpcb/static/js/grblpcb.js:727
 msgid "Move the work zero?"
 msgstr "Werkstück-Nullpunkt verschieben?"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:692
+#: octoprint_grblpcb/static/js/grblpcb.js:728
 msgid "A height map was probed with the current X/Y zero. After moving the zero it no longer fits the board and has to be probed again."
 msgstr "Mit dem aktuellen X/Y-Nullpunkt wurde eine Höhenkarte abgetastet. Nach dem Verschieben des Nullpunkts passt sie nicht mehr zur Platine und muss neu abgetastet werden."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:693
+#: octoprint_grblpcb/static/js/grblpcb.js:729
 msgid "Set zero"
 msgstr "Nullpunkt setzen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:744
+#: octoprint_grblpcb/static/js/grblpcb.js:841
 #, python-format
 msgid "Project '%s' created"
 msgstr "Projekt „%s“ erstellt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:751
+#: octoprint_grblpcb/static/js/grblpcb.js:848
 msgid "Error creating project: "
 msgstr "Fehler beim Erstellen des Projekts: "
 
-#: octoprint_grblpcb/static/js/grblpcb.js:751
-#: octoprint_grblpcb/static/js/grblpcb.js:782
-#: octoprint_grblpcb/static/js/grblpcb.js:812
+#: octoprint_grblpcb/static/js/grblpcb.js:848
+#: octoprint_grblpcb/static/js/grblpcb.js:880
+#: octoprint_grblpcb/static/js/grblpcb.js:904
 msgid "unknown"
 msgstr "unbekannt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:777
+#: octoprint_grblpcb/static/js/grblpcb.js:875
 #, python-format
 msgid "Project '%s' loaded"
 msgstr "Projekt „%s“ geladen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:782
+#: octoprint_grblpcb/static/js/grblpcb.js:880
 msgid "Error loading project: "
 msgstr "Fehler beim Laden des Projekts: "
 
-#: octoprint_grblpcb/static/js/grblpcb.js:788
+#: octoprint_grblpcb/static/js/grblpcb.js:886
 msgid "Delete project"
 msgstr "Projekt löschen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:789
+#: octoprint_grblpcb/static/js/grblpcb.js:887
 #, python-format
 msgid "Delete project '%s'? This cannot be undone."
 msgstr "Projekt „%s“ löschen? Dies kann nicht rückgängig gemacht werden."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:790
-#: octoprint_grblpcb/static/js/grblpcb.js:1565
+#: octoprint_grblpcb/static/js/grblpcb.js:888
+#: octoprint_grblpcb/static/js/grblpcb.js:1764
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:298
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:785
 msgid "Delete"
 msgstr "Löschen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:809
+#: octoprint_grblpcb/static/js/grblpcb.js:901
 #, python-format
 msgid "Project '%s' deleted"
 msgstr "Projekt „%s“ gelöscht"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:812
+#: octoprint_grblpcb/static/js/grblpcb.js:904
 msgid "Error deleting project: "
 msgstr "Fehler beim Löschen des Projekts: "
 
-#: octoprint_grblpcb/static/js/grblpcb.js:895
+#: octoprint_grblpcb/static/js/grblpcb.js:993
 #, python-format
 msgid "Uploading %d file(s)..."
 msgstr "%d Datei(en) werden hochgeladen…"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:910
+#: octoprint_grblpcb/static/js/grblpcb.js:1008
 #, python-format
 msgid "Uploaded %d file(s). Board: %s x %s mm"
 msgstr "%d Datei(en) hochgeladen. Platine: %s × %s mm"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:924
-#: octoprint_grblpcb/static/js/grblpcb.js:931
+#: octoprint_grblpcb/static/js/grblpcb.js:1022
+#: octoprint_grblpcb/static/js/grblpcb.js:1040
 msgid "Slots in the drill file"
 msgstr "Langlöcher in der Bohrdatei"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:925
+#: octoprint_grblpcb/static/js/grblpcb.js:1023
 #, python-format
 msgid "%d slot(s) will be drilled as rows of overlapping holes with the drill of their size. The walls stay slightly scalloped."
 msgstr "%d Langlöcher werden als Reihe überlappender Bohrungen mit dem Bohrer ihrer Breite gebohrt. Die Wände bleiben leicht gewellt."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:932
+#: octoprint_grblpcb/static/js/grblpcb.js:1032
+msgid "Unsupported shapes in the Gerber file"
+msgstr "Nicht unterstützte Formen in der Gerber-Datei"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1033
+#, python-format
+msgid "%d pad(s) use a shape that is not supported and are missing from the copper. Check the layer before milling."
+msgstr "%d Pad(s) haben eine nicht unterstützte Form und fehlen im Kupfer. Die Lage vor dem Fräsen prüfen."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1041
 #, python-format
 msgid "The drill file contains %d routed slot(s). Slots are not supported: they are drilled as a single hole or left out. Mill them by hand or draw them on the outline layer."
-msgstr "Die Bohrdatei enthält %d gefräste Langlöcher. Langlöcher werden nicht unterstützt: Sie werden als einzelnes Loch gebohrt oder ausgelassen. Fräse sie von Hand oder zeichne sie auf die Umrisslage."
+msgstr "Die Bohrdatei enthält %d gefräste Langlöcher. Langlöcher werden nicht unterstützt: Sie werden als einzelnes Loch gebohrt oder ausgelassen. Von Hand fräsen oder auf der Umrisslage zeichnen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:942
+#: octoprint_grblpcb/static/js/grblpcb.js:1051
 msgid "Upload failed: "
 msgstr "Upload fehlgeschlagen: "
 
-#: octoprint_grblpcb/static/js/grblpcb.js:942
+#: octoprint_grblpcb/static/js/grblpcb.js:1051
 msgid "unknown error"
 msgstr "unbekannter Fehler"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:956
+#: octoprint_grblpcb/static/js/grblpcb.js:1065
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:340
 msgid "Remove layer"
 msgstr "Lage entfernen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:957
+#: octoprint_grblpcb/static/js/grblpcb.js:1066
 #, python-format
 msgid "Remove the layer '%s' from the project? Its file has to be imported again to get it back."
 msgstr "Die Lage „%s“ aus dem Projekt entfernen? Um sie zurückzubekommen, muss ihre Datei erneut importiert werden."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:959
+#: octoprint_grblpcb/static/js/grblpcb.js:1068
 msgid "Remove"
 msgstr "Entfernen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:966
-#: octoprint_grblpcb/static/js/grblpcb.js:1056
-#: octoprint_grblpcb/static/js/grblpcb.js:1081
-#: octoprint_grblpcb/static/js/grblpcb.js:1111
-#: octoprint_grblpcb/static/js/grblpcb.js:1137
-#: octoprint_grblpcb/static/js/grblpcb.js:1206
-#: octoprint_grblpcb/static/js/grblpcb.js:1226
-#: octoprint_grblpcb/static/js/grblpcb.js:1475
-#: octoprint_grblpcb/static/js/grblpcb.js:1499
-#: octoprint_grblpcb/static/js/grblpcb.js:1521
-#: octoprint_grblpcb/static/js/grblpcb.js:1697
-#: octoprint_grblpcb/static/js/grblpcb.js:1742
+#: octoprint_grblpcb/static/js/grblpcb.js:1075
+#: octoprint_grblpcb/static/js/grblpcb.js:1178
+#: octoprint_grblpcb/static/js/grblpcb.js:1203
+#: octoprint_grblpcb/static/js/grblpcb.js:1233
+#: octoprint_grblpcb/static/js/grblpcb.js:1259
+#: octoprint_grblpcb/static/js/grblpcb.js:1309
+#: octoprint_grblpcb/static/js/grblpcb.js:1348
+#: octoprint_grblpcb/static/js/grblpcb.js:1368
+#: octoprint_grblpcb/static/js/grblpcb.js:1628
+#: octoprint_grblpcb/static/js/grblpcb.js:1653
+#: octoprint_grblpcb/static/js/grblpcb.js:1686
+#: octoprint_grblpcb/static/js/grblpcb.js:1709
+#: octoprint_grblpcb/static/js/grblpcb.js:1710
+#: octoprint_grblpcb/static/js/grblpcb.js:1896
+#: octoprint_grblpcb/static/js/grblpcb.js:1941
 msgid "Error: "
 msgstr "Fehler: "
 
-#: octoprint_grblpcb/static/js/grblpcb.js:976
+#: octoprint_grblpcb/static/js/grblpcb.js:1088
+msgid "Rotate the board?"
+msgstr "Platine drehen?"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1089
+msgid "Rotating removes all generated operations, the height map and the alignment. They have to be created again."
+msgstr "Beim Drehen werden alle erzeugten Operationen, die Höhenkarte und die Ausrichtung entfernt. Sie müssen neu erstellt werden."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1090
+msgid "Rotate"
+msgstr "Drehen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1098
 #, python-format
 msgid "Rotating board by %d°..."
 msgstr "Platine wird um %d° gedreht…"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:981
+#: octoprint_grblpcb/static/js/grblpcb.js:1103
 #, python-format
 msgid "Rotated %d°, board: %s × %s mm"
 msgstr "%d° gedreht, Platine: %s × %s mm"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:990
+#: octoprint_grblpcb/static/js/grblpcb.js:1112
 msgid "Rotation error: "
 msgstr "Drehungsfehler: "
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1005
+#: octoprint_grblpcb/static/js/grblpcb.js:1127
 msgid "Generating isolation toolpaths..."
 msgstr "Isolationsfräsbahnen werden erzeugt…"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1023
+#: octoprint_grblpcb/static/js/grblpcb.js:1145
 #, python-format
 msgid "Isolation G-code generated: %d lines"
 msgstr "Isolations-G-Code erzeugt: %d Zeilen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1030
+#: octoprint_grblpcb/static/js/grblpcb.js:1152
 #, python-format
 msgid "%(gap)s mm at X %(x)s, Y %(y)s"
 msgstr "%(gap)s mm bei X %(x)s, Y %(y)s"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1033
-#: octoprint_grblpcb/static/js/grblpcb.js:1045
+#: octoprint_grblpcb/static/js/grblpcb.js:1155
+#: octoprint_grblpcb/static/js/grblpcb.js:1167
 msgid "Copper stays connected"
 msgstr "Kupfer bleibt verbunden"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1035
+#: octoprint_grblpcb/static/js/grblpcb.js:1157
 #, python-format
 msgid "%(count)d narrow gap(s) stay uncut, because cutting deep enough to open them would damage the copper next to them: %(spots)s. Use a finer tool or a smaller V-angle, or widen the gaps in the layout."
 msgstr "%(count)d enge Lücke(n) bleiben ungefräst, weil ein Schnitt, der tief genug ist, um sie zu öffnen, das Kupfer daneben beschädigen würde: %(spots)s. Ein feineres Werkzeug oder einen kleineren V-Winkel verwenden oder die Lücken im Layout verbreitern."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1047
+#: octoprint_grblpcb/static/js/grblpcb.js:1169
 #, python-format
 msgid "%(count)d gap(s) are narrower than the tool tip (%(tool)s mm) and cannot be milled. The narrowest is %(gap)s mm at X %(x)s, Y %(y)s. Use a finer tool or fix the layout."
 msgstr "%(count)d Spalt(e) sind schmaler als die Werkzeugspitze (%(tool)s mm) und lassen sich nicht fräsen. Der schmalste ist %(gap)s mm bei X %(x)s, Y %(y)s. Feineres Werkzeug verwenden oder das Layout ändern."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1065
+#: octoprint_grblpcb/static/js/grblpcb.js:1187
 msgid "Generating drill G-code..."
 msgstr "Bohr-G-Code wird erzeugt…"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1077
+#: octoprint_grblpcb/static/js/grblpcb.js:1199
 #, python-format
 msgid "Drill G-code generated: %d lines"
 msgstr "Bohr-G-Code erzeugt: %d Zeilen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1090
+#: octoprint_grblpcb/static/js/grblpcb.js:1212
 msgid "Generating outline G-code..."
 msgstr "Umriss-G-Code wird erzeugt…"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1107
+#: octoprint_grblpcb/static/js/grblpcb.js:1229
 #, python-format
 msgid "Outline G-code generated: %d lines"
 msgstr "Umriss-G-Code erzeugt: %d Zeilen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1120
+#: octoprint_grblpcb/static/js/grblpcb.js:1242
 msgid "Generating mask exposure G-code..."
 msgstr "Maskenbelichtungs-G-Code wird erzeugt…"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1133
+#: octoprint_grblpcb/static/js/grblpcb.js:1255
 #, python-format
 msgid "Mask exposure G-code generated: %d lines"
 msgstr "Maskenbelichtungs-G-Code erzeugt: %d Zeilen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1160
+#: octoprint_grblpcb/static/js/grblpcb.js:1282
 msgid "Replace the height map?"
 msgstr "Höhenkarte ersetzen?"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1161
+#: octoprint_grblpcb/static/js/grblpcb.js:1283
 msgid "A new grid discards the heights measured so far. Leveled G-code made from them is removed as well."
 msgstr "Ein neues Raster verwirft die bisher gemessenen Höhen. Daraus erzeugter höhenkorrigierter G-Code wird ebenfalls entfernt."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1162
+#: octoprint_grblpcb/static/js/grblpcb.js:1284
 msgid "New grid"
 msgstr "Neues Raster"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1179
+#: octoprint_grblpcb/static/js/grblpcb.js:1302
 #, python-format
 msgid "Grid ready: %d probe points"
 msgstr "Raster bereit: %d Messpunkte"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1189
+#: octoprint_grblpcb/static/js/grblpcb.js:1318
+msgid "Probe again?"
+msgstr "Erneut antasten?"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1319
+msgid "All points are measured again. The leveled G-code made from the old heights is removed."
+msgstr "Alle Punkte werden erneut angetastet. Der aus den alten Höhen erzeugte höhenkorrigierte G-Code wird entfernt."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1331
 msgid "Z is not zeroed"
 msgstr "Z ist nicht genullt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1190
+#: octoprint_grblpcb/static/js/grblpcb.js:1332
 msgid "Z has not been zeroed on the board since connecting. Probe Z and zero it first (Machine tab), otherwise the first probe starts from an unknown height."
 msgstr "Z wurde seit dem Verbinden nicht auf der Platine genullt. Zuerst Z antasten und nullen (Reiter „Maschine“), sonst beginnt die erste Messung in unbekannter Höhe."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1191
+#: octoprint_grblpcb/static/js/grblpcb.js:1333
 msgid "Probe anyway"
-msgstr "Trotzdem abtasten"
+msgstr "Trotzdem antasten"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1202
+#: octoprint_grblpcb/static/js/grblpcb.js:1344
 msgid "Probing started..."
-msgstr "Abtastung gestartet…"
+msgstr "Antasten gestartet …"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1216
-#: octoprint_grblpcb/static/js/grblpcb.js:1506
+#: octoprint_grblpcb/static/js/grblpcb.js:1358
+#: octoprint_grblpcb/static/js/grblpcb.js:1660
 msgid "Probing stopped"
-msgstr "Abtastung gestoppt"
+msgstr "Antasten gestoppt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1223
+#: octoprint_grblpcb/static/js/grblpcb.js:1365
 #, python-format
 msgid "Autolevel applied: %d lines"
 msgstr "Autolevel angewendet: %d Zeilen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1448
+#: octoprint_grblpcb/static/js/grblpcb.js:1588
 msgid "Back side created"
 msgstr "Rückseite erzeugt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1451
+#: octoprint_grblpcb/static/js/grblpcb.js:1591
 msgid "Mirroring not possible"
 msgstr "Spiegeln nicht möglich"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1470
+#: octoprint_grblpcb/static/js/grblpcb.js:1602
+msgid "Select new alignment holes?"
+msgstr "Neue Ausrichtungslöcher wählen?"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1603
+msgid "The measured holes and the alignment are discarded, and so is the aligned and leveled G-code made from them."
+msgstr "Die angetasteten Löcher und die Ausrichtung werden verworfen, ebenso der daraus erzeugte ausgerichtete und höhenkorrigierte G-Code."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1604
+msgid "Select holes"
+msgstr "Löcher wählen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1620
 #, python-format
 msgid "Set %d alignment holes (dist=%smm)"
 msgstr "%d Ausrichtungslöcher gesetzt (Abstand=%smm)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1486
+#: octoprint_grblpcb/static/js/grblpcb.js:1623
+msgid "Small alignment holes"
+msgstr "Kleine Ausrichtungslöcher"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1639
 #, python-format
 msgid "Set %d alignment holes"
 msgstr "%d Ausrichtungslöcher gesetzt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1492
+#: octoprint_grblpcb/static/js/grblpcb.js:1646
 msgid "Set alignment holes first"
 msgstr "Zuerst Ausrichtungslöcher festlegen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1496
+#: octoprint_grblpcb/static/js/grblpcb.js:1650
 msgid "Probing alignment holes..."
 msgstr "Ausrichtungslöcher werden abgetastet…"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1499
+#: octoprint_grblpcb/static/js/grblpcb.js:1653
 msgid "Failed to start alignment probing"
-msgstr "Ausrichtungsabtastung konnte nicht gestartet werden"
+msgstr "Antasten der Ausrichtungslöcher konnte nicht gestartet werden"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1516
+#: octoprint_grblpcb/static/js/grblpcb.js:1666
+msgid "Compute the alignment again?"
+msgstr "Ausrichtung neu berechnen?"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1667
+msgid "The aligned G-code made from the previous alignment is removed, and so is the leveled G-code built on it."
+msgstr "Der aus der bisherigen Ausrichtung erzeugte ausgerichtete G-Code wird entfernt, ebenso der darauf aufbauende höhenkorrigierte G-Code."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1668
+msgid "Compute"
+msgstr "Berechnen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1681
 msgid "Alignment computed. The holes match well; apply it to the mirrored operations."
 msgstr "Ausrichtung berechnet. Die Löcher passen gut; jetzt auf die gespiegelten Operationen anwenden."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1517
+#: octoprint_grblpcb/static/js/grblpcb.js:1682
 msgid "Alignment computed, but the holes do not match well (RMS above 0.05 mm). Check that the probe found the hole walls and that the board does not move, then probe again."
 msgstr "Ausrichtung berechnet, aber die Löcher passen schlecht (RMS über 0,05 mm). Prüfen, ob der Taster die Lochwände gefunden hat und die Platine fest liegt, dann erneut antasten."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1520
+#: octoprint_grblpcb/static/js/grblpcb.js:1685
 msgid "Computation failed"
 msgstr "Berechnung fehlgeschlagen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1545
+#: octoprint_grblpcb/static/js/grblpcb.js:1694
+msgid "Apply the alignment?"
+msgstr "Ausrichtung anwenden?"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1695
+msgid "The leveled G-code of this operation is removed. Level it again afterwards."
+msgstr "Der höhenkorrigierte G-Code dieser Operation wird entfernt. Danach erneut höhenkorrigieren."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1696
+msgid "Apply"
+msgstr "Anwenden"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1724
 msgid "No mirrored operations found to align"
 msgstr "Keine gespiegelten Operationen zum Ausrichten gefunden"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1553
-msgid "Alignment cleared"
-msgstr "Ausrichtung zurückgesetzt"
+#: octoprint_grblpcb/static/js/grblpcb.js:1729
+msgid "Apply the alignment to all?"
+msgstr "Ausrichtung auf alle anwenden?"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1563
+#: octoprint_grblpcb/static/js/grblpcb.js:1730
+msgid "The leveled G-code of the mirrored operations is removed. Level it again afterwards."
+msgstr "Der höhenkorrigierte G-Code der gespiegelten Operationen wird entfernt. Danach erneut höhenkorrigieren."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1731
+msgid "Apply to all"
+msgstr "Auf alle anwenden"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1741
+msgid "Clear the alignment?"
+msgstr "Ausrichtung löschen?"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1742
+msgid "The measurements and the alignment are discarded, and so is the aligned and leveled G-code made from them. The selected holes stay."
+msgstr "Die Messwerte und die Ausrichtung werden verworfen, ebenso der daraus erzeugte ausgerichtete und höhenkorrigierte G-Code. Die gewählten Löcher bleiben."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1743
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:870
+msgid "Clear"
+msgstr "Löschen"
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1751
+msgid "Measurements cleared. The alignment holes stay selected; probe them again."
+msgstr "Messwerte gelöscht. Die Ausrichtungslöcher bleiben gewählt; sie erneut antasten."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:1762
 msgid "Delete operation"
 msgstr "Operation löschen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1564
+#: octoprint_grblpcb/static/js/grblpcb.js:1763
 msgid "Delete this operation?"
 msgstr "Diese Operation löschen?"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1576
+#: octoprint_grblpcb/static/js/grblpcb.js:1775
 msgid "Operation deleted"
 msgstr "Operation gelöscht"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1622
+#: octoprint_grblpcb/static/js/grblpcb.js:1821
 #, python-format
 msgid "V-bit, tip %(tip)s mm, %(angle)s°"
 msgstr "V-Stichel, Spitze %(tip)s mm, %(angle)s°"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1624
+#: octoprint_grblpcb/static/js/grblpcb.js:1823
 #, python-format
 msgid "End mill %(d)s mm"
 msgstr "Schaftfräser %(d)s mm"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1626
+#: octoprint_grblpcb/static/js/grblpcb.js:1825
 msgid "Drills: the job pauses before each drill size"
 msgstr "Bohrer: Der Auftrag hält vor jeder Bohrergröße an"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1628
+#: octoprint_grblpcb/static/js/grblpcb.js:1827
 msgid "UV LED instead of the spindle"
 msgstr "UV-LED statt Spindel"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1636
+#: octoprint_grblpcb/static/js/grblpcb.js:1835
 msgid "No G-code generated yet"
 msgstr "Noch kein G-Code erzeugt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1637
+#: octoprint_grblpcb/static/js/grblpcb.js:1836
 msgid "Outdated: generate this operation again"
 msgstr "Veraltet: diese Operation neu erzeugen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1638
+#: octoprint_grblpcb/static/js/grblpcb.js:1837
 msgid "Not connected to a GRBL machine"
 msgstr "Nicht mit einer GRBL-Maschine verbunden"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1639
-msgid "A job is running"
-msgstr "Ein Auftrag läuft"
-
-#: octoprint_grblpcb/static/js/grblpcb.js:1640
+#: octoprint_grblpcb/static/js/grblpcb.js:1839
 msgid "GRBL is in alarm: unlock or home first"
 msgstr "GRBL ist im Alarm: zuerst entsperren oder referenzieren"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1644
+#: octoprint_grblpcb/static/js/grblpcb.js:1843
 msgid "Send this operation to the machine"
 msgstr "Diese Operation an die Maschine senden"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1648
+#: octoprint_grblpcb/static/js/grblpcb.js:1847
 msgid "Send this operation to the CNC machine for execution?"
 msgstr "Diese Operation zur Ausführung an die CNC-Maschine senden?"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1651
+#: octoprint_grblpcb/static/js/grblpcb.js:1850
 #, python-format
 msgid "Tool: %s"
 msgstr "Werkzeug: %s"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1652
+#: octoprint_grblpcb/static/js/grblpcb.js:1851
 msgid "Is this tool in the spindle and Z zeroed with it?"
 msgstr "Ist dieses Werkzeug eingespannt und Z damit genullt?"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1656
+#: octoprint_grblpcb/static/js/grblpcb.js:1855
 msgid "Start milling"
 msgstr "Fräsen starten"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1658
+#: octoprint_grblpcb/static/js/grblpcb.js:1857
 msgid "Start"
 msgstr "Starten"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1670
+#: octoprint_grblpcb/static/js/grblpcb.js:1869
 msgid "Starting..."
 msgstr "Wird gestartet…"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1683
+#: octoprint_grblpcb/static/js/grblpcb.js:1882
 msgid "Pre-flight warnings:"
 msgstr "Warnungen vor dem Start:"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1685
+#: octoprint_grblpcb/static/js/grblpcb.js:1884
 msgid "Start anyway"
 msgstr "Trotzdem starten"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1687
+#: octoprint_grblpcb/static/js/grblpcb.js:1886
 msgid "Not started: fix the warnings first"
 msgstr "Nicht gestartet: zuerst die Warnungen beheben"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1692
+#: octoprint_grblpcb/static/js/grblpcb.js:1891
 #, python-format
 msgid "Streaming: %s"
 msgstr "Sende: %s"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1704
+#: octoprint_grblpcb/static/js/grblpcb.js:1903
 msgid "Z-zero has not been set since connecting. Probe Z and zero it at the board surface before milling (Probe Z, then Zero Z)."
 msgstr "Seit dem Verbinden wurde kein Z-Nullpunkt gesetzt. Vor dem Fräsen Z auf der Platinenoberfläche antasten und nullen (Z antasten, dann Z nullen)."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1706
+#: octoprint_grblpcb/static/js/grblpcb.js:1905
 #, python-format
 msgid "The work zero has moved by X %s mm, Y %s mm since the height map was probed. The leveled G-code would correct the wrong spots. Probe the board again."
-msgstr "Der Werkstücknullpunkt hat sich seit der Höhenmessung um X %s mm, Y %s mm verschoben. Der höhenkorrigierte G-Code würde an den falschen Stellen korrigieren. Bitte die Platine neu abtasten."
+msgstr "Der Werkstücknullpunkt hat sich seit dem Antasten der Höhenkarte um X %s mm, Y %s mm verschoben. Der höhenkorrigierte G-Code würde an den falschen Stellen korrigieren. Bitte die Platine erneut antasten."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1708
+#: octoprint_grblpcb/static/js/grblpcb.js:1907
 msgid "This back-side operation would use a height map measured before the board was flipped (before the alignment holes were probed). Probe the back side again."
-msgstr "Diese Rückseiten-Operation würde eine Höhenkarte nutzen, die vor dem Umdrehen gemessen wurde (vor dem Antasten der Ausrichtungslöcher). Bitte die Rückseite neu abtasten."
+msgstr "Diese Rückseiten-Operation würde eine Höhenkarte nutzen, die vor dem Umdrehen angetastet wurde (vor dem Antasten der Ausrichtungslöcher). Bitte die Rückseite erneut antasten."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1710
+#: octoprint_grblpcb/static/js/grblpcb.js:1909
 #, python-format
 msgid "The job is %(by)s mm longer in %(axis)s than the machine can travel at all (GRBL setting $130 to $132). It cannot be milled in one clamping."
 msgstr "Der Auftrag ist in %(axis)s um %(by)s mm länger, als die Maschine überhaupt verfahren kann (GRBL-Einstellung $130 bis $132). Er lässt sich nicht in einer Aufspannung fräsen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1712
+#: octoprint_grblpcb/static/js/grblpcb.js:1911
 #, python-format
 msgid "With the current work zero the job leaves the travel of the %(axis)s axis by %(by)s mm. GRBL would stop in the middle of the job (soft limit) or the axis would run into its end. Move the board or the zero."
 msgstr "Mit dem aktuellen Werkstück-Nullpunkt verlässt der Auftrag den Verfahrweg der %(axis)s-Achse um %(by)s mm. GRBL würde mitten im Auftrag stoppen (Software-Endschalter) oder die Achse würde an den Anschlag fahren. Verschiebe die Platine oder den Nullpunkt."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1714
+#: octoprint_grblpcb/static/js/grblpcb.js:1913
 msgid "This front-side operation would use a height map measured after the board was flipped. Probe the front side again."
-msgstr "Diese Vorderseiten-Operation würde eine Höhenkarte nutzen, die nach dem Umdrehen gemessen wurde. Bitte die Vorderseite neu abtasten."
+msgstr "Diese Vorderseiten-Operation würde eine Höhenkarte nutzen, die nach dem Umdrehen angetastet wurde. Bitte die Vorderseite erneut antasten."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1716
+#: octoprint_grblpcb/static/js/grblpcb.js:1915
 msgid "For this back-side operation it is unknown whether the height map was measured after flipping the board. Probe the alignment holes after flipping, then probe the height map."
 msgstr "Bei dieser Rückseiten-Operation ist nicht bekannt, ob die Höhenkarte nach dem Umdrehen gemessen wurde. Nach dem Umdrehen erst die Ausrichtungslöcher antasten, dann die Höhenkarte messen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1718
+#: octoprint_grblpcb/static/js/grblpcb.js:1917
 msgid "It is unknown where the work zero was when the height map was probed. Probe the board again so the leveled G-code matches the clamped board."
-msgstr "Es ist nicht bekannt, wo der Werkstücknullpunkt bei der Höhenmessung lag. Bitte die Platine neu abtasten, damit der höhenkorrigierte G-Code zur aufgespannten Platine passt."
+msgstr "Es ist nicht bekannt, wo der Werkstücknullpunkt beim Antasten der Höhenkarte lag. Bitte die Platine erneut antasten, damit der höhenkorrigierte G-Code zur aufgespannten Platine passt."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1728
+#: octoprint_grblpcb/static/js/grblpcb.js:1927
 msgid "Stopped"
 msgstr "Gestoppt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1732
+#: octoprint_grblpcb/static/js/grblpcb.js:1931
 msgid "Stop failed"
 msgstr "Stoppen fehlgeschlagen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1739
+#: octoprint_grblpcb/static/js/grblpcb.js:1938
 msgid "Resuming after tool change..."
 msgstr "Fortsetzen nach Werkzeugwechsel…"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1915
+#: octoprint_grblpcb/static/js/grblpcb.js:2117
 #, python-format
 msgid "Probing point %d/%d (%d%%) Z=%s"
 msgstr "Messpunkt %d/%d (%d%%) Z=%s"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1928
+#: octoprint_grblpcb/static/js/grblpcb.js:2130
 #, python-format
 msgid "GRBL alarm %d"
 msgstr "GRBL-Alarm %d"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1929
+#: octoprint_grblpcb/static/js/grblpcb.js:2131
 msgid "The machine position may be lost. Home the machine or unlock it, then check the work zero before continuing."
 msgstr "Die Maschinenposition ist möglicherweise verloren. Referenzfahrt ausführen oder entsperren und vor dem Weiterarbeiten den Werkstücknullpunkt prüfen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1940
+#: octoprint_grblpcb/static/js/grblpcb.js:2142
 msgid "The serial connection broke. The position and the work zero may be lost. Reconnect, then home the machine or check the zero before milling."
 msgstr "Die serielle Verbindung ist abgebrochen. Die Position und der Werkstück-Nullpunkt sind möglicherweise verloren. Neu verbinden, dann Referenzfahrt machen oder den Nullpunkt prüfen, bevor gefräst wird."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1949
+#: octoprint_grblpcb/static/js/grblpcb.js:2151
 msgid "GRBL rejected the probe command."
 msgstr "GRBL hat den Antastbefehl abgelehnt."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1951
-msgid "No probe result within 30 seconds."
-msgstr "Innerhalb von 30 Sekunden kam kein Antastergebnis."
+#: octoprint_grblpcb/static/js/grblpcb.js:2153
+msgid "No probe result in the expected time."
+msgstr "Kein Antastergebnis in der erwarteten Zeit."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1952
+#: octoprint_grblpcb/static/js/grblpcb.js:2154
 msgid "GRBL did not accept a positioning move, so the machine is not where the probe should be."
 msgstr "GRBL hat eine Positionierfahrt nicht angenommen, die Maschine steht also nicht am Messpunkt."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1956
+#: octoprint_grblpcb/static/js/grblpcb.js:2158
 #, python-format
 msgid "Probing stopped at point %(point)d of %(total)d. No height was recorded for this point."
-msgstr "Abtasten bei Punkt %(point)d von %(total)d abgebrochen. Für diesen Punkt wurde keine Höhe gespeichert."
+msgstr "Antasten bei Punkt %(point)d von %(total)d abgebrochen. Für diesen Punkt wurde keine Höhe gespeichert."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1961
+#: octoprint_grblpcb/static/js/grblpcb.js:2162
+msgid "The height map is complete, but the check of the Z drift was interrupted. Check the position and the zero before milling."
+msgstr "Die Höhenkarte ist vollständig, aber die Prüfung der Z-Drift wurde unterbrochen. Vor dem Fräsen Position und Nullpunkt prüfen."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:2167
 msgid "Autolevel aborted"
 msgstr "Autolevel abgebrochen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1970
+#: octoprint_grblpcb/static/js/grblpcb.js:2176
 msgid "Probing complete! Height map ready."
-msgstr "Abtastung abgeschlossen! Höhenkarte bereit."
+msgstr "Antasten abgeschlossen! Höhenkarte bereit."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1973
+#: octoprint_grblpcb/static/js/grblpcb.js:2179
 #, python-format
 msgid "Z-axis drift of %(drift)s mm detected after probing %(points)d points. The Z motor lost steps. Zero Z again before milling and consider lowering Z acceleration ($122) or Z max rate ($112)."
-msgstr "Nach dem Abtasten von %(points)d Punkten wurde eine Z-Abweichung von %(drift)s mm festgestellt. Der Z-Motor hat Schritte verloren. Vor dem Fräsen Z neu nullen und die Z-Beschleunigung ($122) oder die maximale Z-Geschwindigkeit ($112) senken."
+msgstr "Nach dem Antasten von %(points)d Punkten wurde eine Z-Abweichung von %(drift)s mm festgestellt. Der Z-Motor hat Schritte verloren. Vor dem Fräsen Z neu nullen und die Z-Beschleunigung ($122) oder die maximale Z-Geschwindigkeit ($112) senken."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1978
+#: octoprint_grblpcb/static/js/grblpcb.js:2184
 msgid "Z-axis drift detected"
 msgstr "Z-Abweichung festgestellt"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1984
+#: octoprint_grblpcb/static/js/grblpcb.js:2190
 #, python-format
 msgid "(Z drift: %(drift)d µm)"
 msgstr "(Z-Abweichung: %(drift)d µm)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:1995
+#: octoprint_grblpcb/static/js/grblpcb.js:2200
+#, python-format
+msgid "Hole %(hole)d: the bit touched the board instead of entering the hole. The hole is not where it is expected; check the clamping and the zero."
+msgstr "Loch %(hole)d: Der Fräser hat die Platine berührt, statt ins Loch zu fahren. Das Loch liegt nicht an der erwarteten Stelle; Einspannung und Nullpunkt prüfen."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:2209
 #, python-format
 msgid "Probing hole %d/%d (%d%%)"
 msgstr "Loch %d/%d wird abgetastet (%d%%)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2009
+#: octoprint_grblpcb/static/js/grblpcb.js:2223
 msgid "All holes probed, the alignment is being computed."
 msgstr "Alle Löcher angetastet, die Ausrichtung wird berechnet."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2013
+#: octoprint_grblpcb/static/js/grblpcb.js:2227
 msgid "Probing aborted: GRBL was reset. Check the position and the zero, then probe again."
 msgstr "Antasten abgebrochen: GRBL wurde zurückgesetzt. Position und Nullpunkt prüfen, dann erneut antasten."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2015
+#: octoprint_grblpcb/static/js/grblpcb.js:2230
+#, python-format
+msgid "Probing finished, but the bit did not enter hole %s. The hole is not where it is expected; check the clamping and the zero, then probe again."
+msgstr "Antasten beendet, aber der Fräser ist nicht in Loch %s gefahren. Das Loch liegt nicht an der erwarteten Stelle; Einspannung und Nullpunkt prüfen, dann erneut antasten."
+
+#: octoprint_grblpcb/static/js/grblpcb.js:2234
 msgid "Probing aborted: GRBL did not accept a positioning move. Check the alarm state and the travel limits, then probe again."
-msgstr "Antasten abgebrochen: GRBL hat eine Positionierfahrt nicht angenommen. Prüfe den Alarmzustand und die Verfahrgrenzen, dann taste erneut an."
+msgstr "Antasten abgebrochen: GRBL hat eine Positionierfahrt nicht angenommen. Alarmzustand und Verfahrgrenzen prüfen, dann erneut antasten."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2017
+#: octoprint_grblpcb/static/js/grblpcb.js:2236
 msgid "Probing finished (not all holes probed)"
-msgstr "Abtastung beendet (nicht alle Löcher abgetastet)"
+msgstr "Antasten beendet (nicht alle Löcher angetastet)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2030
+#: octoprint_grblpcb/static/js/grblpcb.js:2254
 #, python-format
 msgid "Completed in %ss"
 msgstr "Abgeschlossen in %ss"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2034
+#: octoprint_grblpcb/static/js/grblpcb.js:2258
 #, python-format
 msgid "Stopped at line %d"
 msgstr "Gestoppt bei Zeile %d"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2039
+#: octoprint_grblpcb/static/js/grblpcb.js:2263
 #, python-format
 msgid "GRBL rejected line %(line)d (%(command)s): error %(code)d. The job was stopped and the machine halted, because the lines after it may depend on the rejected one."
 msgstr "GRBL hat Zeile %(line)d (%(command)s) abgelehnt: Fehler %(code)d. Der Auftrag wurde gestoppt und die Maschine angehalten, weil die folgenden Zeilen von der abgelehnten abhängen können."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2043
+#: octoprint_grblpcb/static/js/grblpcb.js:2267
 msgid "GRBL raised an alarm. The job was stopped. Unlock or home the machine and check the work zero before starting again."
-msgstr "GRBL hat einen Alarm gemeldet. Der Auftrag wurde gestoppt. Entsperre die Maschine oder mache eine Referenzfahrt und prüfe den Werkstück-Nullpunkt, bevor du neu startest."
+msgstr "GRBL hat einen Alarm gemeldet. Der Auftrag wurde gestoppt. Vor dem Neustart die Maschine entsperren oder referenzieren und den Werkstücknullpunkt prüfen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2047
+#: octoprint_grblpcb/static/js/grblpcb.js:2271
 msgid "The connection to GRBL was lost. The job was stopped."
 msgstr "Die Verbindung zu GRBL ist abgebrochen. Der Auftrag wurde gestoppt."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2049
+#: octoprint_grblpcb/static/js/grblpcb.js:2273
 msgid "The job was stopped by an internal error. See the OctoPrint log."
 msgstr "Der Auftrag wurde durch einen internen Fehler gestoppt. Details stehen im OctoPrint-Protokoll."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2051
+#: octoprint_grblpcb/static/js/grblpcb.js:2275
 #, python-format
 msgid "Failed at line %d."
 msgstr "Fehlgeschlagen bei Zeile %d."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2053
+#: octoprint_grblpcb/static/js/grblpcb.js:2277
 msgid "Job failed"
 msgstr "Auftrag fehlgeschlagen"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2059
+#: octoprint_grblpcb/static/js/grblpcb.js:2283
 #, python-format
 msgid "⚠️ TOOL CHANGE required at line %d. After changing the tool, probe and zero Z, then click Confirm."
 msgstr "⚠️ WERKZEUGWECHSEL bei Zeile %d. Nach dem Wechsel Z antasten und nullen, dann auf „Bestätigen“ klicken."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2060
+#: octoprint_grblpcb/static/js/grblpcb.js:2284
 #, python-format
 msgid "Next tool: %s"
 msgstr "Nächstes Werkzeug: %s"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2062
+#: octoprint_grblpcb/static/js/grblpcb.js:2286
 #, python-format
 msgid "⏸ Program pause at line %d. Click Confirm to continue."
 msgstr "⏸ Programmpause bei Zeile %d. Zum Fortfahren auf „Bestätigen“ klicken."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2064
+#: octoprint_grblpcb/static/js/grblpcb.js:2288
 msgid "GRBL went into alarm during the pause. Unlock it, check the position and the Z zero, then confirm again."
 msgstr "GRBL ist während der Pause in einen Alarm gegangen. Entsperren, Position und Z-Nullpunkt prüfen, dann erneut bestätigen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2066
+#: octoprint_grblpcb/static/js/grblpcb.js:2290
 msgid "Waiting until the machine is idle before continuing. If GRBL is in alarm, unlock it or stop the job."
-msgstr "Warte, bis die Maschine im Leerlauf ist. Steht GRBL im Alarm, bitte entsperren oder den Auftrag stoppen."
+msgstr "Es wird gewartet, bis die Maschine im Leerlauf ist. Steht GRBL im Alarm, entsperren oder den Auftrag stoppen."
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2068
+#: octoprint_grblpcb/static/js/grblpcb.js:2292
 #, python-format
 msgid "ETA: %ds"
 msgstr "Restzeit: %ds"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2070
+#: octoprint_grblpcb/static/js/grblpcb.js:2294
 #, python-format
 msgid "Line %d/%d (%d%%)"
 msgstr "Zeile %d/%d (%d%%)"
 
-#: octoprint_grblpcb/static/js/grblpcb.js:2074
+#: octoprint_grblpcb/static/js/grblpcb.js:2298
 #, python-format
 msgid "Streaming started: %s"
 msgstr "Übertragung gestartet: %s"
@@ -1301,26 +1470,26 @@ msgstr "Referenzfahrt fehlgeschlagen: Der zweite Endschalter einer Doppelachse h
 msgid "Board: %s x %s mm"
 msgstr "Platine: %s × %s mm"
 
-#: octoprint_grblpcb/static/js/workspace_renderer.js:1277
+#: octoprint_grblpcb/static/js/workspace_renderer.js:1278
 msgid "Z (mm)"
 msgstr "Z (mm)"
 
-#: octoprint_grblpcb/static/js/workspace_renderer.js:1327
+#: octoprint_grblpcb/static/js/workspace_renderer.js:1328
 #, python-format
 msgid "Probe: %d/%d (%dx%d)"
 msgstr "Messpunkte: %d/%d (%d×%d)"
 
-#: octoprint_grblpcb/static/js/workspace_renderer.js:1330
+#: octoprint_grblpcb/static/js/workspace_renderer.js:1331
 #, python-format
 msgid "Z range: %s .. %s mm"
 msgstr "Z-Bereich: %s .. %s mm"
 
-#: octoprint_grblpcb/static/js/workspace_renderer.js:1331
+#: octoprint_grblpcb/static/js/workspace_renderer.js:1332
 #, python-format
 msgid "Z span: %s mm"
 msgstr "Z-Spanne: %s mm"
 
-#: octoprint_grblpcb/static/js/workspace_renderer.js:1338
+#: octoprint_grblpcb/static/js/workspace_renderer.js:1339
 #, python-format
 msgid "Toolpaths: %d/%d"
 msgstr "Fräsbahnen: %d/%d"
@@ -1452,15 +1621,15 @@ msgstr "Werkstück-Koordinatensystem beim Start"
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:85
 msgid "Probing Settings"
-msgstr "Abtast-Einstellungen"
+msgstr "Antast-Einstellungen"
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:88
 msgid "Probe Depth"
-msgstr "Abtasttiefe"
+msgstr "Antasttiefe"
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:94
-msgid "Maximum probe travel (negative for Z probing down)"
-msgstr "Maximaler Tastweg (negativ für Z-Abtastung nach unten)"
+msgid "Maximum probe travel. The sign is ignored: probing always moves down (negative direction)"
+msgstr "Maximaler Antastweg. Das Vorzeichen wird ignoriert: Es wird immer nach unten (in negative Richtung) angetastet."
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:95
 msgid "Set this slightly deeper than the expected board height difference, but not so deep that it risks the bed."
@@ -1472,7 +1641,7 @@ msgstr "Für genaues Arbeiten die tatsächliche Plattenstärke und die Höhe der
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:101
 msgid "Probe Feed Rate"
-msgstr "Abtast-Vorschub"
+msgstr "Antastvorschub"
 
 #: octoprint_grblpcb/templates/grblpcb_settings.jinja2:113
 msgid "Tool Settings"
@@ -1608,8 +1777,8 @@ msgid "Jog"
 msgstr "Tippbetrieb"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:107
-msgid "Go to 0,0"
-msgstr "Gehe zu 0,0"
+msgid "Go to 0,0 at safe Z height (no lowering)"
+msgstr "Auf 0,0 in sicherer Z-Höhe fahren (ohne Absenken)"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:126
 msgid "Feed:"
@@ -1641,15 +1810,15 @@ msgstr "Check"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:152
 msgid "Feed hold: stop the motion, can be resumed"
-msgstr "Vorschub halt: Bewegung anhalten, kann fortgesetzt werden"
+msgstr "Vorschubhalt: Bewegung anhalten, kann fortgesetzt werden"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:153
 msgid "Hold"
-msgstr "Halt"
+msgstr "Vorschubhalt"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:155
 msgid "Resume after a feed hold"
-msgstr "Nach einem Halt fortsetzen"
+msgstr "Nach einem Vorschubhalt fortsetzen"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:156
 msgid "Resume"
@@ -2061,7 +2230,7 @@ msgstr "G0 ist ein schneller Verfahrweg, G1 eine Schnitt- oder Vorschubbewegung,
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:576
 msgid "Before probing:"
-msgstr "Vor dem Abtasten:"
+msgstr "Vor dem Antasten:"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:578
 msgid "Clamp the board and put the engraving bit into the spindle."
@@ -2085,7 +2254,7 @@ msgstr "Der Lauf tastet das Kupfer an jedem Rasterpunkt an und speichert die Hö
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:588
 msgid "Probe Grid"
-msgstr "Abtastraster"
+msgstr "Antastraster"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:590
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:593
@@ -2123,7 +2292,7 @@ msgstr "Fortschritt"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:625
 msgid "Autolevel can take a while. Do not move the machine manually while probing is active."
-msgstr "Autolevel kann eine Weile dauern. Die Maschine während des Abtastens nicht von Hand bewegen."
+msgstr "Autolevel kann eine Weile dauern. Die Maschine während des Antastens nicht von Hand bewegen."
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:641
 msgid "Probe Data"
@@ -2239,15 +2408,15 @@ msgstr "Ausrichtungslöcher:"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:833
 msgid "Probe each alignment hole to find its actual XY center"
-msgstr "Jedes Ausrichtungsloch abtasten, um seine tatsächliche XY-Mitte zu finden"
+msgstr "Jedes Ausrichtungsloch antasten, um seine tatsächliche XY-Mitte zu finden"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:834
 msgid "Probe Alignment Holes"
-msgstr "Ausrichtungslöcher abtasten"
+msgstr "Ausrichtungslöcher antasten"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:840
 msgid "Stop Probing"
-msgstr "Abtastung stoppen"
+msgstr "Antasten stoppen"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:848
 msgid "Transform:"
@@ -2264,10 +2433,6 @@ msgstr "Auf alle gespiegelten Operationen anwenden"
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:869
 msgid "Clear all alignment data"
 msgstr "Alle Ausrichtungsdaten löschen"
-
-#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:870
-msgid "Clear"
-msgstr "Zurücksetzen"
 
 #: octoprint_grblpcb/templates/grblpcb_tab.jinja2:883
 msgid "Wide view: use the whole page width for the workspace and hide the OctoPrint side panels"
@@ -2309,11 +2474,15 @@ msgstr "Maschinenpos."
 msgid "Toolpaths"
 msgstr "Fräsbahnen"
 
-#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:923
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:919
+msgid "Back side operations are drawn as seen from the front, so they line up with the copper and the holes."
+msgstr "Operationen der Rückseite werden so gezeichnet, wie sie von vorn zu sehen sind, damit sie zu Kupfer und Löchern passen."
+
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:924
 msgid "Create or load a project in the Board tab to begin."
 msgstr "Zum Start im Reiter „Platine“ ein Projekt anlegen oder laden."
 
-#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:924
+#: octoprint_grblpcb/templates/grblpcb_tab.jinja2:925
 msgid "Scroll to zoom &middot; Drag to pan &middot; 3D: drag to rotate"
 msgstr "Scrollen zum Zoomen &middot; Ziehen zum Verschieben &middot; 3D: Ziehen zum Drehen"
 
@@ -2322,4 +2491,16 @@ msgstr "Scrollen zum Zoomen &middot; Ziehen zum Verschieben &middot; 3D: Ziehen 
 
 #~ msgid "Z is set to 0 where the tool touches, then the tool is lifted. If the probe finds no contact, GRBL raises an alarm and the zero stays unchanged."
 #~ msgstr "Z wird an der Berührstelle auf 0 gesetzt, danach hebt das Werkzeug ab. Findet der Taster keinen Kontakt, meldet GRBL einen Alarm und der Nullpunkt bleibt unverändert."
+
+#~ msgid "Alignment cleared"
+#~ msgstr "Ausrichtung zurückgesetzt"
+
+#~ msgid "No probe result within 30 seconds."
+#~ msgstr "Innerhalb von 30 Sekunden kam kein Antastergebnis."
+
+#~ msgid "Go to 0,0"
+#~ msgstr "Gehe zu 0,0"
+
+#~ msgid "Maximum probe travel (negative for Z probing down)"
+#~ msgstr "Maximaler Antastweg (negativ für Z-Antasten nach unten)"
 

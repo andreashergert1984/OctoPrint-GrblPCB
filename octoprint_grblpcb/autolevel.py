@@ -323,7 +323,7 @@ def generate_probe_gcode(
         lines.append(f"; Probe point {i + 1}/{len(height_map.points)}")
         lines.append(f"G0 X{point.x:.4f} Y{point.y:.4f}")
         lines.append(f"G1 Z{travel_z:.3f} F{z_max_feed:.0f}")
-        lines.append(f"G38.2 Z{probe_depth} F{probe_feed}")
+        lines.append(f"G38.2 Z{-abs(probe_depth)} F{probe_feed}")
         lines.append("; >>> Record Z here <<<")
         lines.append(f"G1 Z{travel_z:.3f} F{z_max_feed:.0f}")
         lines.append("")
@@ -372,6 +372,10 @@ def apply_autolevel(gcode: str, height_map: HeightMap, max_segment: float = 1.0)
     current_x = 0.0
     current_y = 0.0
     current_z = 0.0
+    # The start position is unknown: X and Y count as known only once the
+    # program has set them. Until then nothing is invented from (0, 0).
+    have_x = False
+    have_y = False
 
     for line in gcode.splitlines():
         stripped = line.strip()
@@ -384,6 +388,15 @@ def apply_autolevel(gcode: str, height_map: HeightMap, max_segment: float = 1.0)
         # Arcs: below the surface they become short G1 segments that follow
         # the height map; either way the tracked position is the arc end point
         if _IS_ARC.match(stripped):
+            if not (have_x and have_y):
+                # Unknown start point: the arc cannot be interpreted
+                current_x, current_y, current_z = _parse_xyz(
+                    stripped, current_x, current_y, current_z
+                )
+                have_x = have_x or bool(re.search(r"X[+-]?\d", stripped))
+                have_y = have_y or bool(re.search(r"Y[+-]?\d", stripped))
+                output_lines.append(line)
+                continue
             arc_lines, (current_x, current_y, current_z) = _autolevel_arc(
                 stripped, current_x, current_y, current_z, height_map, max_segment
             )
@@ -397,6 +410,36 @@ def apply_autolevel(gcode: str, height_map: HeightMap, max_segment: float = 1.0)
 
         # Parse coordinates
         new_x, new_y, new_z = _parse_xyz(stripped, current_x, current_y, current_z)
+
+        has_x = bool(re.search(r"X[+-]?\d", stripped))
+        has_y = bool(re.search(r"Y[+-]?\d", stripped))
+        start_known = have_x and have_y
+        have_x = have_x or has_x
+        have_y = have_y or has_y
+        dest_known = have_x and have_y
+
+        # Z-only moves keep their shape: only the Z word is corrected, and
+        # not at all while the XY position is unknown. No X/Y words are added
+        # and the line is not split.
+        if not has_x and not has_y:
+            is_g0_z = stripped.startswith("G0") and not stripped.startswith("G01")
+            if dest_known and (new_z <= 0 or (not is_g0_z and current_z <= 0)):
+                z_correction = height_map.get_z(new_x, new_y)
+                output_lines.append(
+                    _rebuild_gcode_line(stripped, new_x, new_y, new_z + z_correction)
+                )
+            else:
+                output_lines.append(line)
+            current_z = new_z
+            continue
+        if not dest_known:
+            # Position still partly unknown: pass through untouched
+            output_lines.append(line)
+            current_x, current_y, current_z = new_x, new_y, new_z
+            continue
+        if not start_known:
+            # No start point to subdivide from: treat as a point move
+            current_x, current_y = new_x, new_y
 
         # Check if this is a cutting move (Z < 0)
         is_g1 = stripped.startswith(("G1", "G01"))

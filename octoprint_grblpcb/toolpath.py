@@ -450,7 +450,7 @@ def _buffer_individual_paths(copper: MultiPolygon, offset: float) -> list[list[t
     """Rings of every copper polygon buffered on its own (no union of the buffers)."""
     paths: list[list[tuple]] = []
     for poly in _polygons(copper):
-        paths.extend(_rings(poly.buffer(offset, join_style=2, quad_segs=16)))
+        paths.extend(_rings(poly.buffer(offset, join_style=1, quad_segs=16)))
     return paths
 
 
@@ -514,7 +514,7 @@ def _narrow_gap_paths(copper, members: set, offset: float) -> tuple[list, list]:
     closed: list[list[tuple]] = []
     opened: list[list[tuple]] = []
     for index in sorted(members):
-        for ring in _rings(polys[index].buffer(offset, join_style=2, quad_segs=16)):
+        for ring in _rings(polys[index].buffer(offset, join_style=1, quad_segs=16)):
             if zone is None:
                 zone = copper.buffer(offset - 1e-4)
             line = LineString(ring)
@@ -562,7 +562,7 @@ def _buffer_copper_paths(
     Returns ``(rings, num_polygons, num_interiors)``; the topology counters
     let clear-gaps mode detect when all gaps are filled.
     """
-    buffered = copper.buffer(offset, join_style=2, quad_segs=16)
+    buffered = copper.buffer(offset, join_style=1, quad_segs=16)
     if buffered.is_empty:
         return [], 0, 0
     polys = [buffered] if isinstance(buffered, Polygon) else [
@@ -590,7 +590,8 @@ def generate_drill_gcode(
 
     Tools run from the smallest to the largest diameter. Each tool starts
     with a tool change: tool up, spindle off, ``T<n> M6`` (the plugin pauses
-    there and asks to change the drill and zero Z again), spindle on.
+    there and asks to change the drill and zero Z again), spindle on, tool
+    up to safe Z before the first move in XY.
     ``settings.cut_depth`` holds the board thickness.
     """
     _logger.info(f"Generating drill G-code: {len(drills)} tools")
@@ -621,6 +622,9 @@ def generate_drill_gcode(
         lines.append(settings.z_move(settings.safe_z, "tool change height"))
         lines.append("M5 ; spindle off for the tool change")
         lines.append(f"T{drill.tool_number} M6 ; drill {drill.diameter:.2f} mm")
+        # The user may have left the tool at the board after the Z zeroing:
+        # lift before the spindle starts and before any XY travel
+        lines.append(settings.z_move(settings.safe_z, "safe Z before spindle start and travelling"))
         lines.append(f"M3 S{settings.spindle_speed} ; spindle on")
         lines.append(f"G4 P{settings.spindle_dwell:.1f} ; dwell for spindle spinup")
         lines.append("")

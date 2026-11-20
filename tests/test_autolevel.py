@@ -358,7 +358,13 @@ def test_probe_loop_stops_without_recording_failed_point(failure, reason):
 
     plugin = _plugin()
     plugin._logger = logging.getLogger("test")
-    plugin._settings = _Settings()
+    class FastProbe(_Settings):
+        def get_float(self, path):
+            return 1e9 if path[0] == "probe_feed" else 1.0
+
+    plugin._settings = FastProbe()
+    # the wait follows travel and feed; a huge feed leaves only the slack
+    plugin.PROBE_SLACK = 0.2
     plugin._plugin_manager = _PluginManager()
     plugin._save_project = lambda: None
     plugin._project = PCBProject()

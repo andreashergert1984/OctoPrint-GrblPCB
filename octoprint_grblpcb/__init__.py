@@ -52,6 +52,7 @@ from .toolpath import (
     generate_isolation_gcode,
     generate_mask_expose_gcode,
     generate_outline_gcode,
+    mirror_geometry,
     plan_narrow_gap_passes,
     travel_check,
 )
@@ -400,6 +401,7 @@ class GrblPcbPlugin(
             "zero_axis": ["axis"],
             "goto_zero": [],
             "status": [],
+            "machine_check": [],
             "set_spindle": ["speed"],
             "spindle_on": [],
             "spindle_off": [],
@@ -600,7 +602,15 @@ class GrblPcbPlugin(
         return connector, None
 
     def _is_probe_active(self):
-        return self._probe_thread is not None and self._probe_thread.is_alive()
+        """Autolevel/alignment probing or a manual probe (Probe Z, probe and zero) runs."""
+        if self._probe_thread is not None and self._probe_thread.is_alive():
+            return True
+        try:
+            connector = self._get_grbl_connector()
+        except Exception:  # noqa: BLE001 - no connector in odd states: not probing
+            return False
+        running = getattr(connector, "is_probe_zero_running", None)
+        return bool(running()) if callable(running) else False
 
     def _probe_running_response(self):
         import flask
@@ -612,6 +622,12 @@ class GrblPcbPlugin(
         """409 response unless GRBL is idle: a job or probing must not start on a moving machine."""
         import flask
 
+        halting = getattr(connector, "halt_in_progress", None)
+        if not self._halt_finished.is_set() or (callable(halting) and halting()):
+            # The reset of a stop button still has to come: it would hit the new work
+            return flask.jsonify(error=gettext(
+                "The machine is still being stopped. Wait a moment, then try again."
+            )), 409
         state = getattr(connector, "_grbl_state", "Idle")
         if state != "Idle":
             return flask.jsonify(error=gettext(
@@ -667,7 +683,11 @@ class GrblPcbPlugin(
         connector, err = self._require_grbl_connection()
         if err:
             return err
-        depth = self._settings.get_float(["probe_depth"])
+        blocked = self._alarm_block(connector) or self._idle_block(connector)
+        if blocked:
+            return blocked
+        # Probing always moves in the negative direction, whatever sign was stored
+        depth = -abs(self._settings.get_float(["probe_depth"]))
         feed = self._settings.get_int(["probe_feed"])
         safe_z = self._settings.get_float(["safe_z_height"]) or 2.0
         if axis == "Z":
@@ -764,7 +784,12 @@ class GrblPcbPlugin(
             return err
         safe_z = self._settings.get_float(["safe_z_height"])
         z_feed = self._settings.get_float(["z_max_feed"])
-        connector.commands("G21 G90", f"G1 Z{safe_z} F{z_feed:.0f}", "G0 X0 Y0", f"G1 Z0 F{z_feed:.0f}")
+        # Only above the zero point: lowering onto the board is not something
+        # a button may do without the user looking (the Z zero may be unknown)
+        # (never down to the safe height: a tool already higher stays there)
+        work_z = (getattr(connector, "_work_position", None) or {}).get("z", safe_z)
+        lift_z = max(safe_z, work_z) if isinstance(work_z, (int, float)) else safe_z
+        connector.commands("G21 G90", f"G1 Z{lift_z:g} F{z_feed:.0f}", "G0 X0 Y0")
         return flask.jsonify(result="going to zero")
 
     def _handle_status(self, data):
@@ -914,10 +939,22 @@ class GrblPcbPlugin(
     # Project Command Handlers (caller holds _project_lock)
     # -----------------------------------------------------------------
 
+    def _default_flip_axis(self):
+        """Mirror axis for new projects (plugin setting ``flip_axis``)."""
+        try:
+            axis = str(self._settings.get(["flip_axis"]) or "X").strip().upper()
+        except Exception:  # noqa: BLE001 - settings backend unavailable
+            axis = "X"
+        return axis if axis in ("X", "Y") else "X"
+
+    def _make_project(self, **kwargs):
+        """New project with the configured default mirror axis."""
+        return PCBProject(flip_axis=self._default_flip_axis(), **kwargs)
+
     def _handle_new_project(self, data):
         import flask
         name = data.get("name", "Untitled PCB")
-        self._project = PCBProject(name=name)
+        self._project = self._make_project(name=name)
         self._geometries = {}
         self._geometries_unrotated = {}
         self._drills_unrotated = []
@@ -958,6 +995,7 @@ class GrblPcbPlugin(
             if lt == LayerType.DRILL:
                 self._project.drills = []
                 self._drills_unrotated = []
+                self._reset_alignment()
             self._project._update_board_dimensions()
             self._drop_stale_operations(lt, before)
         self._save_project()
@@ -1010,10 +1048,23 @@ class GrblPcbPlugin(
             return flask.jsonify(error=gettext("No project")), 400
         side = data.get("side", "single")
         try:
-            self._project.board_side = BoardSide(side)
+            BoardSide(side)
         except (TypeError, ValueError):
             return flask.jsonify(error=gettext("Invalid board side: %(value)s") % {"value": side}), 400
-        self._project.flip_axis = data.get("flip_axis", "X")
+        axis = data.get("flip_axis")
+        if axis is None:
+            axis = self._project.flip_axis
+        axis = str(axis).strip().upper()
+        if axis not in ("X", "Y"):
+            return flask.jsonify(error=gettext("Invalid flip axis: %(value)s") % {"value": data.get("flip_axis")}), 400
+        self._project.board_side = BoardSide(side)
+        if axis != self._project.flip_axis:
+            # Mirrored operations and the alignment belong to the old axis
+            self._project.flip_axis = axis
+            self._project.operations = [
+                op for op in self._project.operations if not op.mirrored
+            ]
+            self._reset_alignment()
         self._save_project()
         return flask.jsonify(result="ok", project=self._project.to_dict())
 
@@ -1055,7 +1106,7 @@ class GrblPcbPlugin(
     def _handle_upload_inner(self, flask, shutil):
         """Inner upload handler (caller holds _project_lock)."""
         if self._project is None:
-            self._project = PCBProject()
+            self._project = self._make_project()
 
         # Destination is the per-project subdirectory
         dest_dir = self._get_project_upload_dir()
@@ -1165,6 +1216,8 @@ class GrblPcbPlugin(
                 self._project.drills = drills
                 # Keep unrotated copy of drill data
                 self._drills_unrotated = copy.deepcopy(drills)
+                # Alignment holes refer to the old drill data
+                self._reset_alignment()
                 self._logger.info(
                     f"Added drill layer: {len(drills)} tools, "
                     f"{sum(d.count for d in drills)} holes"
@@ -1197,7 +1250,7 @@ class GrblPcbPlugin(
         import flask
 
         if self._project is None:
-            self._project = PCBProject()
+            self._project = self._make_project()
 
         filename = os.path.basename(data.get("filename", ""))
         layer_type, err = self._parse_layer_type(data.get("layer_type"))
@@ -1352,6 +1405,7 @@ class GrblPcbPlugin(
             self._project.drills = copy.deepcopy(self._drills_unrotated)
 
         if angle == 0:
+            self._update_layer_bounds()
             self._project._update_board_dimensions()
             return
 
@@ -1421,25 +1475,8 @@ class GrblPcbPlugin(
                 rotated_holes.append((rx + dx, ry + dy))
             drill.holes = rotated_holes
 
-        # --- Update layer bounds from rotated geometry ---
-        for lt, layer in self._project.layers.items():
-            geoms = self._geometries.get(lt)
-            if geoms:
-                if isinstance(geoms, list):
-                    valid = [g for g in geoms if g is not None and not g.is_empty]
-                    if valid:
-                        u = unary_union(valid)
-                        bx0, by0, bx1, by1 = u.bounds
-                    else:
-                        continue
-                else:
-                    bx0, by0, bx1, by1 = geoms.bounds
-                layer.min_x = bx0
-                layer.min_y = by0
-                layer.max_x = bx1
-                layer.max_y = by1
-                layer.width = bx1 - bx0
-                layer.height = by1 - by0
+        # --- Update layer bounds from rotated geometry and drills ---
+        self._update_layer_bounds()
 
         # --- Update board dimensions ---
         self._project._update_board_dimensions()
@@ -1448,6 +1485,51 @@ class GrblPcbPlugin(
             f"Applied rotation {angle}°: board now "
             f"{self._project.board_width:.2f} x {self._project.board_height:.2f} mm"
         )
+
+    def _update_layer_bounds(self):
+        """Recompute every layer's bounds from the current geometry/drills.
+
+        Used for every rotation angle including 0 (restoring the originals) and
+        for the drill layer, whose bounds come from the hole positions.
+        """
+        from shapely.ops import unary_union
+
+        for lt, layer in self._project.layers.items():
+            if lt == LayerType.DRILL:
+                pts = [h for d in self._project.drills for h in d.holes]
+                if not pts:
+                    continue
+                xs = [p[0] for p in pts]
+                ys = [p[1] for p in pts]
+                bx0, by0, bx1, by1 = min(xs), min(ys), max(xs), max(ys)
+            else:
+                geoms = self._geometries.get(lt)
+                if not geoms:
+                    continue
+                if isinstance(geoms, list):
+                    valid = [g for g in geoms if g is not None and not g.is_empty]
+                    if not valid:
+                        continue
+                    bx0, by0, bx1, by1 = unary_union(valid).bounds
+                else:
+                    if geoms.is_empty:
+                        continue
+                    bx0, by0, bx1, by1 = geoms.bounds
+            layer.min_x = bx0
+            layer.min_y = by0
+            layer.max_x = bx1
+            layer.max_y = by1
+            layer.width = bx1 - bx0
+            layer.height = by1 - by0
+
+    def _reset_alignment(self):
+        """Forget alignment holes, transform and probe time, drop aligned G-code."""
+        if self._project is None:
+            return
+        self._project.alignment_holes = []
+        self._project.alignment_transform = None
+        self._project.alignment_probed_at = None
+        self._discard_aligned_gcode()
 
     def _handle_rotate_project(self, data):
         """Rotate all project geometry by the given angle (degrees CCW).
@@ -1484,6 +1566,8 @@ class GrblPcbPlugin(
         # --- 9) Clear height map (probe data is position-dependent) ---
         self._height_map = None
         self._project.height_map = None
+        # Alignment holes are positions of the old orientation
+        self._reset_alignment()
 
         self._save_project()
 
@@ -1610,7 +1694,16 @@ class GrblPcbPlugin(
             origin_y=self._project.board_min_y,
             **mirror_args,
         )
-        gaps = find_unisolatable_gaps(copper, settings.tool_diameter)
+        # Gap positions are reported in the coordinates the G-code uses: for
+        # the back side that is the mirrored geometry
+        gap_copper = copper
+        if mirror_args:
+            gap_copper = mirror_geometry(
+                copper, mirror_args["mirror"],
+                (self._project.board_min_x, self._project.board_min_y),
+                mirror_args["board_size"],
+            )
+        gaps = find_unisolatable_gaps(gap_copper, settings.tool_diameter)
 
         # Create operation
         op = MillingOperation(
@@ -1645,7 +1738,7 @@ class GrblPcbPlugin(
                 "tool": settings.tool_diameter,
             })
         # Narrow gaps the planner leaves uncut, one warning per gap
-        _classes, uncut_gaps = plan_narrow_gap_passes(copper, settings)
+        _classes, uncut_gaps = plan_narrow_gap_passes(gap_copper, settings)
         for gap, (gx, gy) in uncut_gaps:
             warnings.append({
                 "code": "gap_uncut",
@@ -1921,6 +2014,25 @@ class GrblPcbPlugin(
         grid_y = data.get("grid_y", self._settings.get_int(["autolevel_grid_y"]))
         margin = data.get("margin", self._settings.get_float(["autolevel_margin"]))
 
+        grid = []
+        for value in (grid_x, grid_y):
+            try:
+                if isinstance(value, bool) or (isinstance(value, float) and not value.is_integer()):
+                    raise ValueError(value)
+                number = int(value)
+            except (TypeError, ValueError):
+                number = None
+            if number is None or not 2 <= number <= 20:
+                return flask.jsonify(error=gettext("The grid needs a whole number of 2 to 20 points in X and Y.")), 400
+            grid.append(number)
+        grid_x, grid_y = grid
+        try:
+            margin = float(margin)
+        except (TypeError, ValueError):
+            margin = float("nan")
+        if isinstance(data.get("margin"), bool) or not 0.0 <= margin <= 50.0:  # NaN fails the range check
+            return flask.jsonify(error=gettext("The margin must be a number from 0 to 50 mm.")), 400
+
         self._height_map = HeightMap()
         # Use CNC coordinates (0,0 origin at board corner) to match G-code
         self._height_map.generate_grid(
@@ -1990,6 +2102,22 @@ class GrblPcbPlugin(
         return flask.jsonify(result="ok", message=gettext("Probing started"))
 
     PROBE_TIMEOUT = 30.0
+    PROBE_SLACK = 10.0  # seconds on top of the time the probe travel needs
+
+    def _probe_prefix(self):
+        """Absolute mm mode in the run's WCS: starts every move block of a probe run."""
+        return f"G21 G90 {self._probe_wcs}"
+
+    def _probe_result_timeout(self, travel, feed):
+        """Seconds to wait for a probe: travel at the probe feed, safety factor 1.5, plus slack."""
+        feed = max(abs(feed), 1.0)
+        return abs(travel) / feed * 60.0 * 1.5 + self.PROBE_SLACK
+
+    def _probe_move(self, connector, comm, *moves, timeout=10.0):
+        """Send ``moves`` behind the absolute-mode prefix and wait for every ok."""
+        self._probe_commands(connector, self._probe_prefix(), *moves)
+        for _ in range(len(moves) + 1):
+            self._confirm_ok(comm, timeout=timeout)
 
     def _probe_commands(self, connector, *commands):
         """
@@ -2028,7 +2156,7 @@ class GrblPcbPlugin(
         except Exception as e:  # noqa: BLE001 - best-effort retract, must not abort cleanup; logged
             self._logger.warning(f"Retract after probing failed: {e}")
 
-    def _await_probe_result(self, comm, work_offset):
+    def _await_probe_result(self, comm, work_offset, timeout=None):
         """
         Wait for the result of one G38.2 probe.
 
@@ -2037,7 +2165,7 @@ class GrblPcbPlugin(
         "timeout") and (None, None) if the user stopped probing.
         """
         z_val = None
-        deadline = time.time() + self.PROBE_TIMEOUT
+        deadline = time.time() + (self.PROBE_TIMEOUT if timeout is None else timeout)
         while time.time() < deadline:
             if self._probe_stop.is_set():
                 return None, None
@@ -2064,7 +2192,7 @@ class GrblPcbPlugin(
 
     def _autolevel_probe_loop(self, connector):
         """Background thread for sequential probing."""
-        probe_depth = self._settings.get_float(["probe_depth"])
+        probe_depth = -abs(self._settings.get_float(["probe_depth"]))
         probe_feed = self._settings.get_float(["probe_feed"])
         safe_z = self._settings.get_float(["safe_z_height"])
         travel_z = self._settings.get_float(["travel_z_height"])
@@ -2075,6 +2203,8 @@ class GrblPcbPlugin(
 
         total = len(self._height_map.points)
         self._logger.info(f"Starting autolevel probing: {total} points")
+        # From the travel height down to the probe depth at the probe feed
+        probe_wait = self._probe_result_timeout(travel_z - probe_depth, probe_feed)
 
         # Enable stream mode on the comm to capture responses
         comm = connector._comm
@@ -2097,26 +2227,22 @@ class GrblPcbPlugin(
                     continue
 
                 # Move to point — use minimal Z clearance to reduce Z travel
-                self._probe_commands(connector, 
+                self._probe_move(
+                    connector, comm,
                     f"G1 Z{inter_point_z} F{z_feed:.0f}",
                     f"G0 X{point.x:.4f} Y{point.y:.4f}",
                     f"G1 Z{travel_z} F{z_feed:.0f}",
                 )
-                # Wait for the 3 movement commands to complete
-                for _ in range(3):
-                    self._confirm_ok(comm, timeout=10.0)
 
-                # Probe
-                self._probe_commands(connector, 
-                    "G21",
-                    "G90",
-                    f"G38.2 Z{probe_depth} F{probe_feed}",
+                # Probe (absolute target, see the prefix)
+                self._probe_commands(
+                    connector, self._probe_prefix(), f"G38.2 Z{probe_depth} F{probe_feed}",
                 )
-                # Wait for G21 and G90 ok's
-                self._confirm_ok(comm, timeout=2.0)
+                # Wait for the ok of the mode words
                 self._confirm_ok(comm, timeout=2.0)
 
-                z_val, failure = self._await_probe_result(comm, connector._work_offset)
+                z_val, failure = self._await_probe_result(
+                    comm, connector._work_offset, probe_wait)
                 if failure:
                     # Never record a substitute height: the point stays
                     # unprobed and the run stops so the user can fix the cause
@@ -2178,89 +2304,77 @@ class GrblPcbPlugin(
 
         # Build interpolator when done (still inside stream_mode)
         z_drift = None
+        drift_aborted = False
         if self._height_map.is_complete():
             self._height_map.build_interpolator()
+            if self._probe_stop.is_set():
+                drift_aborted = True
 
             # ── Z-drift verification ──
             # Re-probe the first point and compare with the original reading.
             # Any significant difference indicates the Z-axis lost steps during
             # the probing cycle.  Must happen while stream_mode is still active
             # so we can read probe responses from the queue.
-            try:
-                # Re-enable stream mode in case finally already ran
-                if comm is not None:
-                    comm._stream_mode = True
+            if not drift_aborted:
+                try:
+                    # Re-enable stream mode in case finally already ran
+                    if comm is not None:
+                        comm._stream_mode = True
 
-                first_pt = self._height_map.points[0]
-                self._logger.info(
-                    "Drift check: re-probing point 0 "
-                    f"(X{first_pt.x:.3f} Y{first_pt.y:.3f}, "
-                    f"original Z={first_pt.z:.4f})"
-                )
-                self._probe_commands(connector, 
-                    f"G1 Z{inter_point_z} F{z_feed:.0f}",
-                    f"G0 X{first_pt.x:.4f} Y{first_pt.y:.4f}",
-                    f"G1 Z{travel_z} F{z_feed:.0f}",
-                )
-                for _ in range(3):
-                    self._wait_for_ok(comm, timeout=10.0)
-
-                self._probe_commands(connector, 
-                    "G21", "G90",
-                    f"G38.2 Z{probe_depth} F{probe_feed}",
-                )
-                self._wait_for_ok(comm, timeout=2.0)
-                self._wait_for_ok(comm, timeout=2.0)
-
-                # Read the drift-check probe result
-                drift_z = None
-                deadline = time.time() + 30.0
-                while time.time() < deadline:
-                    try:
-                        resp = comm._response_queue.get(timeout=1.0)
-                    except queue.Empty:
-                        continue
-                    if resp[0] == "probe":
-                        pd = resp[1]
-                        if pd["success"]:
-                            wco_z = connector._work_offset.get("z", 0.0)
-                            drift_z = pd["z"] - wco_z
-                        else:
-                            self._logger.warning("Drift check probe failed (no contact)")
-                            break
-                    elif resp[0] == "ok":
-                        if drift_z is not None:
-                            break
-                    elif resp[0] in ("error", "alarm"):
-                        self._logger.warning(f"Drift check probe error: {resp}")
-                        break
-
-                if drift_z is not None:
-                    z_drift = drift_z - first_pt.z
+                    first_pt = self._height_map.points[0]
                     self._logger.info(
-                        f"Z-drift check: original={first_pt.z:.4f}, "
-                        f"re-probe={drift_z:.4f}, drift={z_drift:.4f}mm"
+                        "Drift check: re-probing point 0 "
+                        f"(X{first_pt.x:.3f} Y{first_pt.y:.3f}, "
+                        f"original Z={first_pt.z:.4f})"
                     )
-                    if abs(z_drift) > 0.05:
-                        self._logger.warning(
-                            f"⚠ Z-axis drift of {z_drift:.3f}mm detected! "
-                            f"The Z motor likely lost steps during probing. "
-                            f"Consider reducing Z acceleration ($122) or "
-                            f"max Z rate ($112)."
+                    self._probe_move(
+                        connector, comm,
+                        f"G1 Z{inter_point_z} F{z_feed:.0f}",
+                        f"G0 X{first_pt.x:.4f} Y{first_pt.y:.4f}",
+                        f"G1 Z{travel_z} F{z_feed:.0f}",
+                    )
+                    self._probe_commands(
+                        connector, self._probe_prefix(), f"G38.2 Z{probe_depth} F{probe_feed}",
+                    )
+                    self._confirm_ok(comm, timeout=2.0)
+
+                    # Same wait as for every probe: Stop and Reset end it at once
+                    drift_z, failure = self._await_probe_result(
+                        comm, connector._work_offset, probe_wait)
+                    if failure == "reset":
+                        # GRBL restarted under us: nothing moves any more
+                        self._probe_stop.set()
+                        if not self._probe_user_stop.is_set():
+                            self._probe_reset.set()
+                    elif failure:
+                        self._logger.warning(f"Drift check probe failed: {failure}")
+
+                    if drift_z is not None:
+                        z_drift = drift_z - first_pt.z
+                        self._logger.info(
+                            f"Z-drift check: original={first_pt.z:.4f}, "
+                            f"re-probe={drift_z:.4f}, drift={z_drift:.4f}mm"
                         )
-                        # Force re-zero before milling
-                        connector._z_zeroed = False
-                else:
-                    self._logger.warning(
-                        "Drift check: no probe result received (timeout)"
-                    )
-                # Retract after drift check
-                self._probe_commands(connector, f"G1 Z{travel_z} F{z_feed:.0f}")
-                self._wait_for_ok(comm, timeout=5.0)
-            except Exception as e:  # noqa: BLE001 - drift check best effort, cleanup follows; logged
-                self._logger.warning(f"Z-drift check failed: {e}")
-                import traceback as tb
-                self._logger.debug(tb.format_exc())
+                        if abs(z_drift) > 0.05:
+                            self._logger.warning(
+                                f"Z-axis drift of {z_drift:.3f}mm detected! "
+                                f"The Z motor likely lost steps during probing. "
+                                f"Consider reducing Z acceleration ($122) or "
+                                f"max Z rate ($112)."
+                            )
+                            # Force re-zero before milling
+                            connector._z_zeroed = False
+                        # Retract after drift check
+                        self._probe_commands(connector, f"G1 Z{travel_z} F{z_feed:.0f}")
+                        self._wait_for_ok(comm, timeout=5.0)
+                    elif not self._probe_stop.is_set():
+                        self._logger.warning(
+                            f"Drift check: no probe result received ({failure or 'timeout'})"
+                        )
+                except Exception as e:  # noqa: BLE001 - drift check best effort, cleanup follows; logged
+                    self._logger.warning(f"Z-drift check failed: {e}")
+                    import traceback as tb
+                    self._logger.debug(tb.format_exc())
 
         # Now disable stream mode
         try:
@@ -2276,7 +2390,17 @@ class GrblPcbPlugin(
                 self._save_project()
             self._logger.info("Autolevel probing complete, interpolator built")
 
-            if self._plugin_manager:
+            # Stopped or reset during the drift check: no "complete" message
+            # (the user asked to stop; after a reset nothing is verified)
+            drift_aborted = self._probe_stop.is_set()
+            if drift_aborted:
+                if self._plugin_manager and not self._probe_user_stop.is_set():
+                    self._plugin_manager.send_plugin_message(
+                        "grblpcb",
+                        {"type": "autolevel_failed", "index": 0, "total": total,
+                         "reason": "reset", "stage": "drift_check"},
+                    )
+            elif self._plugin_manager:
                 msg = {
                     "type": "autolevel_complete",
                     "heightmap": self._height_map.to_dict(),
@@ -2294,7 +2418,7 @@ class GrblPcbPlugin(
         # the Z retract (if any): the machine must not travel on
         stopped = self._probe_user_stop.is_set()
         self._retract_after_probing(connector, comm, safe_z, z_feed, wait=False)
-        if not stopped and getattr(connector, "_grbl_state", "") != "Alarm":
+        if not stopped and not self._probe_reset.is_set() and getattr(connector, "_grbl_state", "") != "Alarm":
             connector.commands("G0 X0 Y0", internal=True)
 
     def _wait_for_ok(self, comm, timeout=5.0):
@@ -2456,13 +2580,30 @@ class GrblPcbPlugin(
         ]
         if len(holes) < 2:
             return flask.jsonify(error=gettext("Need at least 2 alignment holes")), 400
+        # The probe has to enter the hole: prefer holes of at least 1 mm (and
+        # not narrower than the tool tip); fall back with a warning
+        min_d = max(1.0, self._settings.get_float(["tool_diameter"]) or 0.0)
+        wide = [h for h in holes if h[2] >= min_d]
+        warning = None
+        if len(wide) >= 2:
+            holes = wide
+        else:
+            warning = gettext(
+                "Fewer than two drill holes are at least %(d)s mm wide. The probe may not fit into the selected holes; "
+                "add larger holes for alignment if probing fails."
+            ) % {"d": f"{min_d:g}"}
         selected = back_side_alignment_holes(
             holes,
             (self._project.board_min_x, self._project.board_min_y),
             (self._project.board_width, self._project.board_height),
             self._project.flip_axis,
         )
-        return self._handle_set_alignment_holes({"holes": selected})
+        response = self._handle_set_alignment_holes({"holes": selected})
+        if warning and not isinstance(response, tuple):
+            payload = response.get_json()
+            payload["warning"] = warning
+            return flask.jsonify(payload)
+        return response
 
     def _discard_aligned_gcode(self):
         """Drop aligned G-code (and leveled G-code built on it)."""
@@ -2566,21 +2707,43 @@ class GrblPcbPlugin(
                     f"at ({ex:.3f}, {ey:.3f}) d={hole['diameter']:.2f}"
                 )
 
+                hole.pop("probe_error", None)
+
                 # -- Move to hole position at safe Z --
-                self._probe_commands(connector, 
+                self._probe_move(
+                    connector, comm,
                     f"G1 Z{safe_z} F{z_feed:.0f}",
                     f"G0 X{ex:.4f} Y{ey:.4f}",
                 )
-                for _ in range(2):
-                    self._confirm_ok(comm, timeout=10.0)
 
-                # -- Plunge into hole --
-                self._probe_commands(connector, f"G1 Z{hole_probe_z:.4f} F{z_feed:.0f}")
-                self._confirm_ok(comm, timeout=10.0)
+                # -- Lower into the hole: probing, never a blind plunge.
+                # Contact means the hole is not under the bit.
+                plunge = self._probe_hole_plunge(
+                    comm, connector, hole_probe_z, probe_feed, travel=safe_z - hole_probe_z)
+                if plunge == "contact":
+                    self._logger.warning(
+                        f"Alignment hole {idx + 1}: the bit touched the board instead of "
+                        f"entering the hole at ({ex:.3f}, {ey:.3f})"
+                    )
+                    hole["probe_error"] = "not_in_hole"
+                    self._retract_after_probing(connector, comm, safe_z, z_feed)
+                    if self._plugin_manager:
+                        self._plugin_manager.send_plugin_message(
+                            "grblpcb",
+                            {
+                                "type": "alignment_hole_failed",
+                                "index": idx,
+                                "total": total,
+                                "reason": "not_in_hole",
+                            },
+                        )
+                    continue
+                if plunge != "clear":
+                    raise _ProbeAborted("move_rejected")
 
                 # -- Probe X+ --
                 x_plus = self._probe_axis(
-                    comm, connector, "X", ex + search_dist, probe_feed
+                    comm, connector, "X", ex + search_dist, probe_feed, travel=2 * search_dist
                 )
                 if x_plus is None:
                     self._logger.warning(f"X+ probe failed at hole {idx}")
@@ -2588,12 +2751,11 @@ class GrblPcbPlugin(
                     continue
 
                 # Return to center
-                self._probe_commands(connector, f"G0 X{ex:.4f}")
-                self._confirm_ok(comm, timeout=5.0)
+                self._probe_move(connector, comm, f"G0 X{ex:.4f}", timeout=5.0)
 
                 # -- Probe X- --
                 x_minus = self._probe_axis(
-                    comm, connector, "X", ex - search_dist, probe_feed
+                    comm, connector, "X", ex - search_dist, probe_feed, travel=2 * search_dist
                 )
                 if x_minus is None:
                     self._logger.warning(f"X- probe failed at hole {idx}")
@@ -2603,12 +2765,11 @@ class GrblPcbPlugin(
                 center_x = (x_plus + x_minus) / 2.0
 
                 # Move to measured center X
-                self._probe_commands(connector, f"G0 X{center_x:.4f}")
-                self._confirm_ok(comm, timeout=5.0)
+                self._probe_move(connector, comm, f"G0 X{center_x:.4f}", timeout=5.0)
 
                 # -- Probe Y+ --
                 y_plus = self._probe_axis(
-                    comm, connector, "Y", ey + search_dist, probe_feed
+                    comm, connector, "Y", ey + search_dist, probe_feed, travel=2 * search_dist
                 )
                 if y_plus is None:
                     self._logger.warning(f"Y+ probe failed at hole {idx}")
@@ -2616,12 +2777,11 @@ class GrblPcbPlugin(
                     continue
 
                 # Return to center Y
-                self._probe_commands(connector, f"G0 Y{ey:.4f}")
-                self._confirm_ok(comm, timeout=5.0)
+                self._probe_move(connector, comm, f"G0 Y{ey:.4f}", timeout=5.0)
 
                 # -- Probe Y- --
                 y_minus = self._probe_axis(
-                    comm, connector, "Y", ey - search_dist, probe_feed
+                    comm, connector, "Y", ey - search_dist, probe_feed, travel=2 * search_dist
                 )
                 if y_minus is None:
                     self._logger.warning(f"Y- probe failed at hole {idx}")
@@ -2642,8 +2802,7 @@ class GrblPcbPlugin(
                 )
 
                 # Retract
-                self._probe_commands(connector, f"G1 Z{safe_z} F{z_feed:.0f}")
-                self._confirm_ok(comm, timeout=5.0)
+                self._probe_move(connector, comm, f"G1 Z{safe_z} F{z_feed:.0f}", timeout=5.0)
 
                 # Send progress
                 if self._plugin_manager:
@@ -2695,28 +2854,66 @@ class GrblPcbPlugin(
                     "type": "alignment_complete",
                     "all_probed": all_probed,
                     "holes": holes,
+                    "failed_holes": [
+                        {"index": i, "reason": h["probe_error"]}
+                        for i, h in enumerate(holes) if h.get("probe_error")
+                    ],
                     "abort_reason": abort_reason,
                 },
             )
 
-    def _probe_axis(self, comm, connector, axis: str, target: float, feed: float):
+    def _probe_hole_plunge(self, comm, connector, z_target: float, feed: float, travel: float = 10.0):
+        """
+        Lower the bit into an alignment hole with G38.3 instead of a blind move.
+
+        Returns "clear" (reached the depth without contact: the bit is in the
+        hole), "contact" (it touched something: the hole is not under the bit,
+        the bit stands on the board) or "failed" (GRBL refused or reset).
+        """
+        self._probe_commands(
+            connector, self._probe_prefix(), f"G38.3 Z{z_target:.4f} F{feed}",
+        )
+        if not self._wait_for_ok(comm, timeout=2.0):
+            return "failed"
+        deadline = time.time() + self._probe_result_timeout(travel, feed)
+        touched = None
+        while time.time() < deadline and not self._probe_stop.is_set():
+            try:
+                resp = comm._response_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            if resp[0] == "probe":
+                touched = bool(resp[1]["success"])
+            elif resp[0] == "ok":
+                if touched is not None:
+                    return "contact" if touched else "clear"
+            elif resp[0] in ("alarm", "reset"):
+                self._probe_stop.set()
+                return "failed"
+            elif resp[0] == "error":
+                return "failed"
+        return "failed"
+
+    def _probe_axis(self, comm, connector, axis: str, target: float, feed: float, travel=None):
         """
         Probe a single axis direction, return the contact coordinate in work
         coordinates or None.
 
         G38.3: finding no wall must not raise an alarm and lock the machine.
         """
-        self._probe_commands(connector, 
-            "G21", "G90",
-            f"G38.3 {axis}{target:.4f} F{feed}",
+        self._probe_commands(
+            connector, self._probe_prefix(), f"G38.3 {axis}{target:.4f} F{feed}",
         )
-        # Wait for G21, G90 ok
-        self._wait_for_ok(comm, timeout=2.0)
-        self._wait_for_ok(comm, timeout=2.0)
+        # The mode words must have been accepted: otherwise the probe would
+        # run in an unknown mode (or not at all) and the oks shift
+        if not self._wait_for_ok(comm, timeout=2.0):
+            self._logger.error(f"Probe {axis}: GRBL did not accept the mode words")
+            self._probe_stop.set()
+            return None
 
         # Wait for probe result
         result_val = None
-        deadline = time.time() + 15.0
+        deadline = time.time() + (15.0 if travel is None else self._probe_result_timeout(travel, feed))
         while time.time() < deadline and not self._probe_stop.is_set():
             try:
                 resp = comm._response_queue.get(timeout=0.5)
@@ -2730,6 +2927,9 @@ class GrblPcbPlugin(
                     result_val = probe_data[axis.lower()] - connector._work_offset.get(axis.lower(), 0.0)
                 else:
                     self._logger.warning(f"Probe {axis} contact failed")
+                    # G38.3 still answers ok: take it, so that the next wait
+                    # does not mistake it for its own
+                    self._wait_for_ok(comm, timeout=2.0)
                     return None
             elif resp[0] == "ok":
                 if result_val is not None:
@@ -2825,7 +3025,7 @@ class GrblPcbPlugin(
         )
 
     def _handle_clear_alignment(self, data):
-        """Clear alignment data (holes + transform)."""
+        """Forget the measurements and the transform; the selected holes stay."""
         import flask
 
         if self._project is None:
@@ -3079,11 +3279,24 @@ class GrblPcbPlugin(
                     "spindle": spindle_on,
                 })
 
+            if points and op.mirrored:
+                # The canvas draws copper, holes and outline in design
+                # coordinates as seen from the front. Mirrored (back side)
+                # G-code is shown mirrored back, so it lines up with them.
+                width, height = self._project.board_width, self._project.board_height
+                if self._project.flip_axis == "Y":
+                    for pt in points:
+                        pt["y"] = height - pt["y"]
+                else:
+                    for pt in points:
+                        pt["x"] = width - pt["x"]
+
             if points:
                 toolpaths.append({
                     "name": op.name,
                     "operation_type": op.operation_type,
                     "layer_type": op.layer_type,
+                    "mirrored": bool(op.mirrored),
                     "points": points,
                 })
 

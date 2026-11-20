@@ -356,7 +356,11 @@ def _alignment_run(state, fail):
 def test_alignment_always_retracts_when_leaving_a_hole(fail):
     conn = _alignment_run("Idle", fail)
     assert conn.sent[-1].startswith("G1 Z1.0")
-    first_fail = next(i for i, c in enumerate(conn.sent) if c.startswith("G38"))
+    # the hole plunge is a G38.3 Z; the failing probe is the first one sideways
+    first_fail = next(
+        i for i, c in enumerate(conn.sent)
+        if c.startswith("G38") and (fail == "exception" or " Z" not in c)
+    )
     assert conn.sent[first_fail + 1].startswith("G1 Z1.0")
 
 
@@ -656,7 +660,7 @@ def test_probe_with_zero_reports_no_contact():
     try:
         connector.probe("Z", 5.0, 100.0, zero=True)  # upwards: no contact
         results = _wait_probe_result(connector)
-        assert results[0] == {"type": "probe_zero_result", "success": False, "reason": "no_contact"}
+        assert results[0] == {"type": "probe_zero_result", "success": False, "reason": "no_contact", "axis": "Z"}
     finally:
         cleanup()
 

@@ -151,6 +151,8 @@ class GrblComm:
         self._reset_callback = reset_callback
         # Number of welcome banners seen: GRBL was reset that many times
         self.reset_count = 0
+        # Number of error answers seen (also when nobody captures the queue)
+        self.error_count = 0
         # Work coordinate system of the last "[GC:...]" parser state report
         self.parser_wcs: str | None = None
         self.parser_state_seq = 0
@@ -388,6 +390,7 @@ class GrblComm:
             error_code = int(error_match.group(1))
             error_msg = GRBL_ERRORS.get(error_code, "Unknown error")
             self._logger.warning(f"GRBL error {error_code}: {error_msg}")
+            self.error_count += 1
             if self._stream_mode:
                 self._response_queue.put(("error", error_code, error_msg))
             if self._error_callback:

@@ -91,7 +91,7 @@
                     <input type="number" step="0.1" class="input-small" data-bind="value: settings.plugins.grblpcb.probe_depth">
                     <span class="add-on">mm</span>
                 </div>
-                <span class="help-inline">{{ _('Maximum probe travel (negative for Z probing down)') }}</span>
+                <span class="help-inline">{{ _('Maximum probe travel. The sign is ignored: probing always moves down (negative direction)') }}</span>
                 <div class="help-inline">{{ _('Set this slightly deeper than the expected board height difference, but not so deep that it risks the bed.') }}</div>
                 <div class="help-inline">{{ _('For precise work, keep a note of the actual board thickness and probe pad height you used.') }}</div>
             </div>

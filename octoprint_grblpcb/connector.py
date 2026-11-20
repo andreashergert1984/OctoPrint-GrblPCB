@@ -83,6 +83,10 @@ class ConnectedGrblPrinter(ConnectedPrinter):
     _stream_failure = None
     _stream_notes: ClassVar[dict] = {}  # replaced per instance in __init__
     _job_wcs = "G54"
+    _probe_zero_running = False
+    _halts_running = 0
+    _stream_thread = None
+    _paused_for_intervention = None
     # Set by the plugin: tells whether its autolevel/alignment probing runs
     _probe_active_check = None
 
@@ -151,6 +155,12 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         # Counts status reports: lets waiters tell a fresh report from an old one
         self._status_seq = 0
         self._link_lost = False
+        # A halt (hold, then reset) running in the background: nothing new
+        # may start until it is through, or its reset hits the new work
+        self._halt_lock = threading.Lock()
+        self._halts_running = 0
+        # "Probe Z" / "Probe and zero" run in a thread of their own
+        self._probe_zero_running = False
         
         self._logger = logging.getLogger(__name__)
     
@@ -397,6 +407,8 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                     "spindle": self._spindle_speed,
                     "wcs": self._current_wcs,
                     "z_zeroed": self._z_zeroed,
+                    "streaming": self.is_streaming(),
+                    "paused": self.is_paused_for_intervention(),
                 }
             if "overrides" in status:
                 msg["overrides"] = status["overrides"]
@@ -405,6 +417,8 @@ class ConnectedGrblPrinter(ConnectedPrinter):
     def _on_grbl_reset(self, banner: str):
         """GRBL restarted: the parser is back at G54, whatever was selected."""
         self._current_wcs = "G54"
+        # The Z zero survives a reset: GRBL keeps the work offsets, and a
+        # reset that loses the position raises ALARM 3, which clears it
 
     def _on_grbl_response(self, response: str):
         """Handle GRBL response."""
@@ -417,9 +431,14 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         self._logger.error(f"GRBL error {error_code}: {error_msg}")
         self._listener.on_printer_logs(f"<<< error:{error_code} ({error_msg})")
 
+    POSITION_LOST_ALARMS = (1, 2, 3)
+
     def _on_grbl_alarm(self, alarm_code: int, alarm_msg: str):
         """Handle GRBL alarm: log it and tell the user what to do."""
         self._listener.on_printer_logs(f"<<< ALARM:{alarm_code} ({alarm_msg})")
+        if alarm_code in self.POSITION_LOST_ALARMS:
+            # Hard/soft limit, abort during motion: the position is gone
+            self._z_zeroed = False
         if self._plugin_manager:
             self._plugin_manager.send_plugin_message(
                 "grblpcb", {"type": "alarm", "code": alarm_code, "message": alarm_msg}
@@ -473,7 +492,9 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         return True
 
     def is_probing(self) -> bool:
-        """True while the plugin's autolevel or alignment probing runs."""
+        """True while the plugin's autolevel/alignment probing or a manual probe runs."""
+        if self._probe_zero_running:
+            return True
         check = self._probe_active_check
         try:
             return bool(check()) if check is not None else False
@@ -483,11 +504,16 @@ class ConnectedGrblPrinter(ConnectedPrinter):
 
     _WCS_WORD = re.compile(r"(?<![\w.])G(5[4-9])(?![\d.])")
 
-    def _note_wcs(self, command: str):
-        """Keep the selected WCS in step with what was sent to GRBL."""
-        found = self._WCS_WORD.findall(command.upper())
-        if found:
-            self._current_wcs = f"G{found[-1]}"
+    def _refresh_wcs(self, command: str):
+        """
+        Ask GRBL which WCS is active after a command that names one.
+
+        The selected WCS is only taken from GRBL's own answer ($G): a
+        command GRBL refuses (alarm, error) must not change what the UI and
+        the probe runs believe.
+        """
+        if self._WCS_WORD.search(command.upper()) and self._comm is not None:
+            self._comm.send_command("$G")
 
     def commands(self, *commands, tags=None, force=False, internal=False, **kwargs):
         """
@@ -508,7 +534,11 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         for command in commands:
             self._listener.on_printer_logs(f">>> {command}")
             self._comm.send_command(command)
-            self._note_wcs(str(command))
+            if not internal:
+                # Not for the plugin's own sequences: they name their WCS
+                # explicitly, and the extra ok of $G would end up in the
+                # capture queue the probe run counts its answers in
+                self._refresh_wcs(str(command))
     
     def jog(self, axes: dict, relative=True, speed=None, *args, **kwargs):
         """Jog the CNC machine."""
@@ -542,6 +572,8 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         if self._reject_during_job("$H"):
             return
         self._comm.send_command("$H")
+        # A probe that ended in alarm may have left G91 (or G20) behind
+        self._comm.send_command("G21 G90")
     
     # -------------------------------------------------------------------------
     # GRBL-Specific Commands
@@ -569,8 +601,8 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         if self._comm and wcs in ("G54", "G55", "G56", "G57", "G58", "G59"):
             if self._reject_during_job(wcs):
                 return
-            self._current_wcs = wcs
             self._comm.send_command(wcs)
+            self._comm.send_command("$G")
     
     def zero_axis(self, axis: str = "all"):
         """Zero axis in current WCS using G10 L20."""
@@ -602,10 +634,28 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         slow = 2 * cls.PROBE_BACKOFF / (feed / 2.0) * 60.0
         return (fast + slow) * 1.5 + cls.PROBE_ZERO_SLACK
 
-    def _send_probe_result(self, success: bool, z=None, reason=None):
+    FRESH_IDLE_TIMEOUT = 5.0
+
+    def _wait_fresh_idle(self, comm) -> bool:
+        """True once two status reports after now say Idle (position is then current)."""
+        seq = self._status_seq
+        deadline = time.monotonic() + self.FRESH_IDLE_TIMEOUT
+        while time.monotonic() < deadline and self._comm is comm:
+            comm.request_status()
+            time.sleep(0.05)
+            if self._status_seq >= seq + 2:
+                if self._grbl_state == "Idle":
+                    return True
+                if self._grbl_state == "Alarm":
+                    return False
+        return False
+
+    def _send_probe_result(self, success: bool, z=None, reason=None, axis=None):
         if not self._plugin_manager:
             return
         msg = {"type": "probe_zero_result", "success": success}
+        if axis:
+            msg["axis"] = axis
         if z is not None:
             msg["z"] = z
         if reason:
@@ -615,52 +665,82 @@ class ConnectedGrblPrinter(ConnectedPrinter):
     def probe(self, axis: str = "Z", depth: float = -5.0, feed: float = 25.0,
               zero: bool = False, clearance: float = 2.0):
         """
-        Probe an axis.
+        Probe an axis in a thread of its own.
 
         With ``zero`` (Z only) the work zero is set where the probe made
         contact, and the tool lifts to ``clearance`` afterwards. The zero is
         only set, and ``z_zeroed`` only noted, if the probe really touched.
+        Everything is absolute: a probe that ends in alarm leaves no G91
+        behind that a later move could run into.
         """
         if self._comm is None:
             return
         if self._reject_during_job("probe"):
             return
-        if zero and axis.upper() == "Z":
-            threading.Thread(
-                target=self._probe_and_zero, args=(depth, feed, clearance), daemon=True
-            ).start()
+        if self.halt_in_progress():
+            self._listener.on_printer_logs("!!! probe " + gettext("not sent: the machine is still being stopped."))
             return
-        
-        commands = [
-            "G21",  # mm mode
-            "G91",  # relative mode
-            f"G38.2 {axis.upper()}{depth} F{feed}",  # probe
-            f"G0 {axis.upper()}1",  # back off 1mm
-            f"G38.2 {axis.upper()}{depth} F{feed / 2}",  # slow probe
-            "G90",  # absolute mode
-        ]
-        
-        for cmd in commands:
-            self._comm.send_command(cmd)
-    
-    def _probe_and_zero(self, depth: float, feed: float, clearance: float):
-        """Z probe, zero on contact, lift; never zero or lift blindly after a failure."""
+        axis = axis.upper()
+        zero = zero and axis == "Z"
+        self._probe_zero_running = True
+        threading.Thread(
+            target=self._probe_and_zero, args=(depth, feed, clearance, axis, zero), daemon=True
+        ).start()
+
+    def is_probe_zero_running(self) -> bool:
+        """True while a manual probe (with or without zeroing) runs."""
+        return self._probe_zero_running
+
+    def _probe_and_zero(self, depth: float, feed: float, clearance: float,
+                        axis: str = "Z", zero: bool = True):
+        """Probe, zero on contact, lift; never zero or lift blindly after a failure."""
+        try:
+            self._probe_and_zero_run(depth, feed, clearance, axis, zero)
+        finally:
+            self._probe_zero_running = False
+
+    def _probe_and_zero_run(self, depth, feed, clearance, axis, zero):
         comm = self._comm
         if comm is None:
             return
+        key = axis.lower()
+        direction = -1.0 if depth < 0 else 1.0
+        # The position of the last status report may be 250 ms old and the
+        # machine may still move: wait for a fresh Idle report
+        if not self._wait_fresh_idle(comm):
+            self._logger.warning("Probe refused: the machine is not idle")
+            self._send_probe_result(False, reason="busy", axis=axis)
+            return
         seq = comm.probe_seq
         resets = comm.reset_count
-        for cmd in ("G21", "G91", f"G38.2 Z{depth} F{feed}", "G0 Z1", f"G38.2 Z{depth} F{feed / 2}"):
-            comm.send_command(cmd)
+        errors = comm.error_count
+        # Absolute targets from where the tool is now
+        start = self._work_position.get(key, 0.0)
+        comm.send_command("G21 G90")
+        comm.send_command(f"G38.2 {axis}{start + depth:.3f} F{feed:g}")
         timeout = self.probe_zero_timeout(depth, feed)
         deadline = time.monotonic() + timeout
         ok = False
         reason = "timeout"
+        backed_off = False
         while time.monotonic() < deadline and self._comm is comm:
             reports = comm.probe_seq - seq
             if reports >= 1 and not comm.last_probe["success"]:
                 reason = "no_contact"
                 break
+            if reports >= 1 and not backed_off:
+                # Back off from the contact, then probe slowly
+                contact = comm.last_probe.get(key)
+                if contact is None:
+                    reason = "no_contact"
+                    break
+                contact_work = contact - self._work_offset.get(key, 0.0)
+                back = contact_work - direction * self.PROBE_BACKOFF
+                comm.send_command(f"G0 {axis}{back:.3f}")
+                # Only a little past the contact: that is what the timeout covers
+                slow_target = back + direction * 2 * self.PROBE_BACKOFF
+                comm.send_command(f"G38.2 {axis}{slow_target:.3f} F{feed / 2:g}")
+                backed_off = True
             if reports >= 2:
                 ok = comm.last_probe["success"]
                 reason = None if ok else "no_contact"
@@ -671,19 +751,24 @@ class ConnectedGrblPrinter(ConnectedPrinter):
             if self._grbl_state == "Alarm":
                 reason = "alarm"
                 break
+            if comm.error_count != errors:
+                # GRBL refused a line (e.g. error:9 while jogging): no probe will come
+                reason = "rejected"
+                break
             time.sleep(0.05)
         if self._comm is not comm:
             self._send_probe_result(False, reason="disconnected")
             return
-        if ok:
+        if ok and zero:
             contact_z = comm.last_probe.get("z")
             comm.send_command("G10 L20 P0 Z0")
             self._z_zeroed = True
             comm.send_command(f"G0 Z{clearance:g}")
             self._send_probe_result(True, z=contact_z)
-        else:
+        elif not ok:
             self._logger.warning(f"Probe and zero failed: {reason} (waited up to {timeout:.0f} s)")
-            self._send_probe_result(False, reason=reason)
+            if zero or reason == "rejected":
+                self._send_probe_result(False, reason=reason, axis=axis)
         # In alarm GRBL refuses this; unlock() repeats it
         comm.send_command("G90")
 
@@ -737,6 +822,10 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         # Reject if a stream is already running
         if self._stream_thread is not None and self._stream_thread.is_alive():
             self._logger.warning("Cannot start stream: another stream is already active")
+            return False
+
+        if self.halt_in_progress() or self.is_probing():
+            self._logger.warning("Cannot start stream: the machine is being stopped or probed")
             return False
         
         if self._grbl_state.split(":")[0] in self.BUSY_STATES:
@@ -797,9 +886,31 @@ class ConnectedGrblPrinter(ConnectedPrinter):
         if wait:
             self._halt_machine()
         else:
-            threading.Thread(target=self._halt_machine, daemon=True).start()
+            # Counted before the thread runs: no gap in which a new job could start
+            self._halt_begin()
+            threading.Thread(target=self._halt_machine, args=(True,), daemon=True).start()
 
-    def _halt_machine(self):
+    def _halt_begin(self):
+        with self._halt_lock:
+            self._halts_running += 1
+
+    def _halt_end(self):
+        with self._halt_lock:
+            self._halts_running = max(0, self._halts_running - 1)
+
+    def halt_in_progress(self) -> bool:
+        """True while a feed hold plus reset is under way (it would hit new work)."""
+        return self._halts_running > 0
+
+    def _halt_machine(self, counted: bool = False):
+        if not counted:
+            self._halt_begin()
+        try:
+            self._halt_machine_now()
+        finally:
+            self._halt_end()
+
+    def _halt_machine_now(self):
         """
         Feed hold, wait until the axes stand still, then soft reset.
 
@@ -858,15 +969,10 @@ class ConnectedGrblPrinter(ConnectedPrinter):
             "wcs": self._current_wcs,
             "z_zeroed": self._z_zeroed,
             "streaming": self.is_streaming(),
+            "paused": self.is_paused_for_intervention(),
         }
 
-    def _safe_pause_before_manual_intervention(self):
-        """
-        Tool up and spindle off before the user works on the machine.
-
-        Returns only when GRBL reports Idle: the user is asked to change
-        the tool once nothing moves any more.
-        """
+    def _safe_z_and_feed(self):
         safe_z = 5.0
         z_feed = 120.0
         if self._plugin_settings is not None:
@@ -875,6 +981,16 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                 z_feed = float(self._plugin_settings.get_float(["z_max_feed"]))
             except (TypeError, ValueError, AttributeError):
                 pass
+        return safe_z, z_feed
+
+    def _safe_pause_before_manual_intervention(self):
+        """
+        Tool up and spindle off before the user works on the machine.
+
+        Returns only when GRBL reports Idle: the user is asked to change
+        the tool once nothing moves any more.
+        """
+        safe_z, z_feed = self._safe_z_and_feed()
 
         # Force absolute mm mode so the retract move cannot be interpreted
         # relative (or as inches) after a manual command of the user.
@@ -1046,6 +1162,8 @@ class ConnectedGrblPrinter(ConnectedPrinter):
                 self._stream_failure = abort.info
                 if abort.reason == "grbl_error":
                     self._halt_machine()
+                elif abort.reason == "connection_lost" and not self._link_lost:
+                    self._silent_link_lost()
         except Exception as e:
             self._logger.exception("Stream error")
             outcome = "failed"
@@ -1063,6 +1181,20 @@ class ConnectedGrblPrinter(ConnectedPrinter):
             if self._comm is not None and not self._link_lost:
                 self.state = ConnectedPrinterState.OPERATIONAL
             self._send_stream_progress(outcome, operation_name, line_num=self._stream_current_line)
+
+    def _silent_link_lost(self):
+        """
+        GRBL stopped answering while the port is still open.
+
+        It may well be cutting: try feed hold and reset anyway (the bytes
+        may get through), then treat the link as lost for good so that the
+        UI does not show an operational machine with stale data.
+        """
+        try:
+            self._halt_machine()
+        except Exception:
+            self._logger.debug("Halting a silent machine failed", exc_info=True)
+        self._on_connection_lost(gettext("GRBL stopped answering, the serial port is still open."))
 
     def _sync_job_wcs(self):
         """
@@ -1097,14 +1229,23 @@ class ConnectedGrblPrinter(ConnectedPrinter):
 
         The user jogged (G91), probed, zeroed or reset in the meantime, and
         the retract before the pause left its own feed rate and the spindle
-        off. After an M0 the spindle is restarted (and given time to spin up).
+        off. The tool goes up to safe Z first (in the job's WCS, absolute),
+        so neither the spindle restart nor the next XY move happens at the
+        board. After an M0 the spindle is restarted (and given time to spin up).
         """
+        # The user may have left the tool at the board (zeroing Z there is
+        # the point of a tool change): lift before anything moves in XY
+        safe_z, z_feed = self._safe_z_and_feed()
+        self._send_counted(f"G21 G90 {self._job_wcs} G1 Z{safe_z:.3f} F{z_feed:.0f}", None)
         words = ["G21", "G90", self._job_wcs]
         if modal.feed:
             words.append(f"F{modal.feed:g}")
         if modal.speed is not None:
             words.append(f"S{modal.speed:g}")
         self._send_counted(" ".join(words), None)
+        # The restore line was accepted (an error would have aborted the
+        # job): GRBL is in the job's WCS again, whatever the user chose
+        self._current_wcs = self._job_wcs
         if kind == "pause" and modal.spindle:
             speed = f" S{modal.speed:g}" if modal.speed is not None else ""
             self._send_counted(f"{modal.spindle}{speed}", None)
@@ -1125,7 +1266,8 @@ class ConnectedGrblPrinter(ConnectedPrinter):
 
     def is_paused_for_intervention(self) -> bool:
         """True while a job waits at M0/M6 for the user."""
-        return self._paused_for_intervention.is_set()
+        paused = self._paused_for_intervention
+        return paused is not None and paused.is_set()
 
     def accepts_manual_commands(self) -> bool:
         """Manual G-code is allowed without a job or while it is paused, never during probing."""

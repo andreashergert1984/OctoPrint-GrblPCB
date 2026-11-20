@@ -398,7 +398,7 @@
 
         // Z scale: default 15x exaggeration for height-map visibility,
         // but callers can pass zScaleOverride=1 for true-scale rendering
-        // of board thickness, toolpaths, machine position etc.
+        // of the board thickness (toolpaths and the heat surface share the default)
         var zScale = (typeof zScaleOverride === "number") ? zScaleOverride : 15.0;
         var scaledZ = -wz * zScale;
 
@@ -1177,12 +1177,13 @@
             ctx.lineWidth = tp.lineWidth || 1;
             ctx.globalAlpha = tp.opacity || 0.8;
 
-            var first = this._w2s(tp.points[0].x, tp.points[0].y, tp.points[0].z || 0, 1);
+            // Same Z scale as the heat surface, so the cut follows the surface
+            var first = this._w2s(tp.points[0].x, tp.points[0].y, tp.points[0].z || 0);
 
             // Draw segments one at a time so each can have its own style
             for (var j = 1; j < tp.points.length; j++) {
                 var pt = tp.points[j];
-                var s = this._w2s(pt.x, pt.y, pt.z || 0, 1);
+                var s = this._w2s(pt.x, pt.y, pt.z || 0);
 
                 if (pt.rapid) {
                     // Rapid move — dashed, faint blue

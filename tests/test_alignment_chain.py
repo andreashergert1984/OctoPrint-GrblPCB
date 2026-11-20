@@ -124,7 +124,7 @@ class _Connector:
     def commands(self, *commands, **kwargs):
         self.sent.extend(commands)
         for _ in commands:
-            if _ in ("G21", "G90"):
+            if _.startswith("G21"):
                 self._comm._response_queue.put(("ok",))
 
 

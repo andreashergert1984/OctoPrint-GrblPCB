@@ -85,6 +85,8 @@ class PCBLayer:
     parsed: bool = False
     # Drill files: routed slot commands the parser cannot turn into holes
     unsupported_slots: int = 0
+    # Gerber layers: pads/objects whose shape is not supported (missing)
+    unsupported_shapes: int = 0
     # Drill files: G85 slots turned into rows of overlapping holes
     drilled_slots: int = 0
     # Gerber layers: widest line/arc stroke in mm. Edge.Cuts strokes run along
@@ -106,6 +108,7 @@ class PCBLayer:
             "height": self.height,
             "parsed": self.parsed,
             "unsupported_slots": self.unsupported_slots,
+            "unsupported_shapes": self.unsupported_shapes,
             "drilled_slots": self.drilled_slots,
             "stroke_width": self.stroke_width,
         }

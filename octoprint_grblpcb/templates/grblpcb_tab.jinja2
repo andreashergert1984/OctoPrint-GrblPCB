@@ -104,7 +104,7 @@
                             <button class="btn btn-small" data-bind="click: jogYPlus, enable: canJog">Y+</button>
                             <div></div>
                             <button class="btn btn-small" data-bind="click: jogXMinus, enable: canJog">X-</button>
-                            <button class="btn btn-small btn-default" data-bind="click: gotoZero, enable: manualIdle" title="{{ _('Go to 0,0') }}">⊙</button>
+                            <button class="btn btn-small btn-default" data-bind="click: gotoZero, enable: manualIdle" title="{{ _('Go to 0,0 at safe Z height (no lowering)') }}">⊙</button>
                             <button class="btn btn-small" data-bind="click: jogXPlus, enable: canJog">X+</button>
                             <div></div>
                             <button class="btn btn-small" data-bind="click: jogYMinus, enable: canJog">Y-</button>
@@ -916,6 +916,7 @@
                             <span data-bind="text: $data.name, style: { color: $data.color }"></span>
                         </label>
                     </div>
+                    <p class="grblpcb-text-xs" data-bind="visible: wsShowToolpaths() && workspaceHasMirrored()">{{ _("Back side operations are drawn as seen from the front, so they line up with the copper and the holes.") }}</p>
                 </div>
             </div>
             <div class="grblpcb-workspace-hint" data-bind="visible: !hasProject() && projectLayers().length === 0">
